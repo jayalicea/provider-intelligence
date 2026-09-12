@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
 import api from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
 import SearchBar from '../components/SearchBar.jsx'
@@ -12,6 +13,7 @@ export default function ProviderSearchPage() {
   const state = searchParams.get('state') || ''
   const city = searchParams.get('city') || ''
   const taxonomy = searchParams.get('taxonomy') || ''
+  const [mipsOnly, setMipsOnly] = useState(false)
 
   const hasCriteria = Boolean(terms || state || city)
 
@@ -25,6 +27,10 @@ export default function ProviderSearchPage() {
       }),
     [terms, state, city, taxonomy]
   )
+
+  const results = mipsOnly
+    ? (data?.results ?? []).filter((p) => p.hasMipsData)
+    : data?.results
 
   const updateParams = (patch) => {
     const next = new URLSearchParams(searchParams)
@@ -53,6 +59,20 @@ export default function ProviderSearchPage() {
           taxonomy={taxonomy}
           onChange={(filters) => updateParams(filters)}
         />
+        <label className="mips-filter">
+          <input
+            type="checkbox"
+            checked={mipsOnly}
+            onChange={(e) => setMipsOnly(e.target.checked)}
+          />
+          Only show providers with MIPS scores
+        </label>
+        {mipsOnly && (
+          <p className="muted mips-filter-note">
+            MIPS coverage reflects cached CMS data (2023, nine states).
+            Absence here does not mean a provider has no MIPS history.
+          </p>
+        )}
       </div>
 
       {!hasCriteria && !loading ? (
@@ -62,7 +82,7 @@ export default function ProviderSearchPage() {
         </p>
       ) : (
         <ProviderResultsTable
-          results={data?.results}
+          results={results}
           loading={loading}
           error={error}
           onRetry={refetch}

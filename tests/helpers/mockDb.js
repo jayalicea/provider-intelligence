@@ -175,6 +175,14 @@ async function query(text, params = []) {
     return { rows: [], rowCount: 1 };
   }
 
+  if (/^SELECT DISTINCT npi FROM mips_performance_scores WHERE npi = ANY\(\$1\)$/.test(sql)) {
+    const wanted = new Set((params[0] || []).map(String));
+    const rows = [...mips.values()]
+      .filter(r => wanted.has(String(r.npi)))
+      .map(r => ({ npi: r.npi }));
+    return { rows, rowCount: rows.length };
+  }
+
   // --- analytics queries (tests/analytics.test.js) -------------------------
 
   // Trends: per-year rows across a year range

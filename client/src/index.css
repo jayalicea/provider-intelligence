@@ -511,3 +511,19 @@ button.btn-primary:hover {
 .badge {
   border-radius: 3px;
 }
+
+/* MIPS availability filter (search page) */
+
+.mips-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.mips-filter-note {
+  font-size: 12px;
+  margin: 4px 0 0 24px;
+  max-width: 480px;
+}

@@ -56,10 +56,36 @@ class NpiService {
         params
       );
 
-      return this.transformNpiResponse(response);
+      const providers = this.transformNpiResponse(response);
+      await this.annotateMipsAvailability(providers);
+      return providers;
     } catch (error) {
       logger.error('Error searching NPI registry:', error);
       throw new Error('Failed to search provider registry');
+    }
+  }
+
+  /**
+   * Flag each search result with whether any MIPS performance row is cached
+   * for its NPI (any year). One indexed query per search; failures degrade
+   * to hasMipsData false rather than failing the search.
+   */
+  async annotateMipsAvailability(providers) {
+    for (const p of providers) p.hasMipsData = false;
+    if (providers.length === 0) return;
+
+    try {
+      const npis = providers.map(p => p.npi);
+      const result = await db.query(
+        'SELECT DISTINCT npi FROM mips_performance_scores WHERE npi = ANY($1)',
+        [npis]
+      );
+      const scored = new Set(result.rows.map(r => String(r.npi)));
+      for (const p of providers) {
+        p.hasMipsData = scored.has(String(p.npi));
+      }
+    } catch (error) {
+      logger.error('Error annotating MIPS availability:', error);
     }
   }
 

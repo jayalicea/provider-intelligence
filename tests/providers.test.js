@@ -64,6 +64,25 @@ describe('GET /api/v1/providers/search', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/at least one search criterion/i);
   });
+
+  test('results include hasMipsData; a scored NPI reports true', async () => {
+    mockDb._stores.mips.set('1234567890:2025', {
+      npi: '1234567890',
+      performance_year: 2025,
+      final_score: 87.5
+    });
+    const unscoredRow = { ...PROVIDER_ROW, npi: '9876543210' };
+    mockNpiSearch('Smith', npiEnvelope([PROVIDER_ROW, unscoredRow]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith' });
+
+    expect(res.status).toBe(200);
+    const byNpi = Object.fromEntries(res.body.data.map(p => [p.npi, p]));
+    expect(byNpi['1234567890'].hasMipsData).toBe(true);
+    expect(byNpi['9876543210'].hasMipsData).toBe(false);
+  });
 });
 
 describe('GET /api/v1/providers/:npi', () => {
