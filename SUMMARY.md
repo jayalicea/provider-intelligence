@@ -77,8 +77,12 @@ no `paymentAdjustmentPct`; quality measures mounted under `/providers`).
 ## Phase 4: Docker
 
 - `docker compose config` — **validates**.
-- `docker compose build` — **skipped**: Docker Desktop daemon not running
-  (npipe connect failure). Manual review only, per the runbook's skip path.
+- `docker compose build app` — **verified 2026-09-12**: image
+  `provider-intelligence-app` built successfully (~8s) with the Docker
+  engine running.
+- Remaining optional step: `docker compose up` runtime validation
+  (containerized app + Postgres healthcheck + schema bootstrap) — not yet
+  run; it does not depend on the local dev database.
 - Deviations from phynpi.md §9.1 (documented, file known to contain errors):
   Node 20-alpine instead of 18; **no Redis service** (the codebase has no
   redis usage; REDIS_* .env vars are dead); compose uses `env_file: .env`
@@ -103,5 +107,5 @@ no `paymentAdjustmentPct`; quality measures mounted under `/providers`).
    trends endpoint does); the UI banner is static copy per DESIGN.md.
 5. `tools/kimi-web.bat` (predates this session) is left untracked and
    uncommitted — not part of this deliverable.
-6. Docker image build is unverified (daemon offline); only compose config
-   validation and manual review were possible.
+6. Docker: image build verified, but `docker compose up` runtime validation
+   (app + database containers) has not been run.
