@@ -158,18 +158,38 @@ class NpiService {
   }
 
   /**
-   * Cache provider data in database
+   * Cache provider data in database. Caches every field the schema holds so
+   * cache hits return the same data as fresh API transforms.
    */
   async cacheProvider(npi, providerData) {
     try {
       const query = `
         INSERT INTO providers (
-          npi, enumeration_type, name_first, name_middle, name_last,
-          name_credential, provider_type, practice_city, practice_state,
-          practice_zipcode, primary_taxonomy_code, license_number,
-          license_issuing_state, created_date, last_updated_date
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          npi, enumeration_type, name_first, name_middle, name_last, name_full,
+          name_credential, provider_type, primary_taxonomy_code,
+          primary_taxonomy_description, taxonomy_grouping,
+          practice_address_line1, practice_address_line2, practice_city,
+          practice_state, practice_zipcode, practice_phone,
+          license_number, license_issuing_state, created_date, last_updated_date
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
         ON CONFLICT (npi) DO UPDATE SET
+          name_first = EXCLUDED.name_first,
+          name_middle = EXCLUDED.name_middle,
+          name_last = EXCLUDED.name_last,
+          name_full = EXCLUDED.name_full,
+          name_credential = EXCLUDED.name_credential,
+          provider_type = EXCLUDED.provider_type,
+          primary_taxonomy_code = EXCLUDED.primary_taxonomy_code,
+          primary_taxonomy_description = EXCLUDED.primary_taxonomy_description,
+          taxonomy_grouping = EXCLUDED.taxonomy_grouping,
+          practice_address_line1 = EXCLUDED.practice_address_line1,
+          practice_address_line2 = EXCLUDED.practice_address_line2,
+          practice_city = EXCLUDED.practice_city,
+          practice_state = EXCLUDED.practice_state,
+          practice_zipcode = EXCLUDED.practice_zipcode,
+          practice_phone = EXCLUDED.practice_phone,
+          license_number = EXCLUDED.license_number,
+          license_issuing_state = EXCLUDED.license_issuing_state,
           last_updated_date = EXCLUDED.last_updated_date,
           sync_timestamp = CURRENT_TIMESTAMP
       `;
@@ -180,12 +200,18 @@ class NpiService {
         providerData.name.first,
         providerData.name.middle,
         providerData.name.last,
+        providerData.name.full,
         providerData.name.credential,
         providerData.taxonomy.description,
+        providerData.taxonomy.code,
+        providerData.taxonomy.description,
+        providerData.taxonomy.grouping,
+        providerData.address.line1,
+        providerData.address.line2,
         providerData.address.city,
         providerData.address.state,
         providerData.address.zipcode,
-        providerData.taxonomy.code,
+        providerData.address.phone,
         providerData.license.number,
         providerData.license.state,
         new Date(),
@@ -219,7 +245,7 @@ class NpiService {
    */
   normalizeProviderRow(row) {
     if (!row) return null;
-    return {
+    const normalized = {
       npi: row.npi,
       enumerationType: row.enumeration_type,
       name: {
@@ -227,8 +253,8 @@ class NpiService {
         middle: row.name_middle || '',
         last: row.name_last || '',
         credential: row.name_credential || '',
-        full: [row.name_first, row.name_middle, row.name_last]
-          .filter(Boolean).join(' ')
+        full: row.name_full ||
+          [row.name_first, row.name_middle, row.name_last].filter(Boolean).join(' ')
       },
       address: {
         line1: row.practice_address_line1 || '',
@@ -240,7 +266,7 @@ class NpiService {
       },
       taxonomy: {
         code: row.primary_taxonomy_code || '',
-        description: row.provider_type || '',
+        description: row.primary_taxonomy_description || row.provider_type || '',
         grouping: row.taxonomy_grouping || ''
       },
       license: {
@@ -248,6 +274,13 @@ class NpiService {
         state: row.license_issuing_state || ''
       }
     };
+    // Carry sync_timestamp for isCacheExpiry checks without exposing it in
+    // JSON responses.
+    Object.defineProperty(normalized, 'sync_timestamp', {
+      value: row.sync_timestamp,
+      enumerable: false
+    });
+    return normalized;
   }
 
   /**

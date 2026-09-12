@@ -298,7 +298,7 @@ class CmsDataService {
   normalizeMipsRow(row) {
     if (!row) return null;
     const num = v => (v === null || v === undefined ? null : Number(v));
-    return {
+    const normalized = {
       npi: row.npi,
       performanceYear: row.performance_year,
       finalScore: num(row.final_score),
@@ -311,6 +311,13 @@ class CmsDataService {
       reportingEntityType: row.reporting_entity_type,
       groupSizeCategory: row.group_size_category
     };
+    // Carry sync_timestamp for isCacheExpired checks without exposing it in
+    // JSON responses.
+    Object.defineProperty(normalized, 'sync_timestamp', {
+      value: row.sync_timestamp,
+      enumerable: false
+    });
+    return normalized;
   }
 
   /**

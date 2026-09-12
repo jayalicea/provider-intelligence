@@ -15,6 +15,7 @@ CREATE TABLE providers (
     name_credential VARCHAR(100),
     name_prefix VARCHAR(50),
     name_suffix VARCHAR(50),
+    name_full VARCHAR(500),
 
     -- Practice Information
     provider_type VARCHAR(255),
