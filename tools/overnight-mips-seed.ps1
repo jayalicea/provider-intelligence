@@ -1,6 +1,6 @@
-# overnight-mips-seed.ps1: MIPS-first enrichment.
-# Pulls scored-clinician NPIs from the CMS QPP dataset per state, then caches provider
-# details + MIPS scores through the local API. Leave this window OPEN overnight.
+# overnight-mips-seed.ps1 v4: MIPS-first enrichment.
+# v4: unwraps the dataset's JSON envelope ({data:[...]}) before reading columns or rows.
+# Leave this window OPEN overnight.
 
 $ErrorActionPreference = 'Continue'
 $project  = 'C:\Users\casalab\provider-intelligence'
@@ -9,18 +9,34 @@ $states   = 'MD','VA','PA','NY','IL','OH','FL','TX','CA'
 $perState = 500
 $pageSize = 500
 $dataset  = '7adb8b1b-b85c-4ed3-b314-064776e50180'
+$dataUri  = "https://data.cms.gov/data-api/v1/dataset/$dataset/data"
 $apiBase  = 'http://localhost:3000/api/v1'
 Set-Location $project
 
 function Log($m){ $l="$(Get-Date -Format 'HH:mm:ss')  $m"; Write-Host $l; Add-Content $log "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" }
 function Jitter($a,$b){ Start-Sleep -Milliseconds (Get-Random -Minimum $a -Maximum $b) }
 function Unwrap($resp){
+  if ($null -eq $resp) { return @() }
   if ($resp -is [array]) { return $resp }
-  if ($resp.data) { return $resp.data }
-  return @()
+  if ($resp.data) { return @($resp.data) }
+  return @($resp)
+}
+function Get-DatasetRows($state, $offset){
+  $body = @{ size = $pageSize; offset = $offset; "filter[$script:stateCol]" = $state }
+  try {
+    return @(Unwrap (Invoke-RestMethod -Uri $dataUri -Body $body -Method Get -TimeoutSec 60))
+  } catch {
+    $code = $null
+    if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+    Log "WARN dataset $state offset $offset : HTTP $code $($_.Exception.Message)"
+    if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+      Log "WARN body: $($_.ErrorDetails.Message.Substring(0, [Math]::Min(160, $_.ErrorDetails.Message.Length)))"
+    }
+    return @()
+  }
 }
 
-Log '=== MIPS-first seeding started ==='
+Log '=== MIPS-first seeding started (v4) ==='
 
 # 0. Start backend if not listening
 $listening = netstat -ano | findstr ':3000' | findstr LISTENING
@@ -34,40 +50,42 @@ if (-not $listening) {
 
 # 1. Probe the CMS dataset once to resolve real column names
 try {
-    $probe = curl.exe -s "https://data.cms.gov/data-api/v1/dataset/$dataset/data?size=1&offset=0" | ConvertFrom-Json
-    $cols = (Unwrap $probe)[0].PSObject.Properties.Name
-    $npiCol   = $cols | Where-Object { $_ -match 'npi' }        | Select-Object -First 1
-    $stateCol = $cols | Where-Object { $_ -match 'state' }      | Select-Object -First 1
-    $scoreCol = $cols | Where-Object { $_ -match 'final.*score|score.*final' } | Select-Object -First 1
-    if (-not $scoreCol) { $scoreCol = $cols | Where-Object { $_ -match 'score' } | Select-Object -First 1 }
-    Log "dataset columns resolved: NPI='$npiCol' STATE='$stateCol' SCORE='$scoreCol'"
-    if (-not $npiCol -or -not $stateCol) { Log 'FATAL: could not resolve column names'; exit 1 }
+    $probe = @(Unwrap (Invoke-RestMethod -Uri $dataUri -Body @{ size = 1; offset = 0 } -Method Get -TimeoutSec 60))
+    $cols = $probe[0].PSObject.Properties.Name
+    $script:npiCol   = $cols | Where-Object { $_ -match 'npi' }   | Select-Object -First 1
+    $script:stateCol = $cols | Where-Object { $_ -match 'state' } | Select-Object -First 1
+    $script:scoreCol = $cols | Where-Object { $_ -match 'final.*score|score.*final' } | Select-Object -First 1
+    if (-not $script:scoreCol) { $script:scoreCol = $cols | Where-Object { $_ -match 'score' } | Select-Object -First 1 }
+    Log "dataset columns resolved: NPI='$($script:npiCol)' STATE='$($script:stateCol)' SCORE='$($script:scoreCol)'"
+    if (-not $script:npiCol -or -not $script:stateCol) {
+        Log "FATAL: no matching columns; first probe row looks like:"
+        Log ("  " + (($probe[0] | ConvertTo-Json -Compress -Depth 2).Substring(0, [Math]::Min(400, ($probe[0] | ConvertTo-Json -Compress -Depth 2).Length))))
+        exit 1
+    }
 } catch {
     Log "FATAL: dataset probe failed: $($_.Exception.Message)"
     exit 1
 }
 
-# 2. Collect scored NPIs per state from the dataset, then enrich through the API
+# 2. Collect scored NPIs per state from the dataset, then enrich through the local API
 $grandTotal = 0
 foreach ($st in $states) {
     $npis = New-Object System.Collections.Generic.List[string]
     for ($off = 0; $off -lt 7000 -and $npis.Count -lt $perState; $off += $pageSize) {
-        try {
-            $url = "https://data.cms.gov/data-api/v1/dataset/$dataset/data?size=$pageSize&offset=$off&filter[$stateCol]=$st"
-            $rows = Unwrap (curl.exe -s $url | ConvertFrom-Json)
-            if ($rows.Count -eq 0) { break }
-            foreach ($r in $rows) {
-                $score = $r.$scoreCol
-                $npi   = "$($r.$npiCol)".Trim()
-                if ($npi -match '^\d{10}$' -and $score -and "$score" -notmatch 'Not Available|Too Small|^$') {
-                    if (-not $npis.Contains($npi)) { $npis.Add($npi) }
-                    if ($npis.Count -ge $perState) { break }
-                }
-            }
-            Jitter 1500 3000
-        } catch {
-            Log "WARN $st offset $off : $($_.Exception.Message)"
+        $rows = Get-DatasetRows $st $off
+        if ($off -eq 0 -and $rows.Count -eq 0) {
+            Log "WARN $st : first page empty, check WARN lines above for the HTTP status"
         }
+        if ($rows.Count -eq 0) { break }
+        foreach ($r in $rows) {
+            $score = $r.($script:scoreCol)
+            $npi   = "$($r.($script:npiCol))".Trim()
+            if ($npi -match '^\d{10}$' -and $score -and "$score" -notmatch 'Not Available|Too Small|^$') {
+                if (-not $npis.Contains($npi)) { $npis.Add($npi) }
+                if ($npis.Count -ge $perState) { break }
+            }
+        }
+        Jitter 1500 3000
     }
     Log "$st : $($npis.Count) scored NPIs found in dataset"
 
