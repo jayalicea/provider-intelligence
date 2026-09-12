@@ -15,6 +15,7 @@ router.use(rateLimiter({ windowMs: 60 * 1000, max: 100 })); // 100 requests per 
 // Provider search and retrieval
 router.get('/search', bound('searchProviders'));
 router.get('/:npi', bound('getProvider'));
+router.get('/:npi/verification', bound('getVerification'));
 
 // MIPS Performance data
 router.get('/:npi/mips-performance', bound('getMipsPerformance'));

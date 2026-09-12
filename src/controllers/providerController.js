@@ -1,11 +1,20 @@
 const NpiService = require('../services/npiService');
 const CmsDataService = require('../services/cmsDataService');
+const ExclusionService = require('../services/exclusionService');
 const { logger } = require('../utils/logger');
+
+const TERMS = 'This report states what public sources published as of the ' +
+  "dates shown. It does not certify any provider's status.";
+
+const SOURCE_LABELS = {
+  NPI_REGISTRY: 'NPI Registry'
+};
 
 class ProviderController {
   constructor() {
     this.npiService = new NpiService();
     this.cmsDataService = new CmsDataService();
+    this.exclusionService = new ExclusionService();
   }
 
   /**
@@ -108,6 +117,100 @@ class ProviderController {
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve provider information'
+      });
+    }
+  }
+
+  /**
+   * Verification dossier: cached identity plus LEIE exclusion resolution,
+   * every field carrying source and as-of provenance.
+   */
+  async getVerification(req, res) {
+    try {
+      const { npi } = req.params;
+
+      if (!this.npiService.validateNpiFormat(npi)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid NPI number format. Must be 10 digits.'
+        });
+      }
+
+      const provider = await this.npiService.getProviderByNpi(npi);
+
+      if (!provider) {
+        return res.status(404).json({
+          success: false,
+          error: 'Provider not found'
+        });
+      }
+
+      const source = SOURCE_LABELS[provider.dataSource] || provider.dataSource || 'NPI Registry';
+      const asOf = provider.sync_timestamp
+        ? new Date(provider.sync_timestamp).toISOString().slice(0, 10)
+        : null;
+      const wrap = value => ({ value, source, asOf });
+
+      // Identity mirrors the provider detail shape, each leaf wrapped with
+      // provenance. The cache carries no DOB, so dob is null below.
+      const identity = {
+        npi: wrap(provider.npi),
+        enumerationType: wrap(provider.enumerationType),
+        name: {
+          first: wrap(provider.name.first),
+          middle: wrap(provider.name.middle),
+          last: wrap(provider.name.last),
+          credential: wrap(provider.name.credential),
+          full: wrap(provider.name.full)
+        },
+        address: {
+          line1: wrap(provider.address.line1),
+          line2: wrap(provider.address.line2),
+          city: wrap(provider.address.city),
+          state: wrap(provider.address.state),
+          zipcode: wrap(provider.address.zipcode),
+          phone: wrap(provider.address.phone)
+        },
+        taxonomy: {
+          code: wrap(provider.taxonomy.code),
+          description: wrap(provider.taxonomy.description),
+          grouping: wrap(provider.taxonomy.grouping)
+        },
+        license: {
+          number: wrap(provider.license.number),
+          state: wrap(provider.license.state)
+        }
+      };
+
+      const exclusion = await this.exclusionService.resolveExclusion({
+        npi: provider.npi,
+        lastname: provider.name.last,
+        firstname: provider.name.first,
+        state: provider.address.state,
+        dob: null
+      });
+
+      const flagsSummary = exclusion.verdict === 'EXCLUDED'
+        ? 'flags found'
+        : exclusion.verdict === 'CLEAR'
+          ? 'no flags found'
+          : 'insufficient data';
+
+      res.json({
+        success: true,
+        data: {
+          npi,
+          identity,
+          exclusion,
+          flagsSummary,
+          terms: TERMS
+        }
+      });
+    } catch (error) {
+      logger.error('Error in getVerification:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve provider verification'
       });
     }
   }
