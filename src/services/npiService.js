@@ -31,6 +31,13 @@ class NpiService {
         ef: EXTRA_FIELDS
       };
 
+      if (criteria.offset) {
+        params.offset = criteria.offset;
+        // The Clinical Tables API paginates on `count` (default 7), not
+        // maxList, once offset is present.
+        params.count = criteria.maxResults || 500;
+      }
+
       // Add additional filters based on criteria
       if (criteria.state) {
         params.q = `addr_practice.state:${criteria.state}`;

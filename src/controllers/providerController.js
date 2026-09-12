@@ -18,7 +18,8 @@ class ProviderController {
         state,
         city,
         taxonomy,
-        maxResults = 50
+        maxResults = 50,
+        offset = 0
       } = req.query;
 
       if (!terms && !state && !city) {
@@ -27,12 +28,19 @@ class ProviderController {
         });
       }
 
+      if (parseInt(offset) < 0) {
+        return res.status(400).json({
+          error: 'Offset must be a non-negative integer'
+        });
+      }
+
       const criteria = {
         terms,
         state,
         city,
         taxonomy,
-        maxResults: parseInt(maxResults) || 50
+        maxResults: parseInt(maxResults) || 50,
+        offset: parseInt(offset) || 0
       };
 
       const providers = await this.npiService.searchProviders(criteria);
