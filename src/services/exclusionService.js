@@ -101,8 +101,8 @@ class ExclusionService {
       const nState = normalize(state);
       if (nLast && nFirst && nState) {
         const result = await db.query(
-          "SELECT * FROM oig_exclusions WHERE upper(regexp_replace(lastname, '[^A-Z0-9 ]', '', 'g')) = $1 AND upper(state) = $2",
-          [nLast, nState]
+          "SELECT * FROM oig_exclusions WHERE upper(regexp_replace(lastname, '[^A-Z0-9 ]', '', 'g')) = $1 AND upper(state) = $2 AND upper(regexp_replace(firstname, '[^A-Z0-9 ]', '', 'g')) = $3",
+          [nLast, nState, nFirst]
         );
         const rows = (result.rows || []).filter(r =>
           normalize(r.lastname) === nLast &&

@@ -136,7 +136,9 @@ class ProviderController {
         });
       }
 
-      const provider = await this.npiService.getProviderByNpi(npi);
+      // Cache-only lookup: the dossier reports what the cache holds and
+      // never fans out to the NPI Registry at request time.
+      const provider = await this.npiService.getCachedProvider(npi);
 
       if (!provider) {
         return res.status(404).json({

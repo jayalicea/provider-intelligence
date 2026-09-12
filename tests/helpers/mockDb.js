@@ -5,11 +5,13 @@
 
 const providers = new Map(); // npi -> row
 const mips = new Map();      // `${npi}:${year}` -> row
+const exclusions = [];       // oig_exclusions rows
 let quality = [];            // quality_measures rows
 
 function reset() {
   providers.clear();
   mips.clear();
+  exclusions.length = 0;
   quality = [];
 }
 
@@ -284,6 +286,31 @@ async function query(text, params = []) {
     return { rows: [groupStats(rows)], rowCount: 1 };
   }
 
+  // --- exclusion queries (tests/exclusions.test.js) ------------------------
+
+  // NPI exact match against oig_exclusions
+  if (/^SELECT \* FROM oig_exclusions WHERE npi = \$1$/.test(sql)) {
+    const rows = exclusions
+      .filter(r => String(r.npi) === String(params[0]))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // Name + state match. The real query strips punctuation in SQL; the mock
+  // applies the same normalization to both sides.
+  if (sql.includes('FROM oig_exclusions WHERE upper(regexp_replace')) {
+    const strip = v =>
+      String(v || '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim();
+    const [nLast, nState, nFirst] = params;
+    const rows = exclusions
+      .filter(r =>
+        strip(r.lastname) === strip(nLast) &&
+        strip(r.state) === strip(nState) &&
+        strip(r.firstname) === strip(nFirst))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   throw new Error(`mockDb: unsupported SQL: ${sql}`);
 }
 
@@ -291,6 +318,11 @@ module.exports = {
   query,
   getClient: async () => { throw new Error('mockDb: getClient not supported'); },
   pool: {},
-  _stores: { providers, mips, get quality() { return quality; } },
+  _stores: {
+    providers,
+    mips,
+    get quality() { return quality; },
+    exclusions
+  },
   _reset: reset
 };
