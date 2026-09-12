@@ -1,0 +1,46 @@
+# Compose stack for the Provider Intelligence Platform backend + Postgres.
+#
+# Secrets: this file never contains secret values. The app service loads the
+# user's .env via env_file; ${DB_PASSWORD} interpolation for the database
+# init also resolves from .env in the project root (compose's automatic
+# .env interpolation). Do not commit a real .env.
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      # Inside the compose network the database host is the db service,
+      # overriding whatever DB_HOST the local .env defines.
+      DB_HOST: db
+      DB_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: provider_intelligence
+      POSTGRES_USER: admin
+      # Must be defined in .env (same variable name the app uses); compose
+      # fails fast with a clear error if it is missing.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Schema bootstrap on first start. Runs against POSTGRES_DB.
+      - ./src/config/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d provider_intelligence"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

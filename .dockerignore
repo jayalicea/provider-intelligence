@@ -1,0 +1,34 @@
+# Secrets and local environment — never bake into the image
+.env
+.env.*
+!.env.example
+
+# Dependencies (installed inside the image)
+node_modules
+client/node_modules
+
+# VCS and tooling metadata
+.git
+.gitignore
+.kimi-code
+
+# Build output and generated artifacts
+client/dist
+coverage
+*.tsbuildinfo
+
+# Logs and scratch
+logs
+*.log
+*.tmp.js
+scratch-tmp
+
+# Local-only tooling and docs archives
+tools
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Never-commit file types (screenshots etc.)
+*.png
