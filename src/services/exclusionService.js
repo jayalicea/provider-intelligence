@@ -32,6 +32,12 @@ const formatLeieDate = v => {
   return s || null;
 };
 
+// pg returns the date-typed as_of column as a JS Date; serialize as YYYY-MM-DD.
+const formatAsOf = v => {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return v === null || v === undefined ? null : String(v);
+};
+
 class ExclusionService {
 
   /**
@@ -63,7 +69,7 @@ class ExclusionService {
               type: active.excltype,
               date: formatLeieDate(active.excldate),
               source: active.source,
-              asOf: active.as_of
+              asOf: formatAsOf(active.as_of)
             },
             reinstated: null,
             notes
@@ -80,7 +86,7 @@ class ExclusionService {
             reinstated: {
               date: formatLeieDate(reinstatedRow.reindate),
               source: reinstatedRow.source,
-              asOf: reinstatedRow.as_of
+              asOf: formatAsOf(reinstatedRow.as_of)
             },
             notes
           };
@@ -119,7 +125,7 @@ class ExclusionService {
               type: active.excltype,
               date: formatLeieDate(active.excldate),
               source: active.source,
-              asOf: active.as_of
+              asOf: formatAsOf(active.as_of)
             },
             reinstated: null,
             notes
@@ -136,7 +142,7 @@ class ExclusionService {
             reinstated: {
               date: formatLeieDate(reinstatedRow.reindate),
               source: reinstatedRow.source,
-              asOf: reinstatedRow.as_of
+              asOf: formatAsOf(reinstatedRow.as_of)
             },
             notes
           };
