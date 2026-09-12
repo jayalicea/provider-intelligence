@@ -140,4 +140,5 @@ CREATE INDEX idx_providers_name ON providers(name_last, name_first);
 CREATE INDEX idx_providers_state ON providers(practice_state);
 CREATE INDEX idx_providers_taxonomy ON providers(primary_taxonomy_code);
 CREATE INDEX idx_mips_npi_year ON mips_performance_scores(npi, performance_year);
+CREATE INDEX idx_mips_year_npi ON mips_performance_scores(performance_year, npi);
 CREATE INDEX idx_quality_facility ON quality_measures(facility_id);

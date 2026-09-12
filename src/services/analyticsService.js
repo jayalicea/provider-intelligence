@@ -4,7 +4,11 @@ const { logger } = require('../utils/logger');
 // phynpi.md §6 specifies these analytics; its SQL is not executable as
 // printed ($0 placeholders, a nonexistent status_count column), so the
 // queries below implement the same intent with valid PostgreSQL.
-const num = v => (v === null || v === undefined ? null : Number(v));
+const num = v => {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 const round2 = v => (v === null || v === undefined ? null : Math.round(v * 100) / 100);
 
 class AnalyticsService {
@@ -15,9 +19,20 @@ class AnalyticsService {
    */
   async getGroupPerformance(npis, year) {
     try {
+      if (!Array.isArray(npis) || npis.some(n => typeof n !== 'string')) {
+        throw Object.assign(new Error('npis must be an array of NPI strings'), { statusCode: 400 });
+      }
+      if (npis.length === 0) {
+        throw Object.assign(new Error('npis must not be empty'), { statusCode: 400 });
+      }
+      // Cap the group size so the ANY($1) query stays within postgres array
+      // limits and response times stay bounded.
+      npis = npis.slice(0, 5000);
+
       const query = `
         SELECT
           COUNT(*) AS provider_count,
+          COUNT(final_score) AS scored_count,
           AVG(final_score) AS final_avg, MIN(final_score) AS final_min,
           MAX(final_score) AS final_max, STDDEV(final_score) AS final_stddev,
           PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY final_score) AS final_p25,
@@ -66,6 +81,7 @@ class AnalyticsService {
       return {
         year,
         providerCount,
+        scoredCount: Number(row.scored_count || 0),
         metrics: providerCount === 0 ? null : {
           finalScore: metric('final'),
           quality: metric('quality'),
@@ -88,25 +104,34 @@ class AnalyticsService {
   async getRanking(npi, year, taxonomy = null) {
     try {
       const withinTaxonomy = Boolean(taxonomy);
+      // Only scored rows (final_score NOT NULL) enter the window partition:
+      // NULL scores must not hold rank 1 (Postgres default NULLS FIRST on
+      // DESC) nor dilute the percentile denominator. The target provider is
+      // LEFT-JOINed in from its own row so an unscored target still returns
+      // a result with rank null rather than vanishing (404).
       const query = `
-        SELECT npi, final_score, rank, total_count, percentile
+        SELECT t.npi, t.final_score, r.rank, r.total_count, r.percentile
         FROM (
+          SELECT npi, final_score FROM mips_performance_scores
+          WHERE npi = $1 AND performance_year = $2
+        ) t
+        LEFT JOIN (
           SELECT m.npi, m.final_score,
-            RANK() OVER (ORDER BY m.final_score DESC) AS rank,
-            COUNT(*) OVER () AS total_count,
-            ROUND(100.0 * COUNT(*) FILTER (WHERE m.final_score <= t.final_score) OVER ()
-                  / COUNT(*) OVER (), 2) AS percentile
+            RANK() OVER (ORDER BY m.final_score DESC NULLS LAST) AS rank,
+            COUNT(m.final_score) OVER () AS total_count,
+            ROUND(100.0 * COUNT(*) FILTER (WHERE m.final_score <= t2.final_score) OVER ()
+                  / COUNT(m.final_score) OVER (), 2) AS percentile
           FROM mips_performance_scores m
           CROSS JOIN (
             SELECT final_score FROM mips_performance_scores
             WHERE npi = $1 AND performance_year = $2
-          ) t
+          ) t2
           WHERE m.performance_year = $2
+            AND m.final_score IS NOT NULL
             ${withinTaxonomy
               ? 'AND m.npi IN (SELECT npi FROM providers WHERE primary_taxonomy_code = $3)'
               : ''}
-        ) ranked
-        WHERE npi = $1
+        ) r ON r.npi = t.npi
       `;
 
       const params = withinTaxonomy ? [npi, year, taxonomy] : [npi, year];
@@ -114,12 +139,29 @@ class AnalyticsService {
       const row = result.rows[0];
       if (!row) return null;
 
+      const finalScore = num(row.final_score);
+      // The target provider exists but has no score this year: rank and
+      // percentile are undefined, with an explicit reason.
+      if (finalScore === null) {
+        return {
+          npi,
+          year,
+          scope: withinTaxonomy ? 'taxonomy' : 'overall',
+          taxonomy: withinTaxonomy ? taxonomy : null,
+          finalScore: null,
+          rank: null,
+          totalCount: row.total_count === null ? 0 : Number(row.total_count),
+          percentile: null,
+          reason: 'Provider has no MIPS final score for this year'
+        };
+      }
+
       return {
         npi: row.npi,
         year,
         scope: withinTaxonomy ? 'taxonomy' : 'overall',
         taxonomy: withinTaxonomy ? taxonomy : null,
-        finalScore: num(row.final_score),
+        finalScore,
         rank: Number(row.rank),
         totalCount: Number(row.total_count),
         percentile: num(row.percentile)
@@ -160,7 +202,10 @@ class AnalyticsService {
         startYear,
         endYear,
         years,
-        analysis: this.analyzeTrend(years)
+        analysis: this.analyzeTrend(years),
+        warning: 'performance_year values are request labels on a rolling CMS ' +
+          'vintage, not distinct measurement years; year-over-year trends may ' +
+          'reflect re-based scores rather than true performance change.'
       };
     } catch (error) {
       logger.error('Error in trend analysis:', error);
@@ -216,13 +261,14 @@ class AnalyticsService {
                PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY m.final_score) AS q1,
                PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.final_score) AS median,
                PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY m.final_score) AS q3,
-               COUNT(*) AS peer_count
+               COUNT(m.final_score) AS peer_count
         FROM mips_performance_scores m
         CROSS JOIN (
           SELECT final_score FROM mips_performance_scores
           WHERE npi = $1 AND performance_year = $2
         ) t
         WHERE m.performance_year = $2
+          AND m.final_score IS NOT NULL
         GROUP BY t.final_score
       `;
 
@@ -235,6 +281,21 @@ class AnalyticsService {
       const median = num(row.median);
       const q3 = num(row.q3);
       const nationalAverage = round2(num(row.national_average));
+
+      // Unscored (or non-numeric) provider scores and quartiles cannot be
+      // classified — return an explicit unscored status instead of defaulting
+      // to the bottom quartile.
+      if (providerScore === null || q1 === null || median === null || q3 === null ||
+          nationalAverage === null) {
+        return {
+          npi,
+          year,
+          status: 'unscored',
+          reason: 'Provider or peer scores are missing or non-numeric for this year',
+          providerScore,
+          peerCount: 0
+        };
+      }
 
       let quartile;
       let position;

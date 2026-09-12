@@ -42,7 +42,10 @@ const ANALYTIC_METRICS = {
 };
 
 function groupStats(rows) {
-  const out = { provider_count: rows.length };
+  const out = {
+    provider_count: rows.length,
+    scored_count: rows.filter(r => r.final_score !== null && r.final_score !== undefined).length
+  };
   for (const [prefix, col] of Object.entries(ANALYTIC_METRICS)) {
     const values = rows
       .map(r => (r[col] === null || r[col] === undefined ? null : Number(r[col])))
@@ -187,7 +190,10 @@ async function query(text, params = []) {
   }
 
   // Ranking: window-function style, overall or within a taxonomy peer group.
-  // Percentile = share of peers scoring at or below the target (100 = best).
+  // Only scored peers enter the partition (matches the service's
+  // final_score IS NOT NULL filter); an unscored target still returns a row
+  // with null rank. Percentile = share of scored peers scoring at or below
+  // the target (100 = best).
   if (sql.includes('RANK() OVER') && sql.includes('AS total_count')) {
     const withinTaxonomy = sql.includes('primary_taxonomy_code');
     const [npi, year, taxonomy] = params;
@@ -203,17 +209,30 @@ async function query(text, params = []) {
     }
     const target = peers.find(r => String(r.npi) === String(npi));
     if (!target) return { rows: [], rowCount: 0 };
+    const scored = peers.filter(r => r.final_score !== null && r.final_score !== undefined);
     const targetScore = Number(target.final_score);
-    const rank = 1 + peers.filter(r => Number(r.final_score) > targetScore).length;
+    if (Number.isNaN(targetScore)) {
+      return {
+        rows: [{
+          npi: target.npi,
+          final_score: target.final_score,
+          rank: null,
+          total_count: scored.length,
+          percentile: null
+        }],
+        rowCount: 1
+      };
+    }
+    const rank = 1 + scored.filter(r => Number(r.final_score) > targetScore).length;
     const percentile = Math.round(
-      10000 * peers.filter(r => Number(r.final_score) <= targetScore).length / peers.length
+      10000 * scored.filter(r => Number(r.final_score) <= targetScore).length / scored.length
     ) / 100;
     return {
       rows: [{
         npi: target.npi,
         final_score: target.final_score,
         rank,
-        total_count: peers.length,
+        total_count: scored.length,
         percentile
       }],
       rowCount: 1
@@ -227,11 +246,14 @@ async function query(text, params = []) {
       .filter(r => Number(r.performance_year) === Number(year));
     const target = peers.find(r => String(r.npi) === String(npi));
     if (!target) return { rows: [], rowCount: 0 };
-    const scores = peers.map(r => Number(r.final_score)).sort((a, b) => a - b);
+    const scores = peers
+      .map(r => (r.final_score === null || r.final_score === undefined ? null : Number(r.final_score)))
+      .filter(v => v !== null && !Number.isNaN(v))
+      .sort((a, b) => a - b);
     return {
       rows: [{
         provider_score: target.final_score,
-        national_average: scores.reduce((a, b) => a + b, 0) / scores.length,
+        national_average: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null,
         min_score: scores[0],
         max_score: scores[scores.length - 1],
         q1: percentileCont(scores, 0.25),

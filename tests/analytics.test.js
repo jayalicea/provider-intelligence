@@ -261,6 +261,121 @@ describe('GET /api/v1/analytics/trends/:npi', () => {
   });
 });
 
+describe('Phase 2B analytics hardening', () => {
+  test('null-scored provider gets rank null with reason, and null peers do not take rank 1', async () => {
+    seedMips('1000000001', 2023, null);
+    seedMips('1000000002', 2023, 90);
+    seedMips('1000000003', 2023, 80);
+
+    const unscored = await request(app)
+      .get('/api/v1/analytics/ranking/1000000001')
+      .query({ year: '2023' });
+    expect(unscored.status).toBe(200);
+    expect(unscored.body.data.rank).toBeNull();
+    expect(unscored.body.data.percentile).toBeNull();
+    expect(unscored.body.data.finalScore).toBeNull();
+    expect(unscored.body.data.reason).toMatch(/no mips final score/i);
+
+    const top = await request(app)
+      .get('/api/v1/analytics/ranking/1000000002')
+      .query({ year: '2023' });
+    expect(top.body.data.rank).toBe(1);
+    expect(top.body.data.totalCount).toBe(2);
+    expect(top.body.data.percentile).toBe(100);
+  });
+
+  test('ranking percentile denominator excludes null-scored peers', async () => {
+    seedMips('1000000001', 2023, 50);
+    seedMips('1000000002', 2023, 100);
+    seedMips('1000000003', 2023, null);
+    seedMips('1000000004', 2023, null);
+
+    const res = await request(app)
+      .get('/api/v1/analytics/ranking/1000000001')
+      .query({ year: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.rank).toBe(2);
+    expect(res.body.data.totalCount).toBe(2);
+    expect(res.body.data.percentile).toBe(50);
+  });
+
+  test('benchmark returns explicit unscored status for a null-scored provider', async () => {
+    seedMips('1000000001', 2023, null);
+    seedMips('1000000002', 2023, 90);
+    seedMips('1000000003', 2023, 80);
+
+    const res = await request(app)
+      .get('/api/v1/analytics/benchmark/1000000001')
+      .query({ year: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('unscored');
+    expect(res.body.data.quartile).toBeUndefined();
+    expect(res.body.data.peerCount).toBe(0);
+  });
+
+  test('benchmark peerCount excludes unscored peers', async () => {
+    seedMips('1000000001', 2023, 40);
+    seedMips('1000000002', 2023, 30);
+    seedMips('1000000003', 2023, null);
+
+    const res = await request(app)
+      .get('/api/v1/analytics/benchmark/1000000001')
+      .query({ year: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.peerCount).toBe(2);
+  });
+
+  test('group-performance reports scoredCount alongside providerCount', async () => {
+    seedMips('1000000001', 2023, 80);
+    seedMips('1000000002', 2023, null);
+    seedMips('1000000003', 2023, 90);
+
+    const res = await request(app)
+      .get('/api/v1/analytics/group-performance')
+      .query({ npis: '1000000001,1000000002,1000000003', year: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.providerCount).toBe(3);
+    expect(res.body.data.scoredCount).toBe(2);
+  });
+
+  test('group-performance single-row group has null stddev, not NaN', async () => {
+    seedMips('1000000001', 2023, 80);
+
+    const res = await request(app)
+      .get('/api/v1/analytics/group-performance')
+      .query({ npis: '1000000001', year: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.metrics.finalScore.stddev).toBeNull();
+    expect(res.body.data.metrics.finalScore.avg).toBe(80);
+    expect(JSON.stringify(res.body)).not.toContain('NaN');
+  });
+
+  test('trends response carries the rolling-vintage warning', async () => {
+    seedMips('1000000001', 2022, 80);
+    seedMips('1000000001', 2023, 90);
+
+    const res = await request(app)
+      .get('/api/v1/analytics/trends/1000000001')
+      .query({ startYear: '2022', endYear: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.warning).toMatch(/rolling cms vintage/i);
+  });
+
+  test('group-performance rejects an empty npis list with 400', async () => {
+    const res = await request(app)
+      .get('/api/v1/analytics/group-performance')
+      .query({ npis: '', year: '2023' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('GET /api/v1/analytics/benchmark/:npi', () => {
   test('compares provider score to the national distribution', async () => {
     seedMips('1000000001', 2023, 40);
