@@ -13,6 +13,7 @@ GLOBAL RULES (apply all session):
 - Never use git add -A, git add ., or git commit -a. Stage files explicitly by name and run git status immediately before every commit to confirm only intended files are staged.
 - Never commit: node_modules/, dist/, .env, *.tmp.js, screenshots, or scratch/debug files.
 - Never print, echo, cat, or log .env contents.
+- After every phase commit, run git push immediately so every phase is backed up off this machine. Never force push.
 - Database: the only permitted writes are INSERTs into the provider cache tables via the existing search endpoint during the Phase 0 top-up, plus the Phase 2B hardening changes explicitly listed there. No schema changes beyond those listed, no migrations, no DELETE/UPDATE/TRUNCATE, no manual SQL inserts. All other phases are strictly read-only against the database.
 - Do not modify committed backend services except the Phase 0 pagination fix and the Phase 2B hardening fixes.
 
