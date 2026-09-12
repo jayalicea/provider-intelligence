@@ -40,13 +40,15 @@ useFetch deps literal).
 
 ## Test results
 
-- Backend: `npm test` — **6 suites, 59 tests, all green** (51 pre-existing +
-  8 new). New: `tests/pagination.test.js` (2) and the Phase 2B block in
-  `tests/analytics.test.js` (8 covering: null-scored ranking target with
-  reason, percentile denominator excluding nulls, NaN benchmark unscored
-  status, peerCount excluding unscored peers, scoredCount in group
-  performance, single-row stddev null-not-NaN, trends warning field, empty
-  npis 400).
+- Backend: `npm test` — **6 suites, 60 tests, all green** (51 pre-existing at
+  commit `95e441c` + 8 new from Phases 0/2B + 1 added by the `hasMipsData`
+  feature commit `c48fa5f`). Re-verified 2026-09-12 (Prompt C): 60 passed,
+  60 total, 3.2s. New tests: `tests/pagination.test.js` (2) and the Phase 2B
+  block in `tests/analytics.test.js` (8 covering: null-scored ranking target
+  with reason, percentile denominator excluding nulls, NaN benchmark
+  unscored status, peerCount excluding unscored peers, scoredCount in group
+  performance, single-row stddev null-not-NaN, trends warning field on
+  `/analytics/trends`, empty npis 400).
 - Client: `npm run lint` (in `client/`) — clean.
 
 ## Phase 0: pagination and top-up
