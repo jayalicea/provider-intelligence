@@ -1,12 +1,15 @@
-# overnight-mips-seed.ps1 v4: MIPS-first enrichment.
-# v4: unwraps the dataset's JSON envelope ({data:[...]}) before reading columns or rows.
-# Leave this window OPEN overnight.
+# overnight-mips-seed.ps1 v5: MIPS-first enrichment, parameterized states.
+# Usage: run with defaults for the original 9 states, or pass -States for a wave.
+# Leave the window OPEN while running.
+
+param(
+  [string[]]$States = @('MD','VA','PA','NY','IL','OH','FL','TX','CA'),
+  [int]$PerState = 500
+)
 
 $ErrorActionPreference = 'Continue'
 $project  = 'C:\Users\casalab\provider-intelligence'
 $log      = "$project\logs\mips-seed.log"
-$states   = 'MD','VA','PA','NY','IL','OH','FL','TX','CA'
-$perState = 500
 $pageSize = 500
 $dataset  = '7adb8b1b-b85c-4ed3-b314-064776e50180'
 $dataUri  = "https://data.cms.gov/data-api/v1/dataset/$dataset/data"
@@ -36,7 +39,7 @@ function Get-DatasetRows($state, $offset){
   }
 }
 
-Log '=== MIPS-first seeding started (v4) ==='
+Log "=== MIPS-first seeding started (v5, states: $($States -join ',')) ==="
 
 # 0. Start backend if not listening
 $listening = netstat -ano | findstr ':3000' | findstr LISTENING
@@ -58,7 +61,7 @@ try {
     if (-not $script:scoreCol) { $script:scoreCol = $cols | Where-Object { $_ -match 'score' } | Select-Object -First 1 }
     Log "dataset columns resolved: NPI='$($script:npiCol)' STATE='$($script:stateCol)' SCORE='$($script:scoreCol)'"
     if (-not $script:npiCol -or -not $script:stateCol) {
-        Log "FATAL: no matching columns; first probe row looks like:"
+        Log "FATAL: no matching columns; first probe row:"
         Log ("  " + (($probe[0] | ConvertTo-Json -Compress -Depth 2).Substring(0, [Math]::Min(400, ($probe[0] | ConvertTo-Json -Compress -Depth 2).Length))))
         exit 1
     }
@@ -69,9 +72,9 @@ try {
 
 # 2. Collect scored NPIs per state from the dataset, then enrich through the local API
 $grandTotal = 0
-foreach ($st in $states) {
+foreach ($st in $States) {
     $npis = New-Object System.Collections.Generic.List[string]
-    for ($off = 0; $off -lt 7000 -and $npis.Count -lt $perState; $off += $pageSize) {
+    for ($off = 0; $off -lt 7000 -and $npis.Count -lt $PerState; $off += $pageSize) {
         $rows = Get-DatasetRows $st $off
         if ($off -eq 0 -and $rows.Count -eq 0) {
             Log "WARN $st : first page empty, check WARN lines above for the HTTP status"
@@ -82,7 +85,7 @@ foreach ($st in $states) {
             $npi   = "$($r.($script:npiCol))".Trim()
             if ($npi -match '^\d{10}$' -and $score -and "$score" -notmatch 'Not Available|Too Small|^$') {
                 if (-not $npis.Contains($npi)) { $npis.Add($npi) }
-                if ($npis.Count -ge $perState) { break }
+                if ($npis.Count -ge $PerState) { break }
             }
         }
         Jitter 1500 3000
