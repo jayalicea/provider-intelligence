@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ProviderLens - Dashboard Mockup (static, sample data)</title>
+<style>
+  :root{
+    --bg:#F7F9FA; --surface:#FFFFFF; --border:#DCE3E8;
+    --text:#1C2B33; --muted:#5B6B75; --accent:#0F6B5C; --accent-hover:#0A5448;
+    --good:#2E7D32; --warn:#B26A00; --bad:#C62828; --unscored:#8A9AA5;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--text); font:14px/1.45 "Segoe UI", "Helvetica Neue", Arial, sans-serif;}
+  .mono{font-family:Consolas, monospace; font-size:13px;}
+  .muted{color:var(--muted);}
+  header{background:var(--surface); border-bottom:1px solid var(--border); padding:12px 24px; display:flex; justify-content:space-between; align-items:center;}
+  header .brand{font-size:17px; font-weight:600;}
+  header .tag{font-size:12px; color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:2px 8px;}
+  header a{color:var(--muted); font-size:13px; margin-left:16px; text-decoration:none;}
+  main{max-width:1080px; margin:24px auto; padding:0 24px; display:grid; gap:24px;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:16px;}
+  h1{font-size:22px; font-weight:600;}
+  h2{font-size:17px; font-weight:600; margin-bottom:12px;}
+  .sub{color:var(--muted); margin-top:4px;}
+  .provline{margin-top:2px;}
+  .tabs{display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:16px;}
+  .tab{padding:8px 14px; font-size:14px; color:var(--muted); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent;}
+  .tab.active{color:var(--accent); border-bottom-color:var(--accent); font-weight:600;}
+  .kpis{display:grid; grid-template-columns:repeat(5, 1fr); gap:16px;}
+  .kpi{border:1px solid var(--border); border-radius:4px; padding:12px;}
+  .kpi .label{font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);}
+  .kpi .value{font-size:26px; font-weight:600; margin-top:4px; font-variant-numeric:tabular-nums;}
+  .kpi .prov{font-size:11px; color:var(--unscored); margin-top:6px;}
+  .bars{display:grid; gap:10px; margin-top:8px;}
+  .bar-row{display:grid; grid-template-columns:180px 1fr 48px; gap:12px; align-items:center;}
+  .bar-row .name{font-size:13px;}
+  .track{height:14px; background:#EDF1F3; border-radius:3px; overflow:hidden;}
+  .fill{height:100%; background:var(--accent); border-radius:3px;}
+  .score{font-variant-numeric:tabular-nums; text-align:right;}
+  .banner{background:#EFF6F4; border:1px solid #BFDCD4; color:#0A5448; border-radius:4px; padding:10px 12px; font-size:13px; margin-bottom:16px;}
+  table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;}
+  th{font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); text-align:left; padding:8px; border-bottom:1px solid var(--border);}
+  td{padding:8px; border-bottom:1px solid var(--border); font-size:13px;}
+  .badge{display:inline-block; font-size:12px; border-radius:3px; padding:2px 8px; font-weight:600;}
+  .b-good{color:var(--good); background:#E8F3E8;}
+  .b-bad{color:var(--bad); background:#F8E7E7;}
+  .b-same{color:var(--muted); background:#EEF1F3;}
+  .b-na{color:var(--unscored); background:#F0F2F4;}
+  .footer-note{color:var(--muted); font-size:12px; margin-top:8px;}
+  .searchbar{display:grid; grid-template-columns:2fr 1fr 140px 1fr auto; gap:8px;}
+  input, select{padding:8px 10px; border:1px solid var(--border); border-radius:4px; font-size:14px; background:#fff;}
+  button.primary{background:var(--accent); color:#fff; border:none; border-radius:4px; padding:8px 16px; font-size:14px; cursor:pointer;}
+  button.primary:hover{background:var(--accent-hover);}
+  .view{display:none;}
+  .view.active{display:block;}
+  .navdemo{margin-bottom:8px; font-size:13px;}
+  .navdemo a{color:var(--accent); cursor:pointer;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="brand">ProviderLens</span>
+  <span>
+    <span class="tag">Public data only</span>
+    <a href="#">About this data</a>
+  </span>
+</header>
+
+<main>
+
+<!-- SEARCH VIEW -->
+<section class="view active" id="search">
+  <div class="card">
+    <div class="navdemo">Mockup demo: <a onclick="show('detail')">skip to provider detail &rarr;</a></div>
+    <h1>Find a provider</h1>
+    <p class="sub">Search the NPI Registry, MIPS quality scores, and hospital quality measures.</p>
+    <div class="searchbar" style="margin-top:16px;">
+      <input placeholder="Dr. Smith or 1234567890">
+      <input placeholder="City">
+      <select><option>State</option><option>MD</option><option>NY</option><option>TX</option></select>
+      <input placeholder="Taxonomy (e.g. Internal Medicine)">
+      <button class="primary" onclick="show('detail')">Search</button>
+    </div>
+    <p class="footer-note">Start with a name, an NPI number, or a state. Results come from the public NPI Registry.</p>
+  </div>
+
+  <div class="card">
+    <table>
+      <tr><th>Name</th><th>NPI</th><th>Taxonomy</th><th>Location</th></tr>
+      <tr><td><a onclick="show('detail')" style="cursor:pointer;color:var(--accent)">Sarah J. Okafor, MD</a></td><td class="mono">1366446619</td><td>Internal Medicine</td><td>Baltimore, MD</td></tr>
+      <tr><td><a onclick="show('detail')" style="cursor:pointer;color:var(--accent)">Daniel Reyes, NP</a></td><td class="mono">1285902331</td><td>Family Medicine</td><td>Austin, TX</td></tr>
+      <tr><td><a onclick="show('detail')" style="cursor:pointer;color:var(--accent)">Mei-Ling Chen, PT</a></td><td class="mono">1922178445</td><td>Physical Therapy</td><td>Albany, NY</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- PROVIDER DETAIL / MIPS VIEW -->
+<section class="view" id="detail">
+  <div class="card">
+    <div class="navdemo"><a onclick="show('search')">&larr; back to search</a> &nbsp; Mockup demo: <a onclick="show('quality')">skip to quality measures &rarr;</a></div>
+    <h1>Sarah J. Okafor, MD</h1>
+    <p class="sub mono">NPI 1366446619</p>
+    <p class="sub">Internal Medicine &middot; 123 Main Street, Baltimore, MD 21201 &middot; (410) 555-0132</p>
+    <div class="provline muted" style="font-size:11px;">NIH NPI Registry, accessed 2026-09-12</div>
+    <div class="tabs" style="margin-top:16px;">
+      <button class="tab">Overview</button>
+      <button class="tab active">MIPS Performance</button>
+      <button class="tab" onclick="show('quality')">Quality Measures</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="label">Final Score 2023</div><div class="value">87.4</div><div class="prov">CMS QPP Experience, accessed 2026-09-12</div></div>
+      <div class="kpi"><div class="label">Quality</div><div class="value">91.0</div><div class="prov">CMS QPP Experience</div></div>
+      <div class="kpi"><div class="label">Improvement Activities</div><div class="value">40.0</div><div class="prov">CMS QPP Experience</div></div>
+      <div class="kpi"><div class="label">Promoting Interoperability</div><div class="value">88.0</div><div class="prov">CMS QPP Experience</div></div>
+      <div class="kpi"><div class="label">Cost</div><div class="value" style="color:var(--unscored)">Not reported</div><div class="prov">footnote: cost category not applicable</div></div>
+    </div>
+
+    <h2 style="margin-top:24px;">Category scores</h2>
+    <div class="bars">
+      <div class="bar-row"><span class="name">Quality</span><div class="track"><div class="fill" style="width:91%"></div></div><span class="score">91.0</span></div>
+      <div class="bar-row"><span class="name">Improvement Activities</span><div class="track"><div class="fill" style="width:40%"></div></div><span class="score">40.0</span></div>
+      <div class="bar-row"><span class="name">Promoting Interoperability</span><div class="track"><div class="fill" style="width:88%"></div></div><span class="score">88.0</span></div>
+      <div class="bar-row"><span class="name">Cost</span><div class="track"></div><span class="score" style="color:var(--unscored)">n/r</span></div>
+    </div>
+
+    <h2 style="margin-top:24px;">Trend, 2019 to 2023</h2>
+    <div class="banner">Year labels are request vintages on CMS's rolling dataset. Year-over-year movement may reflect re-based scores, not true performance change.</div>
+    <svg viewBox="0 0 640 180" width="100%" height="180" role="img" aria-label="Final score trend line, 74 to 87">
+      <line x1="40" y1="150" x2="620" y2="150" stroke="#DCE3E8"/>
+      <line x1="40" y1="30" x2="620" y2="30" stroke="#DCE3E8"/>
+      <text x="40" y="168" font-size="11" fill="#5B6B75">2019</text>
+      <text x="180" y="168" font-size="11" fill="#5B6B75">2020</text>
+      <text x="320" y="168" font-size="11" fill="#5B6B75">2021</text>
+      <text x="460" y="168" font-size="11" fill="#5B6B75">2022</text>
+      <text x="600" y="168" font-size="11" fill="#5B6B75">2023</text>
+      <polyline fill="none" stroke="#0F6B5C" stroke-width="2.5"
+        points="60,120 200,96 340,104 480,60 600,42"/>
+      <circle cx="60" cy="120" r="4" fill="#0F6B5C"/><circle cx="200" cy="96" r="4" fill="#0F6B5C"/>
+      <circle cx="340" cy="104" r="4" fill="#0F6B5C"/><circle cx="480" cy="60" r="4" fill="#0F6B5C"/>
+      <circle cx="600" cy="42" r="4" fill="#0F6B5C"/>
+      <text x="600" y="30" font-size="11" fill="#1C2B33" text-anchor="end">87.4</text>
+    </svg>
+  </div>
+</section>
+
+<!-- QUALITY MEASURES VIEW -->
+<section class="view" id="quality">
+  <div class="card">
+    <div class="navdemo"><a onclick="show('detail')">&larr; back to provider</a></div>
+    <h1>Hospital quality measures</h1>
+    <p class="sub">Facility 140010 &middot; measures as published by CMS Care Compare</p>
+    <div class="provline muted" style="font-size:11px;">CMS Care Compare, accessed 2026-09-12</div>
+    <table style="margin-top:12px;">
+      <tr><th>Measure</th><th>Score</th><th>National comparison</th><th>As of</th></tr>
+      <tr><td>Heart failure 30-day mortality</td><td>11.2</td><td><span class="badge b-good">Better than national</span></td><td class="mono">2026-09-12</td></tr>
+      <tr><td>Heart attack 30-day readmission</td><td>13.8</td><td><span class="badge b-bad">Worse than national</span></td><td class="mono">2026-09-12</td></tr>
+      <tr><td>Pneumonia 30-day mortality</td><td>12.4</td><td><span class="badge b-same">Same as national</span></td><td class="mono">2026-09-12</td></tr>
+      <tr><td>HCAHPS overall rating (top-box)</td><td>71</td><td><span class="badge b-good">Better than national</span></td><td class="mono">2026-09-12</td></tr>
+      <tr><td>CLABSI standardized infection ratio</td><td><span style="color:var(--unscored)">Not reported</span></td><td><span class="badge b-na">Not reported</span></td><td class="mono">2026-09-12</td></tr>
+    </table>
+    <p class="footer-note">Not reported means CMS suppressed or did not publish the measure for this facility. The reason is available on hover from the API footnote field.</p>
+  </div>
+</section>
+
+</main>
+
+<script>
+function show(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>

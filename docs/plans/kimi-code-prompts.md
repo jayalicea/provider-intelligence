@@ -40,6 +40,7 @@ PHASE 2B - Analytics hardening (fix the confirmed bugs from docs/CODE_REVIEW.md 
 
 PHASE 3 - Frontend:
 1. Inventory first: review the WIP commit and read every file under client/. Record for each file whether it is complete, partial, or broken, in client/ADOPTION_NOTES.md. Decide file by file what to keep, fix, or replace. Do not rewrite working files wholesale.
+Design authority: docs/DESIGN.md governs all visual and copy decisions (tokens, page copy, empty/loading/error states, disclaimer panel); docs/mockup/dashboard-mockup.html is the visual target for layout and component structure. Build the React UI to match the mockup using DESIGN.md tokens, adapting only where the live API response shapes require it. Record any deliberate deviation in ADOPTION_NOTES.md.
 2. Before building data-fetching components, curl each endpoint you will consume (search, provider detail, group-performance, ranking, trends, benchmark, quality measures) against the live backend and record the actual response shapes. docs/FRONTEND_SPEC.md entries marked UNVERIFIED are hypotheses; the live backend is authoritative. Build to the backend shape and note discrepancies in the final summary. Do not change backend endpoints to match the spec.
 3. Complete per docs/FRONTEND_SPEC.md: provider search with filters (name, state, city, taxonomy), provider detail view, MIPS dashboard with category bar chart and multi-year trend line chart (recharts), hospital quality measures table with national comparison badges. Vite dev proxy to the backend on port 3000.
 4. Verify each page: start the Vite dev server; for each route (search, provider detail, MIPS dashboard, quality measures), load the page through the dev server and confirm the underlying API calls return HTTP 200 with non-empty data. Record one line per page (route, endpoint, status, row count). 4xx/5xx or empty data means not done.
@@ -88,3 +89,4 @@ Reference files this runbook assumes in the repo:
 - docs/FRONTEND_SPEC.md, docs/GOVERNMENT_API_REFERENCE.md, docs/CODE_REVIEW.md, docs/SECURITY_REVIEW.md, docs/V2_ROADMAP.md, docs/PROMPT_REVIEW.md
 - docs/plans/gtm-productized-services.md (this file's companion, commit it with this one)
 - docs/plans/productized-services.md and docs/plans/verification-product.md (Claude's source prompts, save them here too)
+- docs/DESIGN.md and docs/mockup/dashboard-mockup.html (design system and visual mockup, Prompt A Phase 3 design authority)
