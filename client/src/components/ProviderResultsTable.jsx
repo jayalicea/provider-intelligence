@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import LoadingSpinner from './LoadingSpinner.jsx'
 import ErrorBanner from './ErrorBanner.jsx'
 import EmptyState from './EmptyState.jsx'
 
@@ -10,60 +9,76 @@ function providerName(p) {
   return full || p.name?.full || 'Not available'
 }
 
+function SkeletonRows() {
+  return (
+    <>
+      {[0, 1, 2].map((i) => (
+        <tr key={i} className="skeleton-row" aria-hidden="true">
+          <td colSpan={5}>
+            <span className="skeleton-line" style={{ width: `${85 - i * 15}%` }} />
+          </td>
+        </tr>
+      ))}
+    </>
+  )
+}
+
 export default function ProviderResultsTable({
   results,
   loading,
   error,
   onRetry,
 }) {
-  if (loading && !results) {
-    return (
-      <div className="table-region">
-        <LoadingSpinner size="lg" label="Loading providers" />
-      </div>
-    )
-  }
-
   if (error) {
     return <ErrorBanner message={error.message} onRetry={onRetry} />
   }
 
-  if (!results || results.length === 0) {
+  if (!loading && (!results || results.length === 0)) {
     return (
       <EmptyState
-        title="No providers match the current search."
-        description="Try broadening filters or entering a name, city, or state."
+        title="No providers matched."
+        description="The NPI Registry only lists active registrations; try broadening the state filter."
       />
     )
   }
 
   return (
     <div className={`table-region ${loading ? 'table-dimmed' : ''}`}>
-      <p className="results-count">{results.length} providers found</p>
       <table className="table">
         <thead>
           <tr>
-            <th>NPI</th>
             <th>Name</th>
+            <th>NPI</th>
             <th>Taxonomy</th>
-            <th>City</th>
-            <th>State</th>
+            <th>Location</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          {results.map((p) => (
-            <tr key={p.npi}>
-              <td className="numeric">
-                <Link to={`/providers/${p.npi}`}>{p.npi}</Link>
-              </td>
-              <td>{providerName(p)}</td>
-              <td>{p.taxonomy?.description || 'Not available'}</td>
-              <td>{p.address?.city || 'Not available'}</td>
-              <td>{p.address?.state || 'Not available'}</td>
-            </tr>
-          ))}
+          {loading && <SkeletonRows />}
+          {!loading &&
+            results.map((p) => (
+              <tr key={p.npi}>
+                <td>
+                  <Link to={`/providers/${p.npi}`}>{providerName(p)}</Link>
+                </td>
+                <td className="mono">{p.npi}</td>
+                <td>{p.taxonomy?.description || 'Not available'}</td>
+                <td>
+                  {[p.address?.city, p.address?.state]
+                    .filter(Boolean)
+                    .join(', ') || 'Not available'}
+                </td>
+                <td></td>
+              </tr>
+            ))}
         </tbody>
       </table>
+      <p className="results-count">
+        {loading
+          ? 'Searching the NPI Registry…'
+          : `${results.length} providers · NIH NPI Registry, accessed ${new Date().toISOString().slice(0, 10)}`}
+      </p>
     </div>
   )
 }

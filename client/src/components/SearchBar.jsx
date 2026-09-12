@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
-export default function SearchBar({ value, onChange, onSubmit, placeholder }) {
+// Local draft so the parent (and its URL params / API call) only updates on
+// submit, not per keystroke. Syncs to external value changes by adjusting
+// state during render (React's recommended alternative to setState-in-effect).
+export default function SearchBar({ value, onSubmit, placeholder }) {
   const [draft, setDraft] = useState(value)
-
-  useEffect(() => {
+  const [lastValue, setLastValue] = useState(value)
+  if (lastValue !== value) {
+    setLastValue(value)
     setDraft(value)
-  }, [value])
+  }
 
   const submit = () => onSubmit(draft.trim())
 

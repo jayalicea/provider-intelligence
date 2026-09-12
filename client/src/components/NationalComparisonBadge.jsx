@@ -1,18 +1,7 @@
-const FOOTNOTES = {
-  1: 'Too few cases to report',
-  2: 'Based on a sample',
-  3: 'Shorter time period than required',
-}
-
-export function footnoteLabel(code) {
-  if (code === null || code === undefined || code === '') return null
-  const text = FOOTNOTES[Number(code)]
-  return text || 'See CMS Footnote Crosswalk'
-}
-
+// Copy per docs/DESIGN.md §4 (Quality measures tab): exact badge text.
 export default function NationalComparisonBadge({ comparedToNational }) {
-  let tone = 'neutral'
-  let text = 'Not compared'
+  let tone = 'na'
+  let text = 'Not reported'
   const value = comparedToNational || ''
 
   if (/better/i.test(value)) {
@@ -20,12 +9,10 @@ export default function NationalComparisonBadge({ comparedToNational }) {
     text = 'Better than national'
   } else if (/no different/i.test(value)) {
     tone = 'neutral'
-    text = 'No different than national'
+    text = 'Same as national'
   } else if (/worse/i.test(value)) {
     tone = 'error'
     text = 'Worse than national'
-  } else if (value) {
-    text = value
   }
 
   return (

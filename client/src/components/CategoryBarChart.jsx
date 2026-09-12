@@ -31,7 +31,7 @@ export default function CategoryBarChart({ performance, year }) {
           <XAxis dataKey="name" tick={{ fontSize: 12 }} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
           <Tooltip />
-          <Bar dataKey="score" fill="#3B5B7E" name="Category score" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="score" fill="#0F6B5C" name="Category score" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
       <p className="muted chart-note">

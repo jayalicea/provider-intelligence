@@ -17,7 +17,7 @@ export function useFetch(factory, deps) {
     } catch (error) {
       if (id === seq.current) setState({ data: null, loading: false, error })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
   }, deps)
 
   useEffect(() => {

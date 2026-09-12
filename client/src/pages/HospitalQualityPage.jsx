@@ -12,14 +12,23 @@ export default function HospitalQualityPage() {
 
   return (
     <section>
-      <h1 className="page-title">Hospital Quality Measures</h1>
-      <p className="muted">Facility ID: {facilityId}</p>
-      <QualityMeasuresTable
-        measures={data}
-        loading={loading}
-        error={error}
-        onRetry={refetch}
-      />
+      <h1 className="page-title">Hospital quality measures</h1>
+      <p className="muted">
+        Facility {facilityId} · measures as published by CMS Care Compare
+      </p>
+      <div className="stack-top">
+        <QualityMeasuresTable
+          measures={data}
+          loading={loading}
+          error={error}
+          onRetry={refetch}
+        />
+        {!loading && !error && data && data.length > 0 && (
+          <p className="provenance">
+            CMS Care Compare, accessed {new Date().toISOString().slice(0, 10)}
+          </p>
+        )}
+      </div>
     </section>
   )
 }

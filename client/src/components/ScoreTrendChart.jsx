@@ -52,7 +52,7 @@ export default function ScoreTrendChart({ trends, loading, error, onRetry }) {
             type="monotone"
             dataKey="finalScore"
             name="Final score"
-            stroke="#3B5B7E"
+            stroke="#0F6B5C"
             strokeWidth={2}
             connectNulls
           />

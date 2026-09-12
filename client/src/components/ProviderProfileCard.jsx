@@ -1,15 +1,6 @@
-import LoadingSpinner from './LoadingSpinner.jsx'
 import ErrorBanner from './ErrorBanner.jsx'
 
 export default function ProviderProfileCard({ provider, loading, error }) {
-  if (loading) {
-    return (
-      <div className="card">
-        <LoadingSpinner label="Loading provider" />
-      </div>
-    )
-  }
-
   if (error) {
     if (error.status === 404) {
       return (
@@ -21,7 +12,19 @@ export default function ProviderProfileCard({ provider, loading, error }) {
     return <ErrorBanner message={error.message} />
   }
 
-  if (!provider) return null
+  if (loading || !provider) {
+    return (
+      <div className="card" aria-busy="true">
+        <span className="skeleton-line" style={{ width: '40%' }} />
+        <div style={{ marginTop: 12 }}>
+          <span className="skeleton-line" style={{ width: '70%' }} />
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <span className="skeleton-line" style={{ width: '55%' }} />
+        </div>
+      </div>
+    )
+  }
 
   const name =
     [provider.name?.first, provider.name?.middle, provider.name?.last]
@@ -35,7 +38,7 @@ export default function ProviderProfileCard({ provider, loading, error }) {
       <dl className="detail-list">
         <div>
           <dt>NPI</dt>
-          <dd className="numeric">{provider.npi || 'Not available'}</dd>
+          <dd className="mono">{provider.npi || 'Not available'}</dd>
         </div>
         <div>
           <dt>Taxonomy</dt>
@@ -57,11 +60,10 @@ export default function ProviderProfileCard({ provider, loading, error }) {
           <dt>Phone</dt>
           <dd className="numeric">{addr.phone || 'Not available'}</dd>
         </div>
-        <div>
-          <dt>Enumeration type</dt>
-          <dd>{provider.enumerationType || 'Not available'}</dd>
-        </div>
       </dl>
+      <p className="provenance">
+        NIH NPI Registry, accessed {new Date().toISOString().slice(0, 10)}
+      </p>
     </div>
   )
 }

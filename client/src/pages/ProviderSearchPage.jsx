@@ -37,12 +37,14 @@ export default function ProviderSearchPage() {
 
   return (
     <section>
-      <h1 className="page-title">Provider Search</h1>
+      <h1 className="page-title">Find a provider</h1>
+      <p className="muted">
+        Search the NPI Registry, MIPS quality scores, and hospital quality measures.
+      </p>
       <div className="card">
         <SearchBar
           value={terms}
-          placeholder="Provider name or NPI number"
-          onChange={(value) => updateParams({ query: value })}
+          placeholder="Dr. Smith or 1234567890"
           onSubmit={(value) => updateParams({ query: value })}
         />
         <FilterPanel
@@ -55,8 +57,8 @@ export default function ProviderSearchPage() {
 
       {!hasCriteria && !loading ? (
         <p className="muted">
-          Enter a provider name or NPI, or pick at least a state or city, to
-          search the NPI registry.
+          Start with a name, an NPI number, or a state. Results come from the
+          public NPI Registry.
         </p>
       ) : (
         <ProviderResultsTable

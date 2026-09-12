@@ -1,21 +1,12 @@
-import LoadingSpinner from './LoadingSpinner.jsx'
 import ErrorBanner from './ErrorBanner.jsx'
 import EmptyState from './EmptyState.jsx'
 
 export default function MipsSummaryCard({ performance, loading, error }) {
-  if (loading) {
-    return (
-      <div className="card">
-        <LoadingSpinner label="Loading MIPS performance" />
-      </div>
-    )
-  }
-
   if (error) {
     if (error.status === 404) {
       return (
         <div className="card">
-          <EmptyState title="No MIPS performance data available for this provider." />
+          <EmptyState title="No MIPS score reported for this provider." />
         </div>
       )
     }
@@ -33,10 +24,26 @@ export default function MipsSummaryCard({ performance, loading, error }) {
      performance.promotingInteroperabilityScore, performance.costScore]
       .some((v) => v !== null && v !== undefined)
 
-  if (!hasData) {
+  if (loading || !hasData) {
+    if (loading) {
+      return (
+        <div className="card" aria-busy="true">
+          <span className="skeleton-line" style={{ width: '35%' }} />
+          <div style={{ marginTop: 12 }}>
+            <span className="skeleton-line" style={{ width: '80%' }} />
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <span className="skeleton-line" style={{ width: '65%' }} />
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="card">
-        <EmptyState title="No MIPS performance data available for this provider." />
+        <EmptyState
+          title={`No MIPS score reported${performance?.performanceYear ? ` for ${performance.performanceYear}` : ''}.`}
+          description="CMS did not publish a final score for this provider in the QPP Experience dataset."
+        />
       </div>
     )
   }
@@ -74,6 +81,9 @@ export default function MipsSummaryCard({ performance, loading, error }) {
           </li>
         ))}
       </ul>
+      <p className="provenance">
+        CMS QPP Experience, accessed {new Date().toISOString().slice(0, 10)}
+      </p>
     </div>
   )
 }

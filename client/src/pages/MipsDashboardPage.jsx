@@ -20,7 +20,7 @@ export default function MipsDashboardPage() {
       <p>
         <Link to={`/providers/${npi}`}>&larr; Back to provider detail</Link>
       </p>
-      <h1 className="page-title">MIPS Performance Dashboard</h1>
+      <h1 className="page-title">MIPS performance</h1>
       <p className="muted">NPI {npi}</p>
 
       <div className="stack-top">
@@ -30,6 +30,14 @@ export default function MipsDashboardPage() {
         />
       </div>
       <div className="stack-top">
+        {/* DESIGN.md §4: persistent vintage banner above the trends chart.
+            The provider mips-trends endpoint returns no API warning field,
+            so this is the fixed copy. */}
+        <div className="info-banner">
+          Year labels are request vintages on CMS&apos;s rolling dataset.
+          Year-over-year movement may reflect re-based scores, not true
+          performance change.
+        </div>
         <ScoreTrendChart
           trends={trends.data}
           loading={trends.loading}

@@ -1,16 +1,18 @@
-/* Provider Intelligence Platform — theme per docs/FRONTEND_SPEC.md §6 */
+/* Theme per docs/DESIGN.md (design authority; wins over FRONTEND_SPEC §6) */
 
 :root {
-  --bg: #f7f8fa;
+  --bg: #f7f9fa;
   --surface: #ffffff;
-  --primary: #3b5b7e;
-  --text: #1f2933;
-  --text-muted: #52606d;
-  --success: #4c8055;
-  --warning: #b7791f;
-  --error: #b0433c;
-  --border: #e4e7eb;
-  --radius: 8px;
+  --primary: #0f6b5c; /* DESIGN --accent: teal, primary actions and series */
+  --primary-hover: #0a5448;
+  --text: #1c2b33;
+  --text-muted: #5b6b75;
+  --success: #2e7d32;
+  --warning: #b26a00;
+  --error: #c62828;
+  --unscored: #8a9aa5;
+  --border: #dce3e8;
+  --radius: 4px;
 }
 
 * {
@@ -21,10 +23,9 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 a {
@@ -78,7 +79,7 @@ a:hover {
 }
 
 .page-title {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   line-height: 1.25;
   margin: 0 0 16px;
@@ -391,4 +392,122 @@ a:hover {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* DESIGN.md additions: brand frame, provenance, skeletons, banners */
+
+.app-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.env-tag {
+  font-size: 12px;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+}
+
+.header-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.header-link:hover {
+  text-decoration: underline;
+}
+
+.disclaimer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 43, 51, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.disclaimer-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 560px;
+  margin: 24px;
+  padding: 20px 24px;
+}
+
+.disclaimer-panel h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.disclaimer-panel p {
+  margin: 0 0 16px;
+}
+
+.mono {
+  font-family: Consolas, monospace;
+  font-size: 13px;
+}
+
+.provenance {
+  font-size: 11px;
+  color: var(--unscored);
+  margin-top: 2px;
+}
+
+.info-banner {
+  background: #eff6f4;
+  border: 1px solid #bfdcd4;
+  color: #0a5448;
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* Skeleton rows: DESIGN.md prefers these over spinners on data surfaces */
+
+.skeleton-row td {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.skeleton-line {
+  display: block;
+  height: 12px;
+  border-radius: 3px;
+  background: #edf1f3;
+  width: 80%;
+}
+
+.badge-na {
+  background: #f0f2f4;
+  color: var(--unscored);
+}
+
+.badge-neutral {
+  background: #eef1f3;
+  color: var(--text-muted);
+}
+
+.score-null {
+  color: var(--unscored);
+}
+
+button.btn-primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.badge {
+  border-radius: 3px;
 }
