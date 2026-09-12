@@ -15,6 +15,56 @@ function reset() {
 
 const norm = sql => sql.replace(/\s+/g, ' ').trim();
 
+// --- helpers for the analytics queries below -------------------------------
+// Mirror Postgres semantics: STDDEV is the sample standard deviation
+// (n-1 denominator); PERCENTILE_CONT linearly interpolates over sorted
+// values; ROUND(x, 2) is applied by the service, not here.
+function percentileCont(sorted, p) {
+  if (!sorted.length) return null;
+  const idx = p * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function sampleStddev(values) {
+  if (values.length < 2) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / (values.length - 1));
+}
+
+const ANALYTIC_METRICS = {
+  final: 'final_score',
+  quality: 'quality_score',
+  ia: 'improvement_activities_score',
+  pi: 'promoting_interoperability_score',
+  cost: 'cost_score'
+};
+
+function groupStats(rows) {
+  const out = { provider_count: rows.length };
+  for (const [prefix, col] of Object.entries(ANALYTIC_METRICS)) {
+    const values = rows
+      .map(r => (r[col] === null || r[col] === undefined ? null : Number(r[col])))
+      .filter(v => v !== null && !Number.isNaN(v))
+      .sort((a, b) => a - b);
+    if (values.length === 0) {
+      for (const suffix of ['avg', 'min', 'max', 'stddev', 'p25', 'p50', 'p75']) {
+        out[`${prefix}_${suffix}`] = null;
+      }
+      continue;
+    }
+    out[`${prefix}_avg`] = values.reduce((a, b) => a + b, 0) / values.length;
+    out[`${prefix}_min`] = values[0];
+    out[`${prefix}_max`] = values[values.length - 1];
+    out[`${prefix}_stddev`] = sampleStddev(values);
+    out[`${prefix}_p25`] = percentileCont(values, 0.25);
+    out[`${prefix}_p50`] = percentileCont(values, 0.5);
+    out[`${prefix}_p75`] = percentileCont(values, 0.75);
+  }
+  return out;
+}
+
 async function query(text, params = []) {
   const sql = norm(text);
 
@@ -120,6 +170,88 @@ async function query(text, params = []) {
       sync_timestamp: new Date()
     });
     return { rows: [], rowCount: 1 };
+  }
+
+  // --- analytics queries (tests/analytics.test.js) -------------------------
+
+  // Trends: per-year rows across a year range
+  if (/^SELECT performance_year, final_score, quality_score, improvement_activities_score, promoting_interoperability_score, cost_score FROM mips_performance_scores WHERE npi = \$1 AND performance_year BETWEEN \$2 AND \$3 ORDER BY performance_year ASC$/.test(sql)) {
+    const rows = [...mips.values()]
+      .filter(r =>
+        String(r.npi) === String(params[0]) &&
+        Number(r.performance_year) >= Number(params[1]) &&
+        Number(r.performance_year) <= Number(params[2]))
+      .sort((a, b) => Number(a.performance_year) - Number(b.performance_year))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // Ranking: window-function style, overall or within a taxonomy peer group.
+  // Percentile = share of peers scoring at or below the target (100 = best).
+  if (sql.includes('RANK() OVER') && sql.includes('AS total_count')) {
+    const withinTaxonomy = sql.includes('primary_taxonomy_code');
+    const [npi, year, taxonomy] = params;
+    let peers = [...mips.values()]
+      .filter(r => Number(r.performance_year) === Number(year));
+    if (withinTaxonomy) {
+      const peerNpis = new Set(
+        [...providers.values()]
+          .filter(p => p.primary_taxonomy_code === taxonomy)
+          .map(p => String(p.npi))
+      );
+      peers = peers.filter(r => peerNpis.has(String(r.npi)));
+    }
+    const target = peers.find(r => String(r.npi) === String(npi));
+    if (!target) return { rows: [], rowCount: 0 };
+    const targetScore = Number(target.final_score);
+    const rank = 1 + peers.filter(r => Number(r.final_score) > targetScore).length;
+    const percentile = Math.round(
+      10000 * peers.filter(r => Number(r.final_score) <= targetScore).length / peers.length
+    ) / 100;
+    return {
+      rows: [{
+        npi: target.npi,
+        final_score: target.final_score,
+        rank,
+        total_count: peers.length,
+        percentile
+      }],
+      rowCount: 1
+    };
+  }
+
+  // Benchmark: provider score cross-joined with national distribution stats
+  if (sql.includes('AS national_average')) {
+    const [npi, year] = params;
+    const peers = [...mips.values()]
+      .filter(r => Number(r.performance_year) === Number(year));
+    const target = peers.find(r => String(r.npi) === String(npi));
+    if (!target) return { rows: [], rowCount: 0 };
+    const scores = peers.map(r => Number(r.final_score)).sort((a, b) => a - b);
+    return {
+      rows: [{
+        provider_score: target.final_score,
+        national_average: scores.reduce((a, b) => a + b, 0) / scores.length,
+        min_score: scores[0],
+        max_score: scores[scores.length - 1],
+        q1: percentileCont(scores, 0.25),
+        median: percentileCont(scores, 0.5),
+        q3: percentileCont(scores, 0.75),
+        peer_count: scores.length
+      }],
+      rowCount: 1
+    };
+  }
+
+  // Group performance: aggregates over an NPI list for one year
+  if (sql.includes('AS final_avg')) {
+    const [npis, year] = params;
+    const wanted = new Set((npis || []).map(String));
+    const rows = [...mips.values()]
+      .filter(r =>
+        wanted.has(String(r.npi)) &&
+        Number(r.performance_year) === Number(year));
+    return { rows: [groupStats(rows)], rowCount: 1 };
   }
 
   throw new Error(`mockDb: unsupported SQL: ${sql}`);

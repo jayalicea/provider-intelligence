@@ -6,6 +6,7 @@ const compression = require('compression');
 const { logger } = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const providerRoutes = require('./routes/providerRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 class App {
   constructor() {
@@ -78,13 +79,20 @@ class App {
           '/providers/:npi/mips-performance': 'Get MIPS performance data',
           '/providers/:npi/mips-trends': 'Get MIPS performance trends over time',
           '/quality-measures/:facilityId': 'Get quality measures for a facility',
-          '/bulk-data': 'Bulk provider and MIPS data retrieval'
+          '/bulk-data': 'Bulk provider and MIPS data retrieval',
+          '/analytics/group-performance': 'Group MIPS statistics for a set of NPIs',
+          '/analytics/ranking/:npi': 'Provider rank/percentile vs peers, optionally by taxonomy',
+          '/analytics/trends/:npi': 'Multi-year MIPS scores with trend analysis',
+          '/analytics/benchmark/:npi': 'Provider score vs national average and quartiles'
         }
       });
     });
 
     // Provider routes
     this.app.use('/api/v1/providers', providerRoutes);
+
+    // Analytics routes
+    this.app.use('/api/v1/analytics', analyticsRoutes);
   }
 
   setupErrorHandling() {
