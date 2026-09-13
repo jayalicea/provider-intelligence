@@ -254,35 +254,32 @@ function main() {
     await c.query('TRUNCATE nppes_providers');
     console.log('table truncated, streaming CSV...');
 
-    let chain = Promise.resolve();
-    await new Promise((resolve, reject) => {
-      const stream = fs.createReadStream(args.file);
-      stream.on('data', chunk => {
-        if (stopped) { stream.destroy(); chain.then(resolve, reject); return; }
-        const s = chunk.toString('utf8');
-        for (let i = 0; i < s.length; i++) {
-          const ch = s[i];
-          if (inQ) {
-            if (ch === '"') {
-              if (s[i + 1] === '"') { field += '"'; i++; }
-              else inQ = false;
-            } else field += ch;
-          } else if (ch === '"') { inQ = true; }
-          else if (ch === ',') { rec.push(field); field = ''; }
-          else if (ch === '\n') { rec.push(field); field = ''; const r = rec; rec = []; chain = chain.then(() => handleRecord(r)); }
-          else if (ch === '\r') { /* skip */ }
-          else field += ch;
-        }
-      });
-      stream.on('end', () => {
-        chain = chain.then(async () => {
-          if (field.length || rec.length) { rec.push(field); await handleRecord(rec); }
-          await flush();
-        });
-        chain.then(resolve, reject);
-      });
-      stream.on('error', reject);
-    });
+    // Backpressure: async iteration pauses the read stream while a record is
+    // being handled, so a flush at the batch boundary is awaited before the
+    // next chunk is pulled. The previous fire-and-forget promise chain let the
+    // parser outrun the inserts and grew the pg query queue without bound
+    // (V8 heap OOM around 860k rows on the full file). Parse state (inQ,
+    // field, rec) still persists across chunks.
+    const stream = fs.createReadStream(args.file);
+    for await (const chunk of stream) {
+      if (stopped) { stream.destroy(); break; }
+      const s = chunk.toString('utf8');
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (inQ) {
+          if (ch === '"') {
+            if (s[i + 1] === '"') { field += '"'; i++; }
+            else inQ = false;
+          } else field += ch;
+        } else if (ch === '"') { inQ = true; }
+        else if (ch === ',') { rec.push(field); field = ''; }
+        else if (ch === '\n') { rec.push(field); field = ''; const r = rec; rec = []; await handleRecord(r); }
+        else if (ch === '\r') { /* skip */ }
+        else field += ch;
+      }
+    }
+    if (field.length || rec.length) { rec.push(field); await handleRecord(rec); }
+    await flush();
 
     const r = await c.query('SELECT COUNT(*) AS total FROM nppes_providers');
     const table = parseInt(r.rows[0].total, 10);
