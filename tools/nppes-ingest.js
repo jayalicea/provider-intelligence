@@ -56,7 +56,7 @@ const ADDR_FIELDS = [
 
 function resolveColumnNames() {
   const names = Object.assign({}, COLS);
-  for (const [which, prefix] of [['practice', 'Practice Location'], ['mailing', 'Mailing']]) {
+  for (const [prefix, which] of [['practice', 'Practice Location'], ['mailing', 'Mailing']]) {
     for (const [short, pattern] of ADDR_FIELDS) {
       names[`${prefix}_${short}`] = pattern.replace('{which}', which);
     }
