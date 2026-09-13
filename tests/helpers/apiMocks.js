@@ -8,7 +8,19 @@ const MIPS_DATASET_PATH = '/data-api/v1/dataset/7adb8b1b-b85c-4ed3-b314-064776e5
 const DATASTORE_PATH = datasetId => `/provider-data/api/1/datastore/query/${datasetId}/0`;
 
 // Block all real HTTP; supertest's loopback listener stays reachable.
+//
+// A jest worker runs several test files in one process. Each file gets a fresh
+// module registry, so each requires its own `nock` instance, but http/https are
+// core modules that are never re-instantiated -- the overrides installed by an
+// earlier file's instance survive into the next file. The stale override
+// consults its own (now empty) interceptor registry, matches nothing, and
+// rejects the request as a disallowed net connect. That is why every suite
+// passed alone and whichever suite ran second in a worker failed.
+//
+// Activating on setup and restoring the real http methods when the file ends
+// keeps exactly one instance patched at a time, so suites pass in any order.
 function isolateNet() {
+  if (!nock.isActive()) nock.activate();
   nock.disableNetConnect();
   nock.enableNetConnect(host =>
     /^(127\.0\.0\.1|localhost|::1|\[::1\])/.test(host)
@@ -17,6 +29,17 @@ function isolateNet() {
 
 function resetNet() {
   nock.cleanAll();
+}
+
+// Teardown belongs to the file, not the test: nock.restore() deactivates the
+// instance outright, so calling it per test would leave every test after the
+// first one unintercepted. Registered here rather than in each test file so
+// the suites themselves stay unchanged.
+if (typeof afterAll === 'function') {
+  afterAll(() => {
+    nock.cleanAll();
+    nock.restore();
+  });
 }
 
 /**
