@@ -13,6 +13,7 @@ function reset() {
   mips.clear();
   exclusions.length = 0;
   quality = [];
+  failCacheWrite = false;
 }
 
 const norm = sql => sql.replace(/\s+/g, ' ').trim();
@@ -154,13 +155,23 @@ async function query(text, params = []) {
     return { rows: [], rowCount: before - quality.length };
   }
 
+  // Stale-row sweep issued by cacheQualityMeasures after its upserts.
+  if (/^DELETE FROM quality_measures WHERE facility_id = \$1 AND data_source = \$2 AND measure_id <> ALL\(\$3\)$/.test(sql)) {
+    const keep = new Set(params[2]);
+    const before = quality.length;
+    quality = quality.filter(
+      r => !(r.facility_id === params[0] && r.data_source === params[1] && !keep.has(r.measure_id))
+    );
+    return { rows: [], rowCount: before - quality.length };
+  }
+
   if (/^INSERT INTO quality_measures /.test(sql)) {
     const [
       facilityId, measureId, measureName, score, denominator,
       lowerEstimate, higherEstimate, comparedToNational,
       startDate, endDate, dataSource
     ] = params;
-    quality.push({
+    const row = {
       facility_id: facilityId,
       measure_id: measureId,
       measure_name: measureName,
@@ -173,7 +184,14 @@ async function query(text, params = []) {
       reporting_period_end: endDate,
       data_source: dataSource,
       sync_timestamp: new Date()
-    });
+    };
+    // Mirror the unique index on (facility_id, measure_id, data_source): the
+    // statement upserts, so a second write to the same key replaces the row
+    // rather than adding one.
+    const at = quality.findIndex(
+      r => r.facility_id === facilityId && r.measure_id === measureId && r.data_source === dataSource
+    );
+    if (at === -1) quality.push(row); else quality[at] = row;
     return { rows: [], rowCount: 1 };
   }
 
@@ -386,9 +404,28 @@ async function query(text, params = []) {
   throw new Error(`mockDb: unsupported SQL: ${sql}`);
 }
 
+// Transaction verbs are accepted and the statements simply apply to the shared
+// store: these tests exercise statement semantics, not rollback isolation.
+// failNextCacheWrite() makes the next quality_measures write throw, so the
+// error path of cacheQualityMeasures can be covered.
+let failCacheWrite = false;
+
+async function clientQuery(sql, params) {
+  const text = norm(sql);
+  if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') {
+    return { rows: [], rowCount: 0 };
+  }
+  if (failCacheWrite && /quality_measures/.test(text)) {
+    failCacheWrite = false;
+    throw new Error('mockDb: simulated write failure');
+  }
+  return query(sql, params);
+}
+
 module.exports = {
   query,
-  getClient: async () => { throw new Error('mockDb: getClient not supported'); },
+  getClient: async () => ({ query: clientQuery, release: () => {} }),
+  _failNextCacheWrite: () => { failCacheWrite = true; },
   pool: {},
   _stores: {
     providers,
