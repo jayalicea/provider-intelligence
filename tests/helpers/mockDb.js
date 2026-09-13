@@ -7,6 +7,7 @@ const providers = new Map(); // npi -> row
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
 const stateExclusions = []; // state_exclusions rows
+const otherNames = [];      // nppes_othernames rows
 let quality = [];            // quality_measures rows
 
 function reset() {
@@ -14,6 +15,7 @@ function reset() {
   mips.clear();
   exclusions.length = 0;
   stateExclusions.length = 0;
+  otherNames.length = 0;
   quality = [];
 }
 
@@ -362,6 +364,25 @@ async function query(text, params = []) {
   }
 
   // Table-wide as_of used as the provenance default for CLEAR-by-scan rows
+  // nppes_othernames: DBA aliases for one NPI
+  if (/^SELECT other_name FROM nppes_othernames WHERE npi = \$1 AND other_name_type_code = '3'$/.test(sql)) {
+    const rows = otherNames
+      .filter(r => r.npi === params[0] && String(r.other_name_type_code) === '3')
+      .map(r => ({ other_name: r.other_name }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // oig_exclusions: business name (legal or DBA alias) against busname
+  if (/^SELECT busname, state, excltype, excldate, reindate, source, as_of FROM oig_exclusions WHERE upper\(regexp_replace\(busname/.test(sql)) {
+    const names = params[0];
+    const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    const rows = exclusions
+      .filter(r => r.busname && names.includes(norm(r.busname)))
+      .filter(r => params.length < 2 || String(r.state || '').toUpperCase() === params[1])
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   // state_exclusions: NPI exact match
   if (/^SELECT \* FROM state_exclusions WHERE npi = \$1$/.test(sql)) {
     const rows = stateExclusions.filter(r => r.npi === params[0]).map(r => ({ ...r }));
@@ -414,7 +435,8 @@ module.exports = {
     mips,
     get quality() { return quality; },
     exclusions,
-    stateExclusions
+    stateExclusions,
+    otherNames
   },
   _reset: reset
 };

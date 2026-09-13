@@ -382,3 +382,116 @@ describe('ExclusionService state list reinstatement on the name path', () => {
     expect(result.reinstated.date).toBe('2026-02-01');
   });
 });
+
+// --- business entity screening with DBA aliases ----------------------------
+
+function seedOtherName(overrides = {}) {
+  const row = {
+    npi: '1982736450',
+    other_name: 'ACME HOME HEALTH',
+    other_name_type_code: '3',
+    created_date: '2015-04-01',
+    source: 'othername_pfile.csv',
+    as_of: '2026-09-13',
+    ...overrides
+  };
+  mockDb._stores.otherNames.push(row);
+  return row;
+}
+
+describe('ExclusionService entity screening', () => {
+  test('an excluded business is matched by its legal business name', async () => {
+    seedExclusion({
+      npi: null, lastname: '', firstname: '', busname: 'ACME HEALTH SYSTEM LLC',
+      state: 'CA', display_name: 'ACME HEALTH SYSTEM LLC'
+    });
+
+    const result = await service.resolveEntityExclusion({
+      organizationName: 'Acme Health System LLC', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.matchedVia).toBe('legal_name');
+    expect(result.exclusion.registry).toBe('LEIE');
+  });
+
+  test('an excluded business is caught through a DBA alias the roster does not carry', async () => {
+    // The roster carries the legal name; the LEIE carries the DBA.
+    seedExclusion({
+      npi: null, lastname: '', firstname: '', busname: 'ACME HOME HEALTH',
+      state: 'CA', display_name: 'ACME HOME HEALTH'
+    });
+    seedOtherName({ npi: '1982736450', other_name: 'ACME HOME HEALTH' });
+
+    const result = await service.resolveEntityExclusion({
+      npi: '1982736450', organizationName: 'Acme Health System LLC', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.matchedVia).toBe('dba_alias');
+    expect(result.matchedName).toBe('ACME HOME HEALTH');
+    expect(result.notes.join(' ')).toMatch(/doing-business-as alias/);
+  });
+
+  test('only type code 3 names are treated as DBA aliases', async () => {
+    seedExclusion({
+      npi: null, lastname: '', firstname: '', busname: 'FORMER NAME INC',
+      state: 'CA', display_name: 'FORMER NAME INC'
+    });
+    // Type 4 is a former legal business name, not a DBA.
+    seedOtherName({ other_name: 'FORMER NAME INC', other_name_type_code: '4' });
+
+    const result = await service.resolveEntityExclusion({
+      npi: '1982736450', organizationName: 'Acme Health System LLC', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('CLEAR');
+  });
+
+  test('a DBA alias hit on a state list cites the state source', async () => {
+    seedStateExclusion({ npi: null, entity_name: 'ACME HOME HEALTH', state: 'CA' });
+    seedOtherName({ other_name: 'ACME HOME HEALTH' });
+
+    const result = await service.resolveEntityExclusion({
+      npi: '1982736450', organizationName: 'Something Else LLC', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.exclusion.registry).toBe('STATE');
+    expect(result.exclusion.sourceName).toMatch(/DHCS/);
+    expect(result.matchedVia).toBe('dba_alias');
+  });
+
+  test('a clean entity with aliases is CLEAR and reports how many were screened', async () => {
+    seedOtherName({ other_name: 'ACME HOME HEALTH' });
+    seedOtherName({ other_name: 'ACME HOSPICE' });
+
+    const result = await service.resolveEntityExclusion({
+      npi: '1982736450', organizationName: 'Acme Health System LLC', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('CLEAR');
+    expect(result.notes.join(' ')).toMatch(/plus 2 doing-business-as aliases/);
+  });
+
+  test('no NPI and no organization name is UNVERIFIED, never CLEAR', async () => {
+    const result = await service.resolveEntityExclusion({ state: 'CA' });
+
+    expect(result.verdict).toBe('UNVERIFIED');
+  });
+
+  test('a reinstated business exclusion is CLEAR with the reinstatement reported', async () => {
+    seedExclusion({
+      npi: null, lastname: '', firstname: '', busname: 'ACME HEALTH SYSTEM LLC',
+      state: 'CA', reindate: '20260301', display_name: 'ACME HEALTH SYSTEM LLC'
+    });
+
+    const result = await service.resolveEntityExclusion({
+      organizationName: 'Acme Health System LLC', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('CLEAR');
+    expect(result.reinstated.registry).toBe('LEIE');
+    expect(result.reinstated.date).toBe('2026-03-01');
+  });
+});

@@ -302,6 +302,158 @@ class ExclusionService {
   }
 
   /**
+   * Resolve a business entity against both exclusion registries.
+   *
+   * There was no organization path before this: oig_exclusions.busname is
+   * populated for excluded businesses but nothing queried it, so an entity
+   * could only ever be screened by NPI. This adds the name path and expands it
+   * over the entity's doing-business-as aliases.
+   *
+   * Rosters routinely carry the DBA rather than the legal business name, and
+   * NPPES keeps DBAs in the othername reference file (type code 3), so
+   * screening only the legal name is a false clear waiting to happen. Every
+   * alias is screened and the result reports which name actually matched.
+   *
+   * Organizations have no date of birth, so dobStatus is null throughout and
+   * the match basis is reported instead.
+   *
+   * input: { npi, organizationName, state }
+   */
+  async resolveEntityExclusion({ npi = null, organizationName = null, state = null } = {}) {
+    const notes = [];
+    try {
+      // 1. NPI exact match stays definitive for entities too.
+      if (isValidNpi(npi)) {
+        const leie = await this.resolveLeieExclusion({ npi });
+        const stateHit = await this.resolveStateExclusion({ npi });
+        if (leie.verdict === 'EXCLUDED') {
+          return { ...leie, matchedName: null, matchedVia: 'npi',
+            stateExclusion: stateHit.verdict === 'EXCLUDED' ? stateHit.exclusion : null,
+            notes: [...leie.notes, ...stateHit.notes] };
+        }
+        if (stateHit.verdict === 'EXCLUDED') {
+          return { ...stateHit, matchedName: null, matchedVia: 'npi',
+            stateExclusion: stateHit.exclusion,
+            notes: [...leie.notes, ...stateHit.notes] };
+        }
+      }
+
+      // 2. Name path over the legal name plus every DBA alias.
+      const aliases = [];
+      if (isValidNpi(npi)) {
+        const r = await db.query(
+          "SELECT other_name FROM nppes_othernames WHERE npi = $1 AND other_name_type_code = '3'",
+          [npi]
+        );
+        for (const row of r.rows || []) {
+          const n = normalize(row.other_name);
+          if (n) aliases.push(n);
+        }
+      }
+
+      const legal = normalize(organizationName);
+      const candidates = [...new Set([legal, ...aliases].filter(Boolean))];
+      if (!candidates.length) {
+        notes.push('No valid NPI and no usable organization name were supplied, ' +
+          'so no definitive entity check could be performed.');
+        return { verdict: 'UNVERIFIED', match: null, dobStatus: null, matchedName: null,
+          matchedVia: null, exclusion: null, stateExclusion: null, reinstated: null, notes };
+      }
+      if (aliases.length) {
+        notes.push(`Screened the legal business name plus ${aliases.length} ` +
+          `doing-business-as alias${aliases.length === 1 ? '' : 'es'} from NPPES.`);
+      }
+
+      const nState = normalize(state);
+      const params = [candidates];
+      let stateClause = '';
+      if (nState) { params.push(nState); stateClause = ' AND upper(state) = $2'; }
+
+      const leieRows = await db.query(
+        "SELECT busname, state, excltype, excldate, reindate, source, as_of FROM oig_exclusions " +
+        "WHERE upper(regexp_replace(busname, '[^A-Z0-9 ]', '', 'g')) = ANY($1)" + stateClause,
+        params
+      );
+      const leieMatches = (leieRows.rows || []).filter(r => candidates.includes(normalize(r.busname)));
+      const leieActive = leieMatches.find(r => !isReinstated(r));
+
+      const stateRows = await db.query(
+        "SELECT * FROM state_exclusions WHERE upper(regexp_replace(entity_name, '[^A-Z0-9 ,]', '', 'g')) = ANY($1)" +
+        (nState ? ' AND upper(state) = $2' : ''),
+        params
+      );
+      const stateMatches = (stateRows.rows || []).filter(r => candidates.includes(normalize(r.entity_name)));
+      const stateActive = stateMatches.find(stateRowIsActive);
+
+      const via = name => (normalize(name) === legal ? 'legal_name' : 'dba_alias');
+      const aliasNote = name => {
+        if (via(name) === 'dba_alias') {
+          notes.push('Matched on a doing-business-as alias rather than the legal ' +
+            'business name.');
+        }
+      };
+
+      if (leieActive) {
+        aliasNote(leieActive.busname);
+        return {
+          verdict: 'EXCLUDED', match: nState ? 'name_state' : 'name', dobStatus: null,
+          matchedName: leieActive.busname, matchedVia: via(leieActive.busname),
+          exclusion: {
+            registry: 'LEIE', type: leieActive.excltype,
+            date: formatLeieDate(leieActive.excldate),
+            source: leieActive.source, asOf: formatAsOf(leieActive.as_of)
+          },
+          stateExclusion: stateActive ? stateExclusionPayload(stateActive) : null,
+          reinstated: null, notes
+        };
+      }
+      if (stateActive) {
+        aliasNote(stateActive.entity_name);
+        return {
+          verdict: 'EXCLUDED', match: nState ? 'name_state' : 'name', dobStatus: null,
+          matchedName: stateActive.entity_name, matchedVia: via(stateActive.entity_name),
+          exclusion: stateExclusionPayload(stateActive),
+          stateExclusion: stateExclusionPayload(stateActive),
+          reinstated: null, notes
+        };
+      }
+
+      const reinstatedRow = leieMatches[0] || stateMatches[0] || null;
+      if (reinstatedRow) {
+        const isLeie = leieMatches.length > 0;
+        const matched = isLeie ? reinstatedRow.busname : reinstatedRow.entity_name;
+        notes.push('A prior exclusion matched this entity by name, but it has ' +
+          'been reinstated; treated as clear as of the reinstatement date shown.');
+        return {
+          verdict: 'CLEAR', match: nState ? 'name_state' : 'name', dobStatus: null,
+          matchedName: matched, matchedVia: via(matched),
+          exclusion: null, stateExclusion: null,
+          reinstated: isLeie
+            ? { registry: 'LEIE', date: formatLeieDate(reinstatedRow.reindate),
+              source: reinstatedRow.source, asOf: formatAsOf(reinstatedRow.as_of) }
+            : { registry: 'STATE', date: formatStateDate(reinstatedRow.reinstatement_date),
+              state: reinstatedRow.state || null,
+              source: reinstatedRow.source_name || 'State Medicaid exclusion list',
+              asOf: formatAsOf(reinstatedRow.as_of) },
+          notes
+        };
+      }
+
+      notes.push('No exclusion record found for this entity name or its ' +
+        'doing-business-as aliases in the LEIE or the state lists.');
+      return { verdict: 'CLEAR', match: nState ? 'name_state' : 'name', dobStatus: null,
+        matchedName: null, matchedVia: null, exclusion: null, stateExclusion: null,
+        reinstated: null, notes };
+    } catch (error) {
+      logger.error('Error resolving entity exclusion:', error);
+      notes.push('The entity exclusion query failed; status could not be ' +
+        'verified. A miss is never assumed when the check cannot complete.');
+      return { verdict: 'UNVERIFIED', match: null, dobStatus: null, matchedName: null,
+        matchedVia: null, exclusion: null, stateExclusion: null, reinstated: null, notes };
+    }
+  }
+
+  /**
    * Resolve one identity against state_exclusions, mirroring the LEIE paths:
    * NPI exact match first, then name + state. Returns the same verdict shape
    * with exclusion.registry === 'STATE'.
