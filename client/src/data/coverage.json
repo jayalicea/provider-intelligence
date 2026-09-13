@@ -20,9 +20,9 @@
       "name": "State Medicaid exclusion lists",
       "publisher": "State Medicaid agencies (38 jurisdictions)",
       "scope": "State-level Medicaid program exclusions and terminations",
-      "records": 82929,
+      "records": 0,
       "recordLabel": "exclusion records",
-      "jurisdictions": 38,
+      "jurisdictions": 0,
       "asOf": "2026-09-13",
       "cadence": "Varies by state; each state publishes on its own schedule",
       "sourceUrl": "https://www.opensanctions.org/datasets/us_medicaid_exclusions/",
@@ -80,5 +80,465 @@
       ]
     }
   ],
-  "jurisdictions": []
+  "jurisdictions": [
+    {
+      "code": "AK",
+      "name": "Alaska",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://health.alaska.gov/Commissioner/Pages/ProgramIntegrity/default.aspx",
+      "asOf": null
+    },
+    {
+      "code": "AL",
+      "name": "Alabama",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://medicaid.alabama.gov/content/8.0_Fraud/8.7_Suspended_Providers.aspx",
+      "asOf": null
+    },
+    {
+      "code": "AR",
+      "name": "Arkansas",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://dhs.arkansas.gov/dhs/portal/Exclusions/PublicSearch/",
+      "asOf": null
+    },
+    {
+      "code": "AZ",
+      "name": "Arizona",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.azahcccs.gov/Fraud/Providers/actions.html",
+      "asOf": null
+    },
+    {
+      "code": "CA",
+      "name": "California",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://mcweb.apps.prd.cammis.medi-cal.ca.gov/references/sandi",
+      "asOf": null
+    },
+    {
+      "code": "CO",
+      "name": "Colorado",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://hcpf.colorado.gov/provider-termination",
+      "asOf": null
+    },
+    {
+      "code": "CT",
+      "name": "Connecticut",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://portal.ct.gov/dss/quality-assurance/quality-assurance-administrative-actions-list",
+      "asOf": null
+    },
+    {
+      "code": "DC",
+      "name": "District of Columbia",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://ocp.dc.gov/page/excluded-parties-list",
+      "asOf": null
+    },
+    {
+      "code": "DE",
+      "name": "Delaware",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://medicaid.dhss.delaware.gov/provider/Home/ProgramIntegrityLanding/tabid/2102/Default.aspx",
+      "asOf": null
+    },
+    {
+      "code": "FL",
+      "name": "Florida",
+      "status": "blocked",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://apps.ahca.myflorida.com/dm_web/",
+      "asOf": null
+    },
+    {
+      "code": "GA",
+      "name": "Georgia",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://dch.georgia.gov/office-inspector-general/georgia-oig-exclusions-list",
+      "asOf": null
+    },
+    {
+      "code": "HI",
+      "name": "Hawaii",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://medquest.hawaii.gov/en/plans-providers/provider-exclusion-reinstatement-list.html",
+      "asOf": null
+    },
+    {
+      "code": "IA",
+      "name": "Iowa",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://hhs.iowa.gov/programs/welcome-iowa-medicaid/provider-services/excluded-individuals-and-entities",
+      "asOf": null
+    },
+    {
+      "code": "ID",
+      "name": "Idaho",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://healthandwelfare.idaho.gov/providers/idaho-medicaid-providers/information-medicaid-providers",
+      "asOf": null
+    },
+    {
+      "code": "IL",
+      "name": "Illinois",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://hfs.illinois.gov/oig/sanctionslist.html",
+      "asOf": null
+    },
+    {
+      "code": "IN",
+      "name": "Indiana",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.in.gov/fssa/ompp/provider-information/termination-of-provider-participation-in-medicaid-and-chip",
+      "asOf": null
+    },
+    {
+      "code": "KS",
+      "name": "Kansas",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.kdhe.ks.gov/172/Medicaid",
+      "asOf": null
+    },
+    {
+      "code": "KY",
+      "name": "Kentucky",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.chfs.ky.gov/agencies/dms/dpi/pe/Pages/terminated.aspx",
+      "asOf": null
+    },
+    {
+      "code": "LA",
+      "name": "Louisiana",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://adverseactions.ldh.la.gov/SelSearch/",
+      "asOf": null
+    },
+    {
+      "code": "MA",
+      "name": "Massachusetts",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.mass.gov/info-details/learn-about-suspended-or-excluded-masshealth-providers",
+      "asOf": null
+    },
+    {
+      "code": "MD",
+      "name": "Maryland",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://health.maryland.gov/mmcp/provider/Pages/sanctioned_list.aspx",
+      "asOf": null
+    },
+    {
+      "code": "ME",
+      "name": "Maine",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://mainecare.maine.gov/mhpviewer.aspx?FID=MEEX",
+      "asOf": null
+    },
+    {
+      "code": "MI",
+      "name": "Michigan",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.michigan.gov/mdhhs/doing-business/providers/providers/billingreimbursement/list-of-sanctioned-providers",
+      "asOf": null
+    },
+    {
+      "code": "MN",
+      "name": "Minnesota",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "http://www.dhs.state.mn.us/main/idcplg?IdcService=GET_DYNAMIC_CONVERSION&RevisionSelectionMethod=LatestReleased&dDocName=DHS-295094",
+      "asOf": null
+    },
+    {
+      "code": "MO",
+      "name": "Missouri",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://mmac.mo.gov/providers/provider-sanctions/",
+      "asOf": null
+    },
+    {
+      "code": "MS",
+      "name": "Mississippi",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://medicaid.ms.gov/providers/provider-terminations/",
+      "asOf": null
+    },
+    {
+      "code": "MT",
+      "name": "Montana",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://dphhs.mt.gov/montanahealthcareprograms/terminatedexcludedproviders",
+      "asOf": null
+    },
+    {
+      "code": "NC",
+      "name": "North Carolina",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://medicaid.ncdhhs.gov/providers/excluded-providers",
+      "asOf": null
+    },
+    {
+      "code": "ND",
+      "name": "North Dakota",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.hhs.nd.gov/healthcare/medicaid/provider/compliance/fraud-and-abuse",
+      "asOf": null
+    },
+    {
+      "code": "NE",
+      "name": "Nebraska",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://dhhs.ne.gov/Pages/Program-Integrity-Sanctioned-Providers.aspx",
+      "asOf": null
+    },
+    {
+      "code": "NH",
+      "name": "New Hampshire",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.dhhs.nh.gov/programs-services/medicaid/medicaid-provider-relations",
+      "asOf": null
+    },
+    {
+      "code": "NJ",
+      "name": "New Jersey",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.njoag.gov/about/divisions-and-offices/office-of-the-insurance-fraud-prosecutor-home/medicaid-fraud-control-unit/",
+      "asOf": null
+    },
+    {
+      "code": "NM",
+      "name": "New Mexico",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "NV",
+      "name": "Nevada",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://dhcfp.nv.gov/Providers/PI/PSExclusions/",
+      "asOf": null
+    },
+    {
+      "code": "NY",
+      "name": "New York",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://omig.ny.gov/medicaid-fraud/medicaid-exclusions",
+      "asOf": null
+    },
+    {
+      "code": "OH",
+      "name": "Ohio",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://medicaid.ohio.gov/wps/portal/gov/medicaid/resources-for-providers/enrollment-and-support/provider-enrollment/provider-exclusion-and-suspension-list",
+      "asOf": null
+    },
+    {
+      "code": "OK",
+      "name": "Oklahoma",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "OR",
+      "name": "Oregon",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.oregon.gov/oha/FOD/PIAU/Pages/Convictions.aspx",
+      "asOf": null
+    },
+    {
+      "code": "PA",
+      "name": "Pennsylvania",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.pa.gov/agencies/dhs/report-fraud/medicheck-list",
+      "asOf": null
+    },
+    {
+      "code": "RI",
+      "name": "Rhode Island",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "SC",
+      "name": "South Carolina",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.scdhhs.gov/fraud",
+      "asOf": null
+    },
+    {
+      "code": "SD",
+      "name": "South Dakota",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "TN",
+      "name": "Tennessee",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.tn.gov/tenncare/fraud-and-abuse/program-integrity.html",
+      "asOf": null
+    },
+    {
+      "code": "TX",
+      "name": "Texas",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://oig.hhsc.state.tx.us/oigportal2/Exclusions/ctl/DOW/mid/384",
+      "asOf": null
+    },
+    {
+      "code": "UT",
+      "name": "Utah",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "VA",
+      "name": "Virginia",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "VT",
+      "name": "Vermont",
+      "status": "blocked",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://dvha.vermont.gov/providers/medicaid-excluded-providers",
+      "asOf": null
+    },
+    {
+      "code": "WA",
+      "name": "Washington",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.hca.wa.gov/billers-providers-partners/become-apple-health-provider/provider-termination-and-exclusion-list",
+      "asOf": null
+    },
+    {
+      "code": "WI",
+      "name": "Wisconsin",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "WV",
+      "name": "West Virginia",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.wvmmis.com/SitePages/Medicaid%20Provider%20SanctionedExclusion",
+      "asOf": null
+    },
+    {
+      "code": "WY",
+      "name": "Wyoming",
+      "status": "extracted",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://health.wyo.gov/healthcarefin/medicaid/",
+      "asOf": null
+    }
+  ]
 }

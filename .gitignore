@@ -1,9 +1,9 @@
-﻿node_modules/
+node_modules/
 .env
 logs/
 *.log
 coverage/
-data/
+/data/
 # The data/ rule above is for ingest inputs at the repo root; the committed
 # coverage registry lives under client/src/data and must not be swept up.
 !client/src/data/
