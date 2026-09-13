@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/client.js'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
+import VerdictBadge from '../components/VerdictBadge.jsx'
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI',
@@ -11,16 +12,6 @@ const US_STATES = [
   'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA',
   'WV', 'WI', 'WY',
 ]
-
-function IntegrityBadge({ verdict }) {
-  if (verdict === 'EXCLUDED') {
-    return <span className="badge badge-error">EXCLUDED</span>
-  }
-  if (verdict === 'CLEAR') {
-    return <span className="badge badge-success">CLEAR</span>
-  }
-  return <span className="badge badge-na">UNVERIFIED</span>
-}
 
 function CohortSkeleton() {
   return (
@@ -144,7 +135,7 @@ export default function CohortExplorerPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th>MIPS</th><th>Integrity</th>
+                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th className="num">MIPS</th><th>Integrity</th>
               </tr>
             </thead>
             <tbody><CohortSkeleton /></tbody>
@@ -167,7 +158,7 @@ export default function CohortExplorerPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th>MIPS</th><th>Integrity</th>
+                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th className="num">MIPS</th><th>Integrity</th>
               </tr>
             </thead>
             <tbody>
@@ -185,12 +176,12 @@ export default function CohortExplorerPage() {
                   <td className="mono">{row.npi}</td>
                   <td>{row.taxonomy ?? <span className="score-null">Not reported</span>}</td>
                   <td>{row.city ?? <span className="score-null">Not reported</span>}</td>
-                  <td className="numeric">
+                  <td className="num">
                     {row.finalScore !== null
                       ? row.finalScore
                       : <span className="score-null">Not reported</span>}
                   </td>
-                  <td><IntegrityBadge verdict={row.exclusion?.verdict ?? 'UNVERIFIED'} /></td>
+                  <td><VerdictBadge verdict={row.exclusion?.verdict ?? 'UNVERIFIED'} /></td>
                 </tr>
               ))}
             </tbody>

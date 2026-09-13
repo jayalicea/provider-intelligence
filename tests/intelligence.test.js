@@ -365,3 +365,74 @@ describe('GET /api/v1/intelligence/exclusion-watchlist', () => {
     expect(res.body.data).toEqual([]);
   });
 });
+
+// --- roster screening ------------------------------------------------------
+
+describe('POST /api/v1/intelligence/screen-roster', () => {
+  test('screens rows and returns per-verdict counts', async () => {
+    seedWatchlistRow({ daysAgo: 5, npi: '1760461826', display_name: 'DOE, JANE' });
+
+    const res = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .send({ rows: [{ npi: '1760461826' }, { npi: '1366446619' }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(2);
+    expect(res.body.counts.EXCLUDED).toBe(1);
+    expect(res.body.counts.CLEAR).toBe(1);
+    expect(res.body.data[0].verdict).toBe('EXCLUDED');
+    expect(res.body.data[0].exclusion.registry).toBe('LEIE');
+  });
+
+  test('an unusable row is UNVERIFIED, never CLEAR', async () => {
+    const res = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .send({ rows: [{ npi: 'not-an-npi' }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].verdict).toBe('UNVERIFIED');
+    expect(res.body.counts.UNVERIFIED).toBe(1);
+  });
+
+  test('rows carry the input identity back for reconciliation', async () => {
+    const res = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .send({ rows: [{ lastname: 'Doe', firstname: 'Jane', state: 'CA' }] });
+
+    expect(res.body.data[0].input).toEqual({
+      npi: null, name: 'Doe, Jane', state: 'CA'
+    });
+  });
+
+  test('an empty or missing rows array is rejected', async () => {
+    const empty = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .send({ rows: [] });
+    expect(empty.status).toBe(400);
+
+    const missing = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .send({});
+    expect(missing.status).toBe(400);
+  });
+
+  test('a non-object row is rejected rather than silently skipped', async () => {
+    const res = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .send({ rows: [{ npi: '1366446619' }, 'garbage'] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/every row must be an object/);
+  });
+
+  test('a roster over the row cap is rejected with the limit named', async () => {
+    const rows = Array.from({ length: 1001 }, () => ({ npi: '1366446619' }));
+
+    const res = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .send({ rows });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/1000 row limit/);
+  });
+});

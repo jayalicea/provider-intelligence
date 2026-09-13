@@ -11,6 +11,7 @@ const {
 const WATCHLIST_DEFAULT_DAYS = 90;
 const WATCHLIST_MAX_DAYS = 365;
 const WATCHLIST_MAX_ROWS = 500;
+const ROSTER_MAX_ROWS = 1000;
 
 // excldate is YYYYMMDD text, so the cutoff is compared as the same zero-padded
 // string rather than cast per row.
@@ -143,6 +144,74 @@ class IntelligenceService {
   }
 
   /**
+   * Screen a roster of identities against both exclusion registries.
+   *
+   * Rows arrive already parsed -- the client reads the CSV, so nothing is
+   * uploaded and no file ever touches the server. Each row is resolved
+   * independently and a row that throws comes back UNVERIFIED with the reason,
+   * never silently dropped and never assumed clear, so one malformed row can
+   * never quietly pass a whole roster.
+   *
+   * rows: [{ npi, lastname, firstname, state, dob, organizationName }]
+   */
+  async screenRoster(rows = []) {
+    const ExclusionService = require('./exclusionService');
+    const service = new ExclusionService();
+    const counts = { EXCLUDED: 0, CLEAR: 0, UNVERIFIED: 0 };
+    const results = [];
+
+    for (const row of rows.slice(0, ROSTER_MAX_ROWS)) {
+      let result;
+      try {
+        result = row.organizationName && !row.lastname
+          ? await service.resolveEntityExclusion({
+            npi: row.npi || null,
+            organizationName: row.organizationName,
+            state: row.state || null
+          })
+          : await service.resolveExclusion({
+            npi: row.npi || null,
+            lastname: row.lastname || null,
+            firstname: row.firstname || null,
+            state: row.state || null,
+            dob: row.dob || null
+          });
+      } catch (error) {
+        logger.error('Roster row could not be resolved:', error);
+        result = {
+          verdict: 'UNVERIFIED', match: null, dobStatus: null, exclusion: null,
+          stateExclusion: null, reinstated: null,
+          notes: [`This row could not be resolved: ${error.message}`]
+        };
+      }
+      counts[result.verdict] = (counts[result.verdict] || 0) + 1;
+      results.push({
+        input: {
+          npi: row.npi || null,
+          name: row.organizationName ||
+            [row.lastname, row.firstname].filter(Boolean).join(', ') || null,
+          state: row.state || null
+        },
+        verdict: result.verdict,
+        match: result.match || null,
+        dobStatus: result.dobStatus || null,
+        exclusion: result.exclusion || null,
+        stateExclusion: result.stateExclusion || null,
+        reinstated: result.reinstated || null,
+        notes: result.notes || []
+      });
+    }
+
+    return {
+      counts,
+      screened: results.length,
+      submitted: rows.length,
+      truncated: rows.length > ROSTER_MAX_ROWS,
+      results
+    };
+  }
+
+  /**
    * Recently added, still-active LEIE exclusions -- the screening watchlist.
    *
    * Active means reindate IS NULL: the ingest normalizes LEIE's '00000000' and
@@ -212,3 +281,4 @@ module.exports = IntelligenceService;
 module.exports.WATCHLIST_DEFAULT_DAYS = WATCHLIST_DEFAULT_DAYS;
 module.exports.WATCHLIST_MAX_DAYS = WATCHLIST_MAX_DAYS;
 module.exports.WATCHLIST_MAX_ROWS = WATCHLIST_MAX_ROWS;
+module.exports.ROSTER_MAX_ROWS = ROSTER_MAX_ROWS;

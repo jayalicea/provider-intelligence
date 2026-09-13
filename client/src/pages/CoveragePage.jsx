@@ -25,7 +25,7 @@ function DatasetRow({ dataset }) {
         {dataset.scope}
         {dataset.vintage && <div className="provenance">{dataset.vintage}</div>}
       </td>
-      <td className="mono">
+      <td className="num">
         {nf.format(dataset.records)}
         <div className="provenance">{dataset.recordLabel}</div>
       </td>
@@ -65,7 +65,7 @@ export default function CoveragePage() {
             <tr>
               <th>Dataset</th>
               <th>Scope</th>
-              <th>Records</th>
+              <th className="num">Records</th>
               <th>As of</th>
               <th>Provenance</th>
             </tr>
@@ -115,7 +115,7 @@ export default function CoveragePage() {
               <tr>
                 <th>Jurisdiction</th>
                 <th>Status</th>
-                <th>Records</th>
+                <th className="num">Records</th>
                 <th>Official source</th>
                 <th>As of</th>
               </tr>
@@ -128,7 +128,7 @@ export default function CoveragePage() {
                     <div className="provenance mono">{j.code}</div>
                   </td>
                   <td>{j.status}</td>
-                  <td className="mono">{j.records > 0 ? nf.format(j.records) : '—'}</td>
+                  <td className="num">{j.records > 0 ? nf.format(j.records) : '—'}</td>
                   <td>
                     {j.sourceUrl ? (
                       <a href={j.sourceUrl} target="_blank" rel="noreferrer noopener">

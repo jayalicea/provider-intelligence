@@ -14,5 +14,6 @@ router.use(rateLimiter({ windowMs: 60 * 1000, max: 100 })); // 100 requests per 
 // Joined intelligence endpoints
 router.get('/cohort', bound('getCohort'));
 router.get('/exclusion-watchlist', bound('getExclusionWatchlist'));
+router.post('/screen-roster', bound('screenRoster'));
 
 module.exports = router;

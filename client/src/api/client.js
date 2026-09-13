@@ -95,6 +95,17 @@ export const api = {
     }
   },
 
+  screenRoster: async (rows) => {
+    const { data } = await http.post('/intelligence/screen-roster', { rows })
+    return {
+      results: data.data ?? [],
+      count: data.count ?? 0,
+      counts: data.counts ?? {},
+      submitted: data.submitted ?? 0,
+      truncated: data.truncated ?? false,
+    }
+  },
+
   getQualityMeasures: async (facilityId) => {
     // The backend mounts quality measures under the providers router
     // (/api/v1/providers/quality-measures/:facilityId), not at the API root.
