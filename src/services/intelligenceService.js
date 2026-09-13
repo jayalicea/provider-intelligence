@@ -46,7 +46,11 @@ class IntelligenceService {
       const params = [state.toUpperCase()];
       if (taxonomy) {
         params.push(`%${taxonomy.toLowerCase()}%`);
-        conditions.push(`lower(p.primary_taxonomy_description) LIKE $${params.length}`);
+        // Filter on the same value the row displays: the crosswalk label when
+        // the code resolves, the stored description otherwise.
+        conditions.push(
+          `lower(COALESCE(t.description, p.primary_taxonomy_description)) LIKE $${params.length}`
+        );
       }
       if (minScore !== null) {
         // Null final scores can never satisfy the threshold, so this filter
@@ -58,10 +62,13 @@ class IntelligenceService {
       const query = `
         SELECT
           p.npi, p.name_first, p.name_middle, p.name_last, p.name_credential,
-          p.name_full, p.primary_taxonomy_description, p.practice_city,
+          p.name_full, p.practice_city,
+          COALESCE(t.description, p.primary_taxonomy_description)
+            AS primary_taxonomy_description,
           p.practice_state, p.sync_timestamp,
           m.performance_year, m.final_score, m.sync_timestamp AS mips_sync_timestamp
         FROM providers p
+        LEFT JOIN taxonomy_codes t ON t.code = p.primary_taxonomy_code
         LEFT JOIN mips_performance_scores m
           ON m.npi = p.npi
          AND m.performance_year = (

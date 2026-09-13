@@ -6,6 +6,7 @@
 const providers = new Map(); // npi -> row
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
+const taxonomyCodes = new Map(); // taxonomy_codes rows, keyed by code
 const stateExclusions = []; // state_exclusions rows
 let quality = [];            // quality_measures rows
 
@@ -13,6 +14,7 @@ function reset() {
   providers.clear();
   mips.clear();
   exclusions.length = 0;
+  taxonomyCodes.clear();
   stateExclusions.length = 0;
   quality = [];
   failCacheWrite = false;
@@ -79,6 +81,21 @@ async function query(text, params = []) {
   if (/^SELECT \* FROM providers WHERE npi = \$1$/.test(sql)) {
     const row = providers.get(String(params[0]));
     return { rows: row ? [{ ...row }] : [], rowCount: row ? 1 : 0 };
+  }
+
+  // Cached provider joined to the taxonomy crosswalk.
+  if (/^SELECT p\.\*, t\.description AS taxonomy_crosswalk_description/.test(sql)) {
+    const row = providers.get(String(params[0]));
+    if (!row) return { rows: [], rowCount: 0 };
+    const tax = taxonomyCodes.get(String(row.primary_taxonomy_code || ''));
+    return {
+      rows: [{
+        ...row,
+        taxonomy_crosswalk_description: tax ? tax.description : null,
+        taxonomy_crosswalk_grouping: tax ? tax.grouping : null
+      }],
+      rowCount: 1
+    };
   }
 
   if (/^INSERT INTO providers /.test(sql)) {
@@ -315,11 +332,17 @@ async function query(text, params = []) {
     let rows = [...providers.values()]
       .filter(p => String(p.practice_state || '').toUpperCase() === state);
 
+    // Mirror the COALESCE(t.description, p.primary_taxonomy_description) the
+    // real query uses, so filtering and display agree here as they do there.
+    const label = p => {
+      const tax = taxonomyCodes.get(String(p.primary_taxonomy_code || ''));
+      return (tax && tax.description) || p.primary_taxonomy_description || null;
+    };
+
     let pi = 1;
     if (pi < params.length && typeof params[pi] === 'string' && params[pi].includes('%')) {
       const pat = String(params[pi]).replace(/%/g, '').toLowerCase();
-      rows = rows.filter(p =>
-        String(p.primary_taxonomy_description || '').toLowerCase().includes(pat));
+      rows = rows.filter(p => String(label(p) || '').toLowerCase().includes(pat));
       pi += 1;
     }
 
@@ -352,6 +375,7 @@ async function query(text, params = []) {
         const m = latestMips(p.npi);
         return {
           ...p,
+          primary_taxonomy_description: label(p),
           performance_year: m ? m.performance_year : null,
           final_score: m ? m.final_score : null,
           mips_sync_timestamp: m ? m.sync_timestamp : null
@@ -469,6 +493,7 @@ module.exports = {
     providers,
     mips,
     get quality() { return quality; },
+    taxonomyCodes,
     exclusions,
     stateExclusions
   },
