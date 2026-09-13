@@ -6,12 +6,14 @@
 const providers = new Map(); // npi -> row
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
+const stateExclusions = []; // state_exclusions rows
 let quality = [];            // quality_measures rows
 
 function reset() {
   providers.clear();
   mips.clear();
   exclusions.length = 0;
+  stateExclusions.length = 0;
   quality = [];
 }
 
@@ -360,6 +362,23 @@ async function query(text, params = []) {
   }
 
   // Table-wide as_of used as the provenance default for CLEAR-by-scan rows
+  // state_exclusions: NPI exact match
+  if (/^SELECT \* FROM state_exclusions WHERE npi = \$1$/.test(sql)) {
+    const rows = stateExclusions.filter(r => r.npi === params[0]).map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // state_exclusions: entity_name (any published variant) + state
+  if (/^SELECT \* FROM state_exclusions WHERE upper\(regexp_replace\(entity_name/.test(sql)) {
+    const variants = params[0];
+    const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9 ,]/g, '').replace(/\s+/g, ' ').trim();
+    const rows = stateExclusions
+      .filter(r => variants.includes(norm(r.entity_name)))
+      .filter(r => String(r.state || '').toUpperCase() === params[1])
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   if (/^SELECT max\(as_of\) AS as_of FROM oig_exclusions$/.test(sql)) {
     const asOfs = exclusions.map(r => r.as_of).filter(Boolean).sort();
     return {
@@ -394,7 +413,8 @@ module.exports = {
     providers,
     mips,
     get quality() { return quality; },
-    exclusions
+    exclusions,
+    stateExclusions
   },
   _reset: reset
 };

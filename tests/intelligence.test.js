@@ -136,6 +136,7 @@ describe('GET /api/v1/intelligence/cohort', () => {
     const excluded = data.find(r => r.npi === '1760461826');
     expect(excluded.exclusion.verdict).toBe('EXCLUDED');
     expect(excluded.exclusion.exclusion).toEqual({
+      registry: 'LEIE',
       type: '1128b4',
       date: '2025-01-20',
       source: 'UPDATED.csv',

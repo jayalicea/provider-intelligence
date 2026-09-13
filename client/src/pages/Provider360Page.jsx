@@ -47,6 +47,16 @@ function categoryLabel(field) {
   return field?.value !== null && field?.value !== undefined ? field.value : null
 }
 
+// A hit can come from the federal LEIE or a state Medicaid list; label it by
+// the registry that produced it rather than assuming LEIE.
+function registryLabel(hit) {
+  if (!hit) return null
+  if (hit.registry === 'STATE') {
+    return `${hit.state ? `${hit.state} ` : ''}state Medicaid list${hit.sourceName ? ` (${hit.sourceName})` : ''}`
+  }
+  return `OIG LEIE (${hit.source})`
+}
+
 export default function Provider360Page() {
   const { npi } = useParams()
   const { data, loading, error, refetch } = useFetch(() => api.getVerification(npi), [npi])
@@ -143,7 +153,7 @@ export default function Provider360Page() {
               </dd>
               {exclusion.exclusion && (
                 <Provenance
-                  source={`OIG LEIE (${exclusion.exclusion.source})`}
+                  source={registryLabel(exclusion.exclusion)}
                   asOf={exclusion.exclusion.asOf}
                 />
               )}
@@ -169,8 +179,26 @@ export default function Provider360Page() {
                   Type {exclusion.exclusion.type}, effective {exclusion.exclusion.date}
                 </dd>
                 <Provenance
-                  source={`OIG LEIE (${exclusion.exclusion.source})`}
+                  source={registryLabel(exclusion.exclusion)}
                   asOf={exclusion.exclusion.asOf}
+                />
+              </div>
+            )}
+            {exclusion.stateExclusion && (
+              <div>
+                <dt>State exclusion list</dt>
+                <dd>
+                  <span className="badge badge-error">STATE HIT</span>
+                  {' '}
+                  {exclusion.stateExclusion.state} —{' '}
+                  {exclusion.stateExclusion.type || 'exclusion'}
+                  {exclusion.stateExclusion.date
+                    ? `, effective ${exclusion.stateExclusion.date}`
+                    : ''}
+                </dd>
+                <Provenance
+                  source={registryLabel(exclusion.stateExclusion)}
+                  asOf={exclusion.stateExclusion.asOf}
                 />
               </div>
             )}
@@ -182,7 +210,7 @@ export default function Provider360Page() {
                   as clear as of that date.
                 </dd>
                 <Provenance
-                  source={`OIG LEIE (${exclusion.reinstated.source})`}
+                  source={registryLabel(exclusion.reinstated)}
                   asOf={exclusion.reinstated.asOf}
                 />
               </div>

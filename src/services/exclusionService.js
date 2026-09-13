@@ -94,6 +94,7 @@ const verdictFromNpiRow = (row, notes = []) => {
     match: 'npi',
     dobStatus: null, // NPI match is definitive; no DOB check applies
     exclusion: {
+      registry: 'LEIE',
       type: row.excltype,
       date: formatLeieDate(row.excldate),
       source: row.source,
@@ -104,6 +105,45 @@ const verdictFromNpiRow = (row, notes = []) => {
   };
 };
 
+// --- state Medicaid exclusion lists ----------------------------------------
+//
+// state_exclusions carries no first/last split and no date of birth: one
+// entity_name per row, plus state, source_name, source_url and as_of. Two
+// consequences for the matcher, both deliberate:
+//
+//   - the name fallback compares the normalized entity_name against both
+//     "LAST, FIRST" and "FIRST LAST", since states publish either;
+//   - a name-matched state row can never confirm a date of birth, so it
+//     carries dobStatus 'unavailable', exactly as a LEIE row with no DOB does.
+//
+// reinstatement_date is a real date column here, so an active row is simply
+// one where it is null.
+const stateRowIsActive = r => r.reinstatement_date === null || r.reinstatement_date === undefined;
+
+const formatStateDate = v => {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return v === null || v === undefined || v === '' ? null : String(v);
+};
+
+// A state hit cites the publishing list, not just "a state list".
+const stateExclusionPayload = row => ({
+  registry: 'STATE',
+  type: row.exclusion_type || null,
+  date: formatStateDate(row.exclusion_date),
+  state: row.state || null,
+  sourceName: row.source_name || null,
+  sourceUrl: row.source_url || null,
+  source: row.source_name || 'State Medicaid exclusion list',
+  asOf: formatAsOf(row.as_of)
+});
+
+const nameVariants = (lastname, firstname) => {
+  const l = normalize(lastname);
+  const f = normalize(firstname);
+  if (!l || !f) return [];
+  return [`${l}, ${f}`, `${f} ${l}`, `${l} ${f}`];
+};
+
 class ExclusionService {
 
   /**
@@ -112,7 +152,7 @@ class ExclusionService {
    * Returns { verdict, match, exclusion, reinstated, notes } where verdict is
    * EXCLUDED, CLEAR, or UNVERIFIED.
    */
-  async resolveExclusion({ npi = null, lastname = null, firstname = null, state = null, dob = null } = {}) {
+  async resolveLeieExclusion({ npi = null, lastname = null, firstname = null, state = null, dob = null } = {}) {
     const notes = [];
     const identity = { npi, lastname, firstname, state, dob };
 
@@ -158,6 +198,7 @@ class ExclusionService {
                 match: 'name_state',
                 dobStatus: 'confirmed',
                 exclusion: {
+                  registry: 'LEIE',
                   type: confirmed.excltype,
                   date: formatLeieDate(confirmed.excldate),
                   source: confirmed.source,
@@ -180,6 +221,7 @@ class ExclusionService {
                 match: 'name_state',
                 dobStatus: 'mismatch',
                 exclusion: {
+                  registry: 'LEIE',
                   type: candidate.excltype,
                   date: formatLeieDate(candidate.excldate),
                   source: candidate.source,
@@ -197,6 +239,7 @@ class ExclusionService {
               match: 'name_state',
               dobStatus: 'unavailable',
               exclusion: {
+                registry: 'LEIE',
                 type: candidate.excltype,
                 date: formatLeieDate(candidate.excldate),
                 source: candidate.source,
@@ -212,6 +255,7 @@ class ExclusionService {
             match: 'name_state',
             dobStatus: 'not_provided',
             exclusion: {
+              registry: 'LEIE',
               type: candidate.excltype,
               date: formatLeieDate(candidate.excldate),
               source: candidate.source,
@@ -255,6 +299,139 @@ class ExclusionService {
         'verified. A miss is never assumed when the check cannot complete.');
       return { verdict: 'UNVERIFIED', match: null, dobStatus: null, exclusion: null, reinstated: null, notes };
     }
+  }
+
+  /**
+   * Resolve one identity against state_exclusions, mirroring the LEIE paths:
+   * NPI exact match first, then name + state. Returns the same verdict shape
+   * with exclusion.registry === 'STATE'.
+   */
+  async resolveStateExclusion({ npi = null, lastname = null, firstname = null, state = null } = {}) {
+    const notes = [];
+    try {
+      if (isValidNpi(npi)) {
+        const result = await db.query(
+          'SELECT * FROM state_exclusions WHERE npi = $1',
+          [npi]
+        );
+        const rows = result.rows || [];
+        const active = rows.find(stateRowIsActive);
+        if (active) {
+          notes.push(`Matched by NPI on the ${active.source_name || 'state'} exclusion list.`);
+          return {
+            verdict: 'EXCLUDED', match: 'npi', dobStatus: null,
+            exclusion: stateExclusionPayload(active), reinstated: null, notes
+          };
+        }
+        if (rows.length) {
+          notes.push('A prior state exclusion matched by NPI, but it has been ' +
+            'reinstated; treated as clear as of the reinstatement date shown.');
+          return {
+            verdict: 'CLEAR', match: 'npi', dobStatus: null, exclusion: null,
+            reinstated: {
+              registry: 'STATE',
+              date: formatStateDate(rows[0].reinstatement_date),
+              state: rows[0].state || null,
+              source: rows[0].source_name || 'State Medicaid exclusion list',
+              asOf: formatAsOf(rows[0].as_of)
+            },
+            notes
+          };
+        }
+        return {
+          verdict: 'CLEAR', match: 'npi', dobStatus: null,
+          exclusion: null, reinstated: null, notes
+        };
+      }
+
+      const variants = nameVariants(lastname, firstname);
+      const nState = normalize(state);
+      if (variants.length && nState) {
+        const result = await db.query(
+          "SELECT * FROM state_exclusions WHERE upper(regexp_replace(entity_name, '[^A-Z0-9 ,]', '', 'g')) = ANY($1) AND upper(state) = $2",
+          [variants, nState]
+        );
+        const rows = (result.rows || []).filter(r =>
+          variants.includes(normalize(r.entity_name)) && normalize(r.state) === nState
+        );
+        const active = rows.find(stateRowIsActive);
+        if (active) {
+          // State lists carry no date of birth, so a name match here can never
+          // be DOB-confirmed. Reported as 'unavailable' rather than silently
+          // treated as a confirmed identity.
+          notes.push(`Matched by name and state on the ${active.source_name || 'state'} ` +
+            'exclusion list. State lists carry no date of birth, so the ' +
+            'identity could not be DOB-confirmed.');
+          return {
+            verdict: 'EXCLUDED', match: 'name_state', dobStatus: 'unavailable',
+            exclusion: stateExclusionPayload(active), reinstated: null, notes
+          };
+        }
+        if (rows.length) {
+          notes.push('A prior state exclusion matched by name and state, but ' +
+            'it has been reinstated; treated as clear as of the reinstatement ' +
+            'date shown.');
+          return {
+            verdict: 'CLEAR', match: 'name_state', dobStatus: null, exclusion: null,
+            reinstated: {
+              registry: 'STATE',
+              date: formatStateDate(rows[0].reinstatement_date),
+              state: rows[0].state || null,
+              source: rows[0].source_name || 'State Medicaid exclusion list',
+              asOf: formatAsOf(rows[0].as_of)
+            },
+            notes
+          };
+        }
+        return {
+          verdict: 'CLEAR', match: 'name_state', dobStatus: null,
+          exclusion: null, reinstated: null, notes
+        };
+      }
+
+      return { verdict: 'UNVERIFIED', match: null, dobStatus: null, exclusion: null, reinstated: null, notes };
+    } catch (error) {
+      logger.error('Error resolving state exclusion:', error);
+      notes.push('The state exclusion query failed; the state lists could not ' +
+        'be checked. A miss is never assumed when the check cannot complete.');
+      return { verdict: 'UNVERIFIED', match: null, dobStatus: null, exclusion: null, reinstated: null, notes };
+    }
+  }
+
+  /**
+   * Combined verdict across the federal LEIE and the state Medicaid lists.
+   *
+   * Merge follows prefer-miss-over-false-clear: any EXCLUDED wins, then any
+   * UNVERIFIED, and CLEAR only when both registries came back clear. A federal
+   * hit is cited as the primary exclusion when both fire, because the LEIE is
+   * the stronger signal, but the state hit is still reported in stateExclusion
+   * so neither is hidden by the other.
+   */
+  async resolveExclusion(identity = {}) {
+    const leie = await this.resolveLeieExclusion(identity);
+    const state = await this.resolveStateExclusion(identity);
+
+    const notes = [...leie.notes, ...state.notes];
+    const stateHit = state.verdict === 'EXCLUDED' ? state.exclusion : null;
+
+    if (leie.verdict === 'EXCLUDED') {
+      return { ...leie, notes, stateExclusion: stateHit };
+    }
+    if (state.verdict === 'EXCLUDED') {
+      return { ...state, notes, stateExclusion: stateHit };
+    }
+    if (leie.verdict === 'UNVERIFIED' || state.verdict === 'UNVERIFIED') {
+      const base = leie.verdict === 'UNVERIFIED' ? leie : state;
+      return { ...base, verdict: 'UNVERIFIED', notes, stateExclusion: null };
+    }
+    // Both clear. A reinstatement is why one of them is clear, so keep it
+    // rather than letting the other registry's empty result hide it.
+    return {
+      ...leie,
+      reinstated: leie.reinstated || state.reinstated || null,
+      notes,
+      stateExclusion: null
+    };
   }
 }
 
