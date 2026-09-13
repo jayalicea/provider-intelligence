@@ -107,3 +107,53 @@ describe('GET /api/v1/providers/quality-measures/:facilityId', () => {
     expect(second.body).toEqual(first.body);
   });
 });
+
+describe('quality measure cache refresh', () => {
+  const rowsFor = facilityId => mockDb._stores.quality.filter(
+    r => r.facility_id === facilityId && r.data_source === 'CARE_COMPARE_COMPLICATIONS'
+  );
+
+  // Cached rows are considered fresh for an hour, so a refresh has to be
+  // forced by ageing the stored sync_timestamp past that window.
+  const expireCache = () => {
+    mockDb._stores.quality.forEach(r => { r.sync_timestamp = new Date(Date.now() - 2 * 60 * 60 * 1000); });
+  };
+
+  test('refreshing the same facility replaces rows instead of duplicating them', async () => {
+    mockDatastore('ynj2-r877', { results: QM_ROWS, count: QM_ROWS.length });
+    await request(app).get('/api/v1/providers/quality-measures/140010');
+    expect(rowsFor('140010')).toHaveLength(2);
+
+    expireCache();
+    mockDatastore('ynj2-r877', { results: QM_ROWS, count: QM_ROWS.length });
+    const res = await request(app).get('/api/v1/providers/quality-measures/140010');
+
+    expect(res.status).toBe(200);
+    expect(rowsFor('140010')).toHaveLength(2);
+  });
+
+  test('a measure missing from the refresh is dropped from the cache', async () => {
+    mockDatastore('ynj2-r877', { results: QM_ROWS, count: QM_ROWS.length });
+    await request(app).get('/api/v1/providers/quality-measures/140010');
+    expect(rowsFor('140010').map(r => r.measure_id)).toContain('COMP_HIP_KNEE');
+
+    expireCache();
+    const [firstRow] = QM_ROWS;
+    mockDatastore('ynj2-r877', { results: [firstRow], count: 1 });
+    await request(app).get('/api/v1/providers/quality-measures/140010');
+
+    const remaining = rowsFor('140010');
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].measure_id).toBe('COMP_HIP_KNEE');
+  });
+
+  test('a failed cache write surfaces as an error instead of being swallowed', async () => {
+    mockDatastore('ynj2-r877', { results: QM_ROWS, count: QM_ROWS.length });
+    mockDb._failNextCacheWrite();
+
+    const res = await request(app).get('/api/v1/providers/quality-measures/140010');
+
+    expect(res.status).toBe(500);
+    expect(rowsFor('140010')).toHaveLength(0);
+  });
+});

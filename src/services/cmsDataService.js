@@ -389,25 +389,44 @@ class CmsDataService {
   }
 
   /**
-   * Cache quality measures in database (replaces the facility/family rows)
+   * Cache quality measures in database (replaces the facility/family rows).
+   *
+   * Runs as one transaction of upserts. The previous version deleted the
+   * facility/family rows and then issued single-row inserts outside any
+   * transaction, so two concurrent refreshes of the same facility could
+   * interleave as DELETE-A, DELETE-B, INSERT-A, INSERT-B and leave both row
+   * sets behind -- the source of the duplicate rows found in the cache. The
+   * unique index on (facility_id, measure_id, data_source) makes the upsert
+   * serialize on the conflicting row instead, and the surrounding transaction
+   * means a refresh is never half applied.
    */
   async cacheQualityMeasures(facilityId, measureType, measures) {
+    const dataSource = this.qualityDataSource(measureType);
+    const client = await db.getClient();
     try {
-      await db.query(
-        'DELETE FROM quality_measures WHERE facility_id = $1 AND data_source = $2',
-        [facilityId, this.qualityDataSource(measureType)]
-      );
+      await client.query('BEGIN');
 
       const query = `
         INSERT INTO quality_measures (
           facility_id, measure_id, measure_name, score, denominator,
           lower_estimate, higher_estimate, compared_to_national,
-          reporting_period_start, reporting_period_end, data_source
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          reporting_period_start, reporting_period_end, data_source,
+          sync_timestamp
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
+        ON CONFLICT (facility_id, measure_id, data_source) DO UPDATE SET
+          measure_name = EXCLUDED.measure_name,
+          score = EXCLUDED.score,
+          denominator = EXCLUDED.denominator,
+          lower_estimate = EXCLUDED.lower_estimate,
+          higher_estimate = EXCLUDED.higher_estimate,
+          compared_to_national = EXCLUDED.compared_to_national,
+          reporting_period_start = EXCLUDED.reporting_period_start,
+          reporting_period_end = EXCLUDED.reporting_period_end,
+          sync_timestamp = CURRENT_TIMESTAMP
       `;
 
       for (const m of measures) {
-        await db.query(query, [
+        await client.query(query, [
           facilityId,
           m.measureId,
           m.measureName,
@@ -418,11 +437,27 @@ class CmsDataService {
           m.comparedToNational,
           m.startDate,
           m.endDate,
-          this.qualityDataSource(measureType)
+          dataSource
         ]);
       }
+
+      // Drop rows the refresh no longer carries, so the family still reads as
+      // a replacement rather than an accumulation.
+      await client.query(
+        `DELETE FROM quality_measures
+         WHERE facility_id = $1 AND data_source = $2 AND measure_id <> ALL($3)`,
+        [facilityId, dataSource, measures.map(m => m.measureId)]
+      );
+
+      await client.query('COMMIT');
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      // Deliberately rethrown: a swallowed failure here left the caller
+      // believing the refresh had been persisted.
       logger.error('Error caching quality measures:', error);
+      throw error;
+    } finally {
+      client.release();
     }
   }
 

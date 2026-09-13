@@ -142,3 +142,8 @@ CREATE INDEX idx_providers_taxonomy ON providers(primary_taxonomy_code);
 CREATE INDEX idx_mips_npi_year ON mips_performance_scores(npi, performance_year);
 CREATE INDEX idx_mips_year_npi ON mips_performance_scores(performance_year, npi);
 CREATE INDEX idx_quality_facility ON quality_measures(facility_id);
+-- One row per facility/measure/family. Without this, two concurrent refreshes
+-- of the same facility could each insert a full set of rows; it is also what
+-- the ON CONFLICT upsert in cacheQualityMeasures targets.
+CREATE UNIQUE INDEX idx_quality_facility_measure_source
+    ON quality_measures(facility_id, measure_id, data_source);
