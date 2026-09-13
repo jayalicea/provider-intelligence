@@ -264,3 +264,4 @@ module.exports = ExclusionService;
 module.exports.verdictFromNpiRow = verdictFromNpiRow;
 module.exports.isValidNpi = isValidNpi;
 module.exports.formatAsOf = formatAsOf;
+module.exports.formatLeieDate = formatLeieDate;
