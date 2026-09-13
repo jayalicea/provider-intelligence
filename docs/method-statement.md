@@ -47,9 +47,18 @@ deliverable produced by the Provider Intelligence Platform.
 
 ## Known limitations
 
-- The LEIE carries **no date of birth**. Name plus state matches are not
-  DOB-confirmed; common-name matches can coincide with a different
-  individual. NPI matches do not have this weakness.
+- The LEIE snapshot carries **dates of birth as YYYYMMDD text for about
+  79,683 records**. When the roster supplies a DOB, it is canonicalized
+  (non-digits stripped; an MMDDYYYY-looking value is flipped to YYYYMMDD)
+  and compared against the candidate record. An exact match confirms the
+  name plus state match (`dobStatus: confirmed`). A mismatch downgrades the
+  verdict to UNVERIFIED: the candidate stays reported for manual review, but
+  an EXCLUDED verdict would overstate a name match whose DOB disagrees. When
+  the record carries no DOB, the match proceeds on name plus state alone
+  (`dobStatus: unavailable`). When the roster supplies no DOB, behavior is
+  unchanged (`dobStatus: not_provided`). Name matches without a DOB check
+  can still coincide with a different individual sharing the same name and
+  state; NPI matches do not have this weakness.
 - **CLEAR means "no record in these sources as of the as-of date."** It is
   not a certification that a provider has never been, or will never be,
   excluded.
