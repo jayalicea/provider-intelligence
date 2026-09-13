@@ -75,6 +75,7 @@ describe('ExclusionService.resolveExclusion', () => {
     expect(result.verdict).toBe('EXCLUDED');
     expect(result.match).toBe('npi');
     expect(result.exclusion).toEqual({
+      registry: 'LEIE',
       type: '1128b4',
       date: '2025-01-20',
       source: 'UPDATED.csv',
@@ -249,5 +250,135 @@ describe('GET /api/v1/providers/:npi/verification', () => {
   test('400 for a malformed NPI', async () => {
     const res = await request(app).get('/api/v1/providers/123/verification');
     expect(res.status).toBe(400);
+  });
+});
+
+// --- state Medicaid exclusion lists ----------------------------------------
+
+// Row shape mirrors the live state_exclusions table: one entity_name (no
+// first/last split), no dob column, and a real date reinstatement_date.
+function seedStateExclusion(overrides = {}) {
+  const row = {
+    state: 'CA',
+    source_name: 'CA DHCS Medi-Cal Suspended and Ineligible Provider List',
+    source_url: 'https://files.medi-cal.ca.gov/suspended.pdf',
+    entity_name: 'NGUYEN, TRAN',
+    npi: '1982736450',
+    exclusion_type: 'Suspension',
+    exclusion_date: '2025-06-02',
+    reinstatement_date: null,
+    as_of: '2026-09-13',
+    leie_overlap: false,
+    ...overrides
+  };
+  mockDb._stores.stateExclusions.push(row);
+  return row;
+}
+
+describe('ExclusionService state list screening', () => {
+  test('an NPI on a state list is EXCLUDED and cites the state source', async () => {
+    seedStateExclusion();
+
+    const result = await service.resolveExclusion({ npi: '1982736450' });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.match).toBe('npi');
+    expect(result.exclusion.registry).toBe('STATE');
+    expect(result.exclusion.state).toBe('CA');
+    expect(result.exclusion.sourceName).toBe('CA DHCS Medi-Cal Suspended and Ineligible Provider List');
+    expect(result.exclusion.asOf).toBe('2026-09-13');
+    expect(result.stateExclusion).not.toBeNull();
+  });
+
+  test('clean in both registries is CLEAR', async () => {
+    const result = await service.resolveExclusion({ npi: '1366446619' });
+
+    expect(result.verdict).toBe('CLEAR');
+    expect(result.exclusion).toBeNull();
+    expect(result.stateExclusion).toBeNull();
+  });
+
+  test('garbage input is UNVERIFIED, never CLEAR', async () => {
+    const result = await service.resolveExclusion({ npi: 'not-an-npi' });
+
+    expect(result.verdict).toBe('UNVERIFIED');
+    expect(result.exclusion).toBeNull();
+  });
+
+  test('a federal hit stays the cited exclusion but the state hit is still reported', async () => {
+    seedExclusion({ npi: '1760461826' });
+    seedStateExclusion({ npi: '1760461826' });
+
+    const result = await service.resolveExclusion({ npi: '1760461826' });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.exclusion.registry).toBe('LEIE');
+    expect(result.stateExclusion.registry).toBe('STATE');
+    expect(result.stateExclusion.sourceName).toMatch(/DHCS/);
+  });
+
+  test('name plus state matches a state list and reports DOB as unavailable', async () => {
+    seedStateExclusion({ npi: null, entity_name: 'NGUYEN, TRAN' });
+
+    const result = await service.resolveExclusion({
+      lastname: 'Nguyen', firstname: 'Tran', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.match).toBe('name_state');
+    expect(result.exclusion.registry).toBe('STATE');
+    // State lists carry no DOB, so a name match can never be DOB-confirmed.
+    expect(result.dobStatus).toBe('unavailable');
+  });
+
+  test('a state list publishing "FIRST LAST" is matched too', async () => {
+    seedStateExclusion({ npi: null, entity_name: 'TRAN NGUYEN' });
+
+    const result = await service.resolveExclusion({
+      lastname: 'Nguyen', firstname: 'Tran', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.exclusion.registry).toBe('STATE');
+  });
+
+  test('a reinstated state row is CLEAR with the reinstatement reported', async () => {
+    seedStateExclusion({ reinstatement_date: '2026-02-01' });
+
+    const result = await service.resolveExclusion({ npi: '1982736450' });
+
+    expect(result.verdict).toBe('CLEAR');
+    expect(result.reinstated.registry).toBe('STATE');
+    expect(result.reinstated.date).toBe('2026-02-01');
+  });
+
+  test('a state match in a different state does not fire', async () => {
+    seedStateExclusion({ npi: null, state: 'NY' });
+
+    const result = await service.resolveExclusion({
+      lastname: 'Nguyen', firstname: 'Tran', state: 'CA'
+    });
+
+    expect(result.verdict).toBe('CLEAR');
+  });
+});
+
+// Regression: the name path once dropped reinstatement detail that the NPI
+// path reported, so a reinstated state row looked like a plain no-match.
+describe('ExclusionService state list reinstatement on the name path', () => {
+  test('a reinstated state row matched by name reports the reinstatement', async () => {
+    seedStateExclusion({
+      npi: null, entity_name: "O'BRIEN, MARY", state: 'NY',
+      source_name: 'NY OMIG Exclusions', reinstatement_date: '2026-02-01'
+    });
+
+    const result = await service.resolveExclusion({
+      lastname: "O'Brien", firstname: 'Mary', state: 'NY'
+    });
+
+    expect(result.verdict).toBe('CLEAR');
+    expect(result.reinstated).not.toBeNull();
+    expect(result.reinstated.registry).toBe('STATE');
+    expect(result.reinstated.date).toBe('2026-02-01');
   });
 });

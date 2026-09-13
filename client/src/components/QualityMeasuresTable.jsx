@@ -55,7 +55,7 @@ export default function QualityMeasuresTable({ measures, loading, error, onRetry
         <thead>
           <tr>
             <th>Measure</th>
-            <th>Score</th>
+            <th className="num">Score</th>
             <th>National comparison</th>
             <th>As of</th>
           </tr>
@@ -71,7 +71,7 @@ export default function QualityMeasuresTable({ measures, loading, error, onRetry
                     {m.measureName || m.measureId || 'Not available'}
                     <div className="provenance mono">{m.measureId}</div>
                   </td>
-                  <td className="numeric">
+                  <td className="num">
                     {reported ? (
                       m.score
                     ) : (
@@ -81,7 +81,7 @@ export default function QualityMeasuresTable({ measures, loading, error, onRetry
                   <td>
                     <NationalComparisonBadge comparedToNational={m.comparedToNational} />
                   </td>
-                  <td className="numeric mono">{formatAsOf(m.endDate)}</td>
+                  <td className="mono">{formatAsOf(m.endDate)}</td>
                 </tr>
               )
             })}

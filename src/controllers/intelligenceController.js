@@ -1,7 +1,8 @@
 const IntelligenceService = require('../services/intelligenceService');
 const {
   WATCHLIST_DEFAULT_DAYS,
-  WATCHLIST_MAX_DAYS
+  WATCHLIST_MAX_DAYS,
+  ROSTER_MAX_ROWS
 } = IntelligenceService;
 const { logger } = require('../utils/logger');
 
@@ -100,6 +101,54 @@ class IntelligenceController {
       res.status(500).json({
         success: false,
         error: 'Failed to build exclusion watchlist'
+      });
+    }
+  }
+
+  /**
+   * POST /api/v1/intelligence/screen-roster
+   * Body: { rows: [{ npi, lastname, firstname, state, dob, organizationName }] }
+   *
+   * The client parses the CSV and posts rows, so no file is uploaded and none
+   * is retained. Rows are screened in memory and returned; nothing is stored.
+   */
+  async screenRoster(req, res) {
+    try {
+      const rows = req.body && req.body.rows;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'rows must be a non-empty array'
+        });
+      }
+      if (rows.length > ROSTER_MAX_ROWS) {
+        return res.status(400).json({
+          success: false,
+          error: `rows exceeds the ${ROSTER_MAX_ROWS} row limit for one screen`
+        });
+      }
+      if (rows.some(r => r === null || typeof r !== 'object' || Array.isArray(r))) {
+        return res.status(400).json({
+          success: false,
+          error: 'every row must be an object'
+        });
+      }
+
+      const data = await this.intelligenceService.screenRoster(rows);
+
+      res.json({
+        success: true,
+        data: data.results,
+        count: data.screened,
+        counts: data.counts,
+        submitted: data.submitted,
+        truncated: data.truncated
+      });
+    } catch (error) {
+      logger.error('Error in screenRoster:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to screen roster'
       });
     }
   }

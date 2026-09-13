@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 import api from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
+import VerdictBadge from '../components/VerdictBadge.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 
@@ -33,18 +34,18 @@ const DOB_STATUS_COPY = {
   },
 }
 
-function VerdictBadge({ verdict }) {
-  if (verdict === 'EXCLUDED') {
-    return <span className="badge badge-error">EXCLUDED</span>
-  }
-  if (verdict === 'CLEAR') {
-    return <span className="badge badge-success">CLEAR</span>
-  }
-  return <span className="badge badge-na">UNVERIFIED</span>
-}
-
 function categoryLabel(field) {
   return field?.value !== null && field?.value !== undefined ? field.value : null
+}
+
+// A hit can come from the federal LEIE or a state Medicaid list; label it by
+// the registry that produced it rather than assuming LEIE.
+function registryLabel(hit) {
+  if (!hit) return null
+  if (hit.registry === 'STATE') {
+    return `${hit.state ? `${hit.state} ` : ''}state Medicaid list${hit.sourceName ? ` (${hit.sourceName})` : ''}`
+  }
+  return `OIG LEIE (${hit.source})`
 }
 
 export default function Provider360Page() {
@@ -100,36 +101,56 @@ export default function Provider360Page() {
     <section>
       <h1 className="page-title">Provider 360</h1>
 
-      <div className="card passport">
-        <header className="passport-header">
-          <div>
-            <h2 className="passport-name">{identity.name.full.value}</h2>
-            <p className="passport-sub mono">NPI {identity.npi.value}</p>
-            <p className="passport-sub">
-              {identity.taxonomy.description.value}
-              {identity.taxonomy.code.value
-                ? ` (${identity.taxonomy.code.value})`
-                : ''}
-            </p>
-            <p className="passport-sub">
-              {[identity.address.line1.value, identity.address.city.value, identity.address.state.value, identity.address.zipcode.value]
-                .filter(Boolean)
-                .join(', ')}
-            </p>
-            {identity.address.phone.value && (
-              <p className="passport-sub">{identity.address.phone.value}</p>
-            )}
-            <Provenance
-              source={identity.npi.source}
-              asOf={identity.npi.asOf}
-            />
+      <div className="dossier">
+        <aside className="dossier-rail">
+          <div className="identity-card">
+            <div className="identity-head">
+              <h2 className="passport-name">{identity.name.full.value}</h2>
+              <p className="passport-sub mono">NPI {identity.npi.value}</p>
+              <Provenance
+                source={identity.npi.source}
+                asOf={identity.npi.asOf}
+              />
+            </div>
+            <div className="identity-verdict">
+              <VerdictBadge verdict={exclusion.verdict} size="lg" />
+              <div className="provenance">Flags summary: {flagsSummary}</div>
+            </div>
+            <div className="identity-body">
+              <dl className="detail-list">
+                <div>
+                  <dt>Taxonomy</dt>
+                  <dd>
+                    {identity.taxonomy.description.value || (
+                      <span className="muted">Not reported</span>
+                    )}
+                    {identity.taxonomy.code.value && (
+                      <div className="provenance mono">{identity.taxonomy.code.value}</div>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Practice address</dt>
+                  <dd>
+                    {[identity.address.line1.value, identity.address.city.value, identity.address.state.value, identity.address.zipcode.value]
+                      .filter(Boolean)
+                      .join(', ') || <span className="muted">Not reported</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Phone</dt>
+                  <dd>
+                    {identity.address.phone.value || (
+                      <span className="muted">Not reported</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </div>
-          <div className="passport-verdict">
-            <VerdictBadge verdict={exclusion.verdict} />
-            <div className="provenance">Flags summary: {flagsSummary}</div>
-          </div>
-        </header>
+        </aside>
 
+        <div className="dossier-main">
         <section className="passport-section">
           <h3 className="card-title">Integrity</h3>
           <dl className="detail-list">
@@ -143,7 +164,7 @@ export default function Provider360Page() {
               </dd>
               {exclusion.exclusion && (
                 <Provenance
-                  source={`OIG LEIE (${exclusion.exclusion.source})`}
+                  source={registryLabel(exclusion.exclusion)}
                   asOf={exclusion.exclusion.asOf}
                 />
               )}
@@ -169,8 +190,26 @@ export default function Provider360Page() {
                   Type {exclusion.exclusion.type}, effective {exclusion.exclusion.date}
                 </dd>
                 <Provenance
-                  source={`OIG LEIE (${exclusion.exclusion.source})`}
+                  source={registryLabel(exclusion.exclusion)}
                   asOf={exclusion.exclusion.asOf}
+                />
+              </div>
+            )}
+            {exclusion.stateExclusion && (
+              <div>
+                <dt>State exclusion list</dt>
+                <dd>
+                  <span className="badge badge-error">STATE HIT</span>
+                  {' '}
+                  {exclusion.stateExclusion.state} —{' '}
+                  {exclusion.stateExclusion.type || 'exclusion'}
+                  {exclusion.stateExclusion.date
+                    ? `, effective ${exclusion.stateExclusion.date}`
+                    : ''}
+                </dd>
+                <Provenance
+                  source={registryLabel(exclusion.stateExclusion)}
+                  asOf={exclusion.stateExclusion.asOf}
                 />
               </div>
             )}
@@ -182,7 +221,7 @@ export default function Provider360Page() {
                   as clear as of that date.
                 </dd>
                 <Provenance
-                  source={`OIG LEIE (${exclusion.reinstated.source})`}
+                  source={registryLabel(exclusion.reinstated)}
                   asOf={exclusion.reinstated.asOf}
                 />
               </div>
@@ -237,8 +276,10 @@ export default function Provider360Page() {
           </section>
         )}
 
-        <footer className="passport-terms muted">{terms}</footer>
+        </div>
       </div>
+
+      <footer className="passport-terms muted">{terms}</footer>
     </section>
   )
 }
