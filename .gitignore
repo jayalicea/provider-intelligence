@@ -1,13 +1,6 @@
-# Dependencies
-node_modules/
-
-# Environment / secrets
+﻿node_modules/
 .env
-
-# Logs
 logs/
 *.log
-npm-debug.log*
-
-# Test coverage
 coverage/
+data/
