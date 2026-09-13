@@ -69,8 +69,9 @@ export default function ProviderSearchPage() {
         </label>
         {mipsOnly && (
           <p className="muted mips-filter-note">
-            MIPS coverage reflects cached CMS data (2023, nine states).
-            Absence here does not mean a provider has no MIPS history.
+            MIPS coverage reflects cached CMS data. CMS publishes one rolling
+            vintage rather than per-year data, and as-of dates are shown per
+            value. Absence here does not mean a provider has no MIPS history.
           </p>
         )}
       </div>
