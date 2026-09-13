@@ -196,6 +196,32 @@ class ProviderController {
       });
       exclusion.dobStatus = exclusion.dobStatus || null;
 
+      // Performance block: cache-only MIPS lookup, never a request-time
+      // fan-out to CMS. Null when the provider has no cached score; the
+      // dossier then simply omits the section.
+      let performance = null;
+      try {
+        const year = new Date().getFullYear() - 1;
+        const cached = await this.cmsDataService.getCachedMipsData(provider.npi, year);
+        if (cached) {
+          const mAsOf = cached.sync_timestamp
+            ? new Date(cached.sync_timestamp).toISOString().slice(0, 10)
+            : null;
+          const mSource = 'CMS QPP Experience';
+          const wrapM = value => ({ value, source: mSource, asOf: mAsOf });
+          performance = {
+            performanceYear: wrapM(cached.performanceYear),
+            finalScore: wrapM(cached.finalScore),
+            qualityScore: wrapM(cached.qualityScore),
+            improvementActivitiesScore: wrapM(cached.improvementActivitiesScore),
+            promotingInteroperabilityScore: wrapM(cached.promotingInteroperabilityScore),
+            costScore: wrapM(cached.costScore)
+          };
+        }
+      } catch (mipsError) {
+        logger.warn('Failed to load cached MIPS data for verification dossier:', mipsError.message);
+      }
+
       const flagsSummary = exclusion.verdict === 'EXCLUDED'
         ? 'flags found'
         : exclusion.verdict === 'CLEAR'
@@ -208,6 +234,7 @@ class ProviderController {
           npi,
           identity,
           exclusion,
+          performance,
           flagsSummary,
           terms: TERMS
         }

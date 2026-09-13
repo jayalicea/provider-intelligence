@@ -286,6 +286,60 @@ async function query(text, params = []) {
     return { rows: [groupStats(rows)], rowCount: 1 };
   }
 
+  // --- intelligence cohort query (tests/intelligence.test.js) --------------
+
+  // Joined providers + latest-year MIPS scan. The service builds the WHERE
+  // clause dynamically; params are [state, taxonomyPattern?, minScore?].
+  if (/FROM providers p/.test(sql) && /LEFT JOIN mips_performance_scores m/.test(sql)) {
+    const state = String(params[0]).toUpperCase();
+    let rows = [...providers.values()]
+      .filter(p => String(p.practice_state || '').toUpperCase() === state);
+
+    let pi = 1;
+    if (pi < params.length && typeof params[pi] === 'string' && params[pi].includes('%')) {
+      const pat = String(params[pi]).replace(/%/g, '').toLowerCase();
+      rows = rows.filter(p =>
+        String(p.primary_taxonomy_description || '').toLowerCase().includes(pat));
+      pi += 1;
+    }
+
+    const latestMips = npi => {
+      const years = [...mips.values()]
+        .filter(r => String(r.npi) === String(npi))
+        .map(r => Number(r.performance_year));
+      if (!years.length) return null;
+      const maxYear = Math.max(...years);
+      return mips.get(`${npi}:${maxYear}`);
+    };
+
+    if (pi < params.length && params[pi] !== null && params[pi] !== undefined) {
+      const min = Number(params[pi]);
+      rows = rows.filter(p => {
+        const m = latestMips(p.npi);
+        return m && m.final_score !== null && m.final_score !== undefined &&
+          Number(m.final_score) >= min;
+      });
+      pi += 1;
+    }
+
+    rows = rows
+      .sort((a, b) =>
+        String(a.name_last).localeCompare(String(b.name_last)) ||
+        String(a.name_first).localeCompare(String(b.name_first)) ||
+        String(a.npi).localeCompare(String(b.npi)))
+      .slice(0, 500)
+      .map(p => {
+        const m = latestMips(p.npi);
+        return {
+          ...p,
+          performance_year: m ? m.performance_year : null,
+          final_score: m ? m.final_score : null,
+          mips_sync_timestamp: m ? m.sync_timestamp : null
+        };
+      });
+    return { rows, rowCount: rows.length };
+  }
+
   // --- exclusion queries (tests/exclusions.test.js) ------------------------
 
   // NPI exact match against oig_exclusions
@@ -294,6 +348,24 @@ async function query(text, params = []) {
       .filter(r => String(r.npi) === String(params[0]))
       .map(r => ({ ...r }));
     return { rows, rowCount: rows.length };
+  }
+
+  // Batched NPI scan for the intelligence cohort endpoint
+  if (/^SELECT \* FROM oig_exclusions WHERE npi = ANY\(\$1\)$/.test(sql)) {
+    const wanted = new Set((params[0] || []).map(String));
+    const rows = exclusions
+      .filter(r => wanted.has(String(r.npi)))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // Table-wide as_of used as the provenance default for CLEAR-by-scan rows
+  if (/^SELECT max\(as_of\) AS as_of FROM oig_exclusions$/.test(sql)) {
+    const asOfs = exclusions.map(r => r.as_of).filter(Boolean).sort();
+    return {
+      rows: [{ as_of: asOfs.length ? asOfs[asOfs.length - 1] : null }],
+      rowCount: 1
+    };
   }
 
   // Name + state match. The real query strips punctuation in SQL; the mock
