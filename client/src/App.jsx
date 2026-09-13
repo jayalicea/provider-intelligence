@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ProviderSearchPage from './pages/ProviderSearchPage.jsx'
 import ProviderDetailPage from './pages/ProviderDetailPage.jsx'
 import Provider360Page from './pages/Provider360Page.jsx'
+import CohortExplorerPage from './pages/CohortExplorerPage.jsx'
 import MipsDashboardPage from './pages/MipsDashboardPage.jsx'
 import HospitalQualityPage from './pages/HospitalQualityPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/providers" element={<ProviderSearchPage />} />
             <Route path="/providers/:npi" element={<ProviderDetailPage />} />
             <Route path="/providers/:npi/360" element={<Provider360Page />} />
+            <Route path="/cohort" element={<CohortExplorerPage />} />
             <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
             <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
             <Route path="*" element={<NotFoundPage />} />
