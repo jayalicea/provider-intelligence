@@ -184,6 +184,9 @@ class ProviderController {
         }
       };
 
+      // The cache carries no DOB, so name-fallback checks from this endpoint
+      // can never confirm a DOB; surface the status explicitly (null on the
+      // NPI path) so consumers can rely on the field always being present.
       const exclusion = await this.exclusionService.resolveExclusion({
         npi: provider.npi,
         lastname: provider.name.last,
@@ -191,6 +194,7 @@ class ProviderController {
         state: provider.address.state,
         dob: null
       });
+      exclusion.dobStatus = exclusion.dobStatus || null;
 
       const flagsSummary = exclusion.verdict === 'EXCLUDED'
         ? 'flags found'
