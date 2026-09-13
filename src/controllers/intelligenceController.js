@@ -1,4 +1,8 @@
 const IntelligenceService = require('../services/intelligenceService');
+const {
+  WATCHLIST_DEFAULT_DAYS,
+  WATCHLIST_MAX_DAYS
+} = IntelligenceService;
 const { logger } = require('../utils/logger');
 
 class IntelligenceController {
@@ -48,6 +52,54 @@ class IntelligenceController {
       res.status(500).json({
         success: false,
         error: 'Failed to build cohort intelligence'
+      });
+    }
+  }
+
+  /**
+   * GET /api/v1/intelligence/exclusion-watchlist?state=&days=
+   * Recently added, still-active LEIE exclusions, newest first.
+   */
+  async getExclusionWatchlist(req, res) {
+    try {
+      const { state, days } = req.query;
+
+      if (state !== undefined && state !== '' && !/^[A-Za-z]{2}$/.test(state)) {
+        return res.status(400).json({
+          success: false,
+          error: 'state must be a 2-letter code'
+        });
+      }
+
+      let window = WATCHLIST_DEFAULT_DAYS;
+      if (days !== undefined && days !== '') {
+        window = Number(days);
+        if (!Number.isInteger(window) || window < 1 || window > WATCHLIST_MAX_DAYS) {
+          return res.status(400).json({
+            success: false,
+            error: `days must be an integer between 1 and ${WATCHLIST_MAX_DAYS}`
+          });
+        }
+      }
+
+      const data = await this.intelligenceService.getExclusionWatchlist({
+        state: state ? state.toUpperCase() : null,
+        days: window
+      });
+
+      res.json({
+        success: true,
+        data: data.rows,
+        count: data.rows.length,
+        windowDays: data.windowDays,
+        state: data.state,
+        capped: data.capped
+      });
+    } catch (error) {
+      logger.error('Error in getExclusionWatchlist:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to build exclusion watchlist'
       });
     }
   }

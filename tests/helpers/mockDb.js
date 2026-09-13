@@ -360,6 +360,25 @@ async function query(text, params = []) {
   }
 
   // Table-wide as_of used as the provenance default for CLEAR-by-scan rows
+  // Exclusion watchlist: active rows inside the excldate window, newest first.
+  if (/^SELECT display_name, lastname, firstname, busname, npi, city, state, zip, excltype, general, specialty, excldate, source, as_of FROM oig_exclusions WHERE /.test(sql)) {
+    const cutoff = params[0];
+    const stateFilter = params.length > 2 ? params[1] : null;
+    const limit = params[params.length - 1];
+    const rows = exclusions
+      .filter(r => r.reindate === null || r.reindate === undefined)
+      .filter(r => /^[0-9]{8}$/.test(String(r.excldate || '')))
+      .filter(r => String(r.excldate) >= cutoff)
+      .filter(r => !stateFilter || String(r.state || '').toUpperCase() === stateFilter)
+      .sort((a, b) => (
+        String(b.excldate).localeCompare(String(a.excldate)) ||
+        String(a.display_name || '').localeCompare(String(b.display_name || ''))
+      ))
+      .slice(0, limit)
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   if (/^SELECT max\(as_of\) AS as_of FROM oig_exclusions$/.test(sql)) {
     const asOfs = exclusions.map(r => r.as_of).filter(Boolean).sort();
     return {
