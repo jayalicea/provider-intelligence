@@ -62,6 +62,48 @@ const rowDob = r => {
   return d && d !== '00000000' ? d : null;
 };
 
+/**
+ * Build the NPI-path verdict from the chosen oig_exclusions row, or from
+ * null when the scan found no row for the NPI. Shared by resolveExclusion
+ * and batched cohort scans so the NPI decision tree lives in one place.
+ */
+const verdictFromNpiRow = (row, notes = []) => {
+  if (!row) {
+    notes.push('No exclusion record found for this NPI in the LEIE.');
+    return { verdict: 'CLEAR', match: 'npi', dobStatus: null, exclusion: null, reinstated: null, notes };
+  }
+  if (isReinstated(row)) {
+    notes.push('A prior exclusion record matched by NPI, but the ' +
+      'individual has been reinstated; treated as clear as of the ' +
+      'reinstatement date shown.');
+    return {
+      verdict: 'CLEAR',
+      match: 'npi',
+      dobStatus: null,
+      exclusion: null,
+      reinstated: {
+        date: formatLeieDate(row.reindate),
+        source: row.source,
+        asOf: formatAsOf(row.as_of)
+      },
+      notes
+    };
+  }
+  return {
+    verdict: 'EXCLUDED',
+    match: 'npi',
+    dobStatus: null, // NPI match is definitive; no DOB check applies
+    exclusion: {
+      type: row.excltype,
+      date: formatLeieDate(row.excldate),
+      source: row.source,
+      asOf: formatAsOf(row.as_of)
+    },
+    reinstated: null,
+    notes
+  };
+};
+
 class ExclusionService {
 
   /**
@@ -83,42 +125,7 @@ class ExclusionService {
         );
         const rows = result.rows || [];
         const active = rows.find(r => !isReinstated(r));
-        const reinstatedRow = active ? null : rows[0] || null;
-
-        if (active) {
-          return {
-            verdict: 'EXCLUDED',
-            match: 'npi',
-            dobStatus: null, // NPI match is definitive; no DOB check applies
-            exclusion: {
-              type: active.excltype,
-              date: formatLeieDate(active.excldate),
-              source: active.source,
-              asOf: formatAsOf(active.as_of)
-            },
-            reinstated: null,
-            notes
-          };
-        }
-        if (reinstatedRow) {
-          notes.push('A prior exclusion record matched by NPI, but the ' +
-            'individual has been reinstated; treated as clear as of the ' +
-            'reinstatement date shown.');
-          return {
-            verdict: 'CLEAR',
-            match: 'npi',
-            dobStatus: null,
-            exclusion: null,
-            reinstated: {
-              date: formatLeieDate(reinstatedRow.reindate),
-              source: reinstatedRow.source,
-              asOf: formatAsOf(reinstatedRow.as_of)
-            },
-            notes
-          };
-        }
-        notes.push('No exclusion record found for this NPI in the LEIE.');
-        return { verdict: 'CLEAR', match: 'npi', dobStatus: null, exclusion: null, reinstated: null, notes };
+        return verdictFromNpiRow(active || rows[0] || null, notes);
       }
 
       // 2. Name + state fallback (only when a usable identity was supplied).
@@ -252,3 +259,8 @@ class ExclusionService {
 }
 
 module.exports = ExclusionService;
+// Shared NPI-path helpers for batched scans (intelligenceService) so the
+// decision rules stay defined once.
+module.exports.verdictFromNpiRow = verdictFromNpiRow;
+module.exports.isValidNpi = isValidNpi;
+module.exports.formatAsOf = formatAsOf;

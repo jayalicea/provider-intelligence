@@ -7,6 +7,7 @@ const { logger } = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const providerRoutes = require('./routes/providerRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const intelligenceRoutes = require('./routes/intelligenceRoutes');
 
 class App {
   constructor() {
@@ -83,7 +84,8 @@ class App {
           '/analytics/group-performance': 'Group MIPS statistics for a set of NPIs',
           '/analytics/ranking/:npi': 'Provider rank/percentile vs peers, optionally by taxonomy',
           '/analytics/trends/:npi': 'Multi-year MIPS scores with trend analysis',
-          '/analytics/benchmark/:npi': 'Provider score vs national average and quartiles'
+          '/analytics/benchmark/:npi': 'Provider score vs national average and quartiles',
+          '/intelligence/cohort': 'Joined providers, latest MIPS, and LEIE verdicts for a state'
         }
       });
     });
@@ -93,6 +95,9 @@ class App {
 
     // Analytics routes
     this.app.use('/api/v1/analytics', analyticsRoutes);
+
+    // Intelligence routes
+    this.app.use('/api/v1/intelligence', intelligenceRoutes);
   }
 
   setupErrorHandling() {
