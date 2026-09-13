@@ -38,6 +38,30 @@ const formatAsOf = v => {
   return v === null || v === undefined ? null : String(v);
 };
 
+// oig_exclusions.dob stores dates as 8-digit YYYYMMDD text strings (verified
+// by sampling the loaded snapshot: every populated value is 8 digits in
+// 19xx/20xx, so MMDDYYYY is impossible). Roster DOB input arrives in mixed
+// formats; strip non-digits and flip a value that looks like MMDDYYYY
+// (month 01-12, year 19xx/20xx) to YYYYMMDD before comparing.
+const digits = v => String(v === null || v === undefined ? '' : v).replace(/\D/g, '');
+
+const canonicalizeDob = v => {
+  const d = digits(v);
+  if (!/^\d{8}$/.test(d)) return d || null;
+  const month = parseInt(d.slice(0, 2), 10);
+  const year = d.slice(4, 8);
+  if (month >= 1 && month <= 12 &&
+      (year.startsWith('19') || year.startsWith('20'))) {
+    return d.slice(4, 8) + d.slice(0, 4); // MMDDYYYY -> YYYYMMDD
+  }
+  return d;
+};
+
+const rowDob = r => {
+  const d = digits(r.dob);
+  return d && d !== '00000000' ? d : null;
+};
+
 class ExclusionService {
 
   /**
@@ -65,6 +89,7 @@ class ExclusionService {
           return {
             verdict: 'EXCLUDED',
             match: 'npi',
+            dobStatus: null, // NPI match is definitive; no DOB check applies
             exclusion: {
               type: active.excltype,
               date: formatLeieDate(active.excldate),
@@ -82,6 +107,7 @@ class ExclusionService {
           return {
             verdict: 'CLEAR',
             match: 'npi',
+            dobStatus: null,
             exclusion: null,
             reinstated: {
               date: formatLeieDate(reinstatedRow.reindate),
@@ -92,7 +118,7 @@ class ExclusionService {
           };
         }
         notes.push('No exclusion record found for this NPI in the LEIE.');
-        return { verdict: 'CLEAR', match: 'npi', exclusion: null, reinstated: null, notes };
+        return { verdict: 'CLEAR', match: 'npi', dobStatus: null, exclusion: null, reinstated: null, notes };
       }
 
       // 2. Name + state fallback (only when a usable identity was supplied).
@@ -101,7 +127,7 @@ class ExclusionService {
       const nState = normalize(state);
       if (nLast && nFirst && nState) {
         const result = await db.query(
-          "SELECT * FROM oig_exclusions WHERE upper(regexp_replace(lastname, '[^A-Z0-9 ]', '', 'g')) = $1 AND upper(state) = $2 AND upper(regexp_replace(firstname, '[^A-Z0-9 ]', '', 'g')) = $3",
+          "SELECT lastname, firstname, state, excltype, excldate, reindate, source, as_of, dob FROM oig_exclusions WHERE upper(regexp_replace(lastname, '[^A-Z0-9 ]', '', 'g')) = $1 AND upper(state) = $2 AND upper(regexp_replace(firstname, '[^A-Z0-9 ]', '', 'g')) = $3",
           [nLast, nState, nFirst]
         );
         const rows = (result.rows || []).filter(r =>
@@ -109,23 +135,80 @@ class ExclusionService {
           normalize(r.firstname) === nFirst &&
           normalize(r.state) === nState
         );
-        const active = rows.find(r => !isReinstated(r));
-        const reinstatedRow = active ? null : rows[0] || null;
+        const actives = rows.filter(r => !isReinstated(r));
+        const reinstatedRow = actives.length ? null : rows[0] || null;
 
-        if (active) {
-          if (dob) {
+        if (actives.length) {
+          const inputDob = dob ? canonicalizeDob(dob) : null;
+          const candidate = actives[0];
+
+          if (inputDob) {
+            const confirmed = actives.find(r => rowDob(r) === inputDob);
+            if (confirmed) {
+              notes.push('dob confirmed');
+              return {
+                verdict: 'EXCLUDED',
+                match: 'name_state',
+                dobStatus: 'confirmed',
+                exclusion: {
+                  type: confirmed.excltype,
+                  date: formatLeieDate(confirmed.excldate),
+                  source: confirmed.source,
+                  asOf: formatAsOf(confirmed.as_of)
+                },
+                reinstated: null,
+                notes
+              };
+            }
+            if (actives.some(r => rowDob(r))) {
+              // A candidate matched on name and state but the DOB disagrees.
+              // The candidate stays reported (never silently ignored), but
+              // prefer-miss-over-false-clear forbids overstating the match:
+              // a DOB mismatch cannot be an EXCLUDED verdict.
+              notes.push('A candidate matched on name and state, but the ' +
+                'date of birth disagreed, so the match could not be ' +
+                'confirmed. The candidate is reported for manual review.');
+              return {
+                verdict: 'UNVERIFIED',
+                match: 'name_state',
+                dobStatus: 'mismatch',
+                exclusion: {
+                  type: candidate.excltype,
+                  date: formatLeieDate(candidate.excldate),
+                  source: candidate.source,
+                  asOf: formatAsOf(candidate.as_of)
+                },
+                reinstated: null,
+                notes
+              };
+            }
             notes.push('Name and state matched an active LEIE record, but ' +
-              'the LEIE carries no date of birth, so the DOB could not be ' +
-              'confirmed against this record.');
+              'the LEIE record carries no date of birth, so the DOB could ' +
+              'not be confirmed against this record.');
+            return {
+              verdict: 'EXCLUDED',
+              match: 'name_state',
+              dobStatus: 'unavailable',
+              exclusion: {
+                type: candidate.excltype,
+                date: formatLeieDate(candidate.excldate),
+                source: candidate.source,
+                asOf: formatAsOf(candidate.as_of)
+              },
+              reinstated: null,
+              notes
+            };
           }
+
           return {
             verdict: 'EXCLUDED',
             match: 'name_state',
+            dobStatus: 'not_provided',
             exclusion: {
-              type: active.excltype,
-              date: formatLeieDate(active.excldate),
-              source: active.source,
-              asOf: formatAsOf(active.as_of)
+              type: candidate.excltype,
+              date: formatLeieDate(candidate.excldate),
+              source: candidate.source,
+              asOf: formatAsOf(candidate.as_of)
             },
             reinstated: null,
             notes
@@ -138,6 +221,7 @@ class ExclusionService {
           return {
             verdict: 'CLEAR',
             match: 'name_state',
+            dobStatus: null,
             exclusion: null,
             reinstated: {
               date: formatLeieDate(reinstatedRow.reindate),
@@ -148,7 +232,7 @@ class ExclusionService {
           };
         }
         notes.push('No exclusion record found for this name and state in the LEIE.');
-        return { verdict: 'CLEAR', match: 'name_state', exclusion: null, reinstated: null, notes };
+        return { verdict: 'CLEAR', match: 'name_state', dobStatus: null, exclusion: null, reinstated: null, notes };
       }
 
       // 3. Neither a valid NPI nor a usable name/state identity: UNVERIFIED.
@@ -157,12 +241,12 @@ class ExclusionService {
       }
       notes.push('No valid NPI and no usable lastname, firstname, and state ' +
         'were supplied, so no definitive check could be performed.');
-      return { verdict: 'UNVERIFIED', match: null, exclusion: null, reinstated: null, notes };
+      return { verdict: 'UNVERIFIED', match: null, dobStatus: null, exclusion: null, reinstated: null, notes };
     } catch (error) {
       logger.error('Error resolving exclusion:', error);
       notes.push('The exclusion database query failed; status could not be ' +
         'verified. A miss is never assumed when the check cannot complete.');
-      return { verdict: 'UNVERIFIED', match: null, exclusion: null, reinstated: null, notes };
+      return { verdict: 'UNVERIFIED', match: null, dobStatus: null, exclusion: null, reinstated: null, notes };
     }
   }
 }
