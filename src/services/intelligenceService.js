@@ -3,8 +3,21 @@ const { logger } = require('../utils/logger');
 const {
   verdictFromNpiRow,
   isValidNpi,
-  formatAsOf
+  formatAsOf,
+  formatLeieDate
 } = require('./exclusionService');
+
+// Watchlist window bounds, shared with the controller's validation.
+const WATCHLIST_DEFAULT_DAYS = 90;
+const WATCHLIST_MAX_DAYS = 365;
+const WATCHLIST_MAX_ROWS = 500;
+
+// excldate is YYYYMMDD text, so the cutoff is compared as the same zero-padded
+// string rather than cast per row.
+const yyyymmdd = date => {
+  const p = n => String(n).padStart(2, '0');
+  return `${date.getUTCFullYear()}${p(date.getUTCMonth() + 1)}${p(date.getUTCDate())}`;
+};
 
 const isReinstatedRow = row => {
   const r = row.reindate;
@@ -128,6 +141,74 @@ class IntelligenceService {
       throw new Error('Failed to build cohort intelligence');
     }
   }
+
+  /**
+   * Recently added, still-active LEIE exclusions -- the screening watchlist.
+   *
+   * Active means reindate IS NULL: the ingest normalizes LEIE's '00000000' and
+   * empty reinstatement dates to null, so a null reindate is an exclusion that
+   * has not been lifted. The window is applied to excldate, which is YYYYMMDD
+   * text, so the cutoff is compared as a string of the same shape.
+   *
+   * filters: { state (optional 2-letter), days (1..365, default 90) }
+   */
+  async getExclusionWatchlist({ state = null, days = WATCHLIST_DEFAULT_DAYS } = {}) {
+    try {
+      const window = Math.min(Math.max(parseInt(days, 10) || WATCHLIST_DEFAULT_DAYS, 1), WATCHLIST_MAX_DAYS);
+      const cutoff = new Date(Date.now() - window * 24 * 60 * 60 * 1000);
+
+      const params = [yyyymmdd(cutoff)];
+      const conditions = [
+        'reindate IS NULL',
+        "excldate ~ '^[0-9]{8}$'",
+        'excldate >= $1'
+      ];
+      if (state) {
+        params.push(state.toUpperCase());
+        conditions.push(`upper(state) = $${params.length}`);
+      }
+      params.push(WATCHLIST_MAX_ROWS);
+
+      const query = `
+        SELECT display_name, lastname, firstname, busname, npi, city, state, zip,
+               excltype, general, specialty, excldate, source, as_of
+        FROM oig_exclusions
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY excldate DESC, display_name ASC
+        LIMIT $${params.length}`;
+
+      const result = await db.query(query, params);
+
+      return {
+        windowDays: window,
+        state: state ? state.toUpperCase() : null,
+        capped: result.rows.length >= WATCHLIST_MAX_ROWS,
+        rows: result.rows.map(row => ({
+          name: row.display_name ||
+            row.busname ||
+            [row.lastname, row.firstname].filter(Boolean).join(', ') ||
+            null,
+          entityType: row.busname ? 'ORGANIZATION' : 'INDIVIDUAL',
+          npi: isValidNpi(row.npi) ? row.npi : null,
+          city: row.city || null,
+          state: row.state || null,
+          zip: row.zip || null,
+          exclusionType: row.excltype || null,
+          exclusionDate: formatLeieDate(row.excldate),
+          // Provenance travels with the row: which file it came from and the
+          // vintage of that file, so a stale list is visible per entry.
+          source: row.source,
+          asOf: formatAsOf(row.as_of)
+        }))
+      };
+    } catch (error) {
+      logger.error('Error building exclusion watchlist:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = IntelligenceService;
+module.exports.WATCHLIST_DEFAULT_DAYS = WATCHLIST_DEFAULT_DAYS;
+module.exports.WATCHLIST_MAX_DAYS = WATCHLIST_MAX_DAYS;
+module.exports.WATCHLIST_MAX_ROWS = WATCHLIST_MAX_ROWS;

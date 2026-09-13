@@ -83,6 +83,18 @@ export const api = {
     return { results: data.data ?? [], count: data.count ?? 0 }
   },
 
+  getExclusionWatchlist: async ({ state, days } = {}) => {
+    const { data } = await http.get('/intelligence/exclusion-watchlist', {
+      params: { state: state || undefined, days: days || undefined },
+    })
+    return {
+      results: data.data ?? [],
+      count: data.count ?? 0,
+      windowDays: data.windowDays ?? null,
+      capped: data.capped ?? false,
+    }
+  },
+
   getQualityMeasures: async (facilityId) => {
     // The backend mounts quality measures under the providers router
     // (/api/v1/providers/quality-measures/:facilityId), not at the API root.
