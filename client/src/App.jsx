@@ -5,6 +5,7 @@ import ProviderDetailPage from './pages/ProviderDetailPage.jsx'
 import Provider360Page from './pages/Provider360Page.jsx'
 import CohortExplorerPage from './pages/CohortExplorerPage.jsx'
 import WatchlistPage from './pages/WatchlistPage.jsx'
+import CoveragePage from './pages/CoveragePage.jsx'
 import MipsDashboardPage from './pages/MipsDashboardPage.jsx'
 import HospitalQualityPage from './pages/HospitalQualityPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
@@ -28,6 +29,7 @@ export default function App() {
             <a href="/providers">Provider Search</a>
             <a href="/cohort">Cohort Explorer</a>
             <a href="/watchlist">Watchlist</a>
+            <a href="/coverage">Coverage</a>
           </nav>
           <span className="app-header-right">
             <span className="env-tag">Public data only</span>
@@ -48,6 +50,7 @@ export default function App() {
             <Route path="/providers/:npi/360" element={<Provider360Page />} />
             <Route path="/cohort" element={<CohortExplorerPage />} />
             <Route path="/watchlist" element={<WatchlistPage />} />
+            <Route path="/coverage" element={<CoveragePage />} />
             <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
             <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
             <Route path="*" element={<NotFoundPage />} />

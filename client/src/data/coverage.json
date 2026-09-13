@@ -1,0 +1,84 @@
+{
+  "note": "Coverage registry rendered by client/src/pages/CoveragePage.jsx. Every figure carries the vintage it was measured at; nothing here is computed at request time.",
+  "generatedAt": "2026-09-13",
+  "datasets": [
+    {
+      "id": "oig-leie",
+      "name": "OIG LEIE",
+      "publisher": "HHS Office of Inspector General",
+      "scope": "Federal healthcare program exclusions, national",
+      "records": 84001,
+      "recordLabel": "exclusion records",
+      "asOf": "2026-09-12",
+      "cadence": "Monthly, with weekly supplements",
+      "sourceUrl": "https://oig.hhs.gov/exclusions/exclusions_list.asp",
+      "provenance": "Downloaded directly from the OIG exclusions database.",
+      "notes": []
+    },
+    {
+      "id": "state-medicaid-exclusions",
+      "name": "State Medicaid exclusion lists",
+      "publisher": "State Medicaid agencies (38 jurisdictions)",
+      "scope": "State-level Medicaid program exclusions and terminations",
+      "records": 82929,
+      "recordLabel": "exclusion records",
+      "jurisdictions": 38,
+      "asOf": "2026-09-13",
+      "cadence": "Varies by state; each state publishes on its own schedule",
+      "sourceUrl": "https://www.opensanctions.org/datasets/us_medicaid_exclusions/",
+      "provenance": "Sourced via the OpenSanctions public mirror of official state lists, not scraped from each state directly.",
+      "notes": [
+        "Commercial deployments should re-extract from the official state URLs recorded per jurisdiction below, or license OpenSanctions directly. The mirror is suitable for evaluation and internal screening, not for redistribution."
+      ]
+    },
+    {
+      "id": "nppes",
+      "name": "NPPES national registry",
+      "publisher": "CMS / NPPES",
+      "scope": "All enumerated NPIs, national",
+      "records": 9726865,
+      "recordLabel": "providers",
+      "asOf": "2026-08",
+      "vintage": "August 2026 dissemination file, V.2 layout",
+      "cadence": "Monthly full replacement, with weekly incrementals",
+      "sourceUrl": "https://download.cms.gov/nppes/NPI_Files.html",
+      "provenance": "Full-file load of the August 2026 V.2 dissemination file.",
+      "notes": [
+        "Count includes deactivated enumerations, which is why it exceeds the number of active NPIs."
+      ]
+    },
+    {
+      "id": "cms-care-compare",
+      "name": "CMS Care Compare quality measures",
+      "publisher": "CMS",
+      "scope": "Hospital quality measures, cached per facility on demand",
+      "records": 2342,
+      "recordLabel": "hospitals cached",
+      "asOf": "per value",
+      "cadence": "Rolling; CMS refreshes the underlying datasets on its own schedule",
+      "sourceUrl": "https://data.cms.gov/provider-data/",
+      "provenance": "Fetched per facility from the CMS provider-data datastore API and cached.",
+      "notes": [
+        "Coverage grows as facilities are requested; it is a cache, not a bulk load.",
+        "Each cached measure carries its own access date rather than sharing one dataset-level vintage."
+      ]
+    },
+    {
+      "id": "cms-qpp-mips",
+      "name": "CMS QPP MIPS",
+      "publisher": "CMS Quality Payment Program",
+      "scope": "MIPS performance scores, cached per provider on demand",
+      "records": 8400,
+      "recordLabel": "providers cached",
+      "asOf": "per value",
+      "cadence": "One rolling vintage; CMS re-bases the dataset in place",
+      "sourceUrl": "https://data.cms.gov/provider-data/topics/physician-office-visit-costs",
+      "provenance": "Fetched per NPI from the CMS QPP Experience dataset and cached.",
+      "notes": [
+        "CMS publishes a single rolling vintage, so year-over-year movement may reflect re-based scores rather than true performance change.",
+        "Each cached score carries its own access date."
+      ]
+    }
+  ],
+  "jurisdictions": []
+}
