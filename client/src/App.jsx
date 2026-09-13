@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ProviderSearchPage from './pages/ProviderSearchPage.jsx'
 import ProviderDetailPage from './pages/ProviderDetailPage.jsx'
+import Provider360Page from './pages/Provider360Page.jsx'
 import MipsDashboardPage from './pages/MipsDashboardPage.jsx'
 import HospitalQualityPage from './pages/HospitalQualityPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
@@ -23,6 +24,7 @@ export default function App() {
           <span className="app-brand">ProviderLens</span>
           <nav className="app-nav">
             <a href="/providers">Provider Search</a>
+            <a href="/cohort">Cohort Explorer</a>
           </nav>
           <span className="app-header-right">
             <span className="env-tag">Public data only</span>
@@ -40,6 +42,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/providers" replace />} />
             <Route path="/providers" element={<ProviderSearchPage />} />
             <Route path="/providers/:npi" element={<ProviderDetailPage />} />
+            <Route path="/providers/:npi/360" element={<Provider360Page />} />
             <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
             <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
             <Route path="*" element={<NotFoundPage />} />

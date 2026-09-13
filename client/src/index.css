@@ -527,3 +527,68 @@ button.btn-primary:hover {
   margin: 4px 0 0 24px;
   max-width: 480px;
 }
+
+/* Provider 360 passport */
+
+.passport {
+  padding: 0;
+  overflow: hidden;
+}
+
+.passport-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.passport-name {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.passport-sub {
+  margin: 2px 0;
+}
+
+.passport-verdict {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.passport-section {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.passport-section .card-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.passport-notes {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.passport-terms {
+  padding: 12px 24px;
+  font-size: 12px;
+}
+
+.dob-mismatch {
+  color: var(--error);
+}
+
+/* Cohort explorer row affordance */
+
+.row-clickable {
+  cursor: pointer;
+}
+
+.row-clickable:hover {
+  background: var(--bg);
+}

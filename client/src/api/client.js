@@ -71,6 +71,18 @@ export const api = {
     return records
   },
 
+  getVerification: async (npi) => {
+    const { data } = await http.get(`/providers/${npi}/verification`)
+    return data.data
+  },
+
+  getCohort: async ({ state, taxonomy, minScore }) => {
+    const { data } = await http.get('/intelligence/cohort', {
+      params: { state, taxonomy, minScore },
+    })
+    return { results: data.data ?? [], count: data.count ?? 0 }
+  },
+
   getQualityMeasures: async (facilityId) => {
     // The backend mounts quality measures under the providers router
     // (/api/v1/providers/quality-measures/:facilityId), not at the API root.
