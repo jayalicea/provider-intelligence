@@ -29,6 +29,7 @@ function seedExclusion(overrides = {}) {
     excltype: '1128b4',
     excldate: '20250120',
     reindate: null,
+    dob: null,
     source: 'UPDATED.csv',
     as_of: '2026-09-12',
     display_name: 'ABAD-SANTOS, CRISELDA',
@@ -133,6 +134,71 @@ describe('ExclusionService.resolveExclusion', () => {
     expect(result.notes.join(' ')).toMatch(/date of birth/i);
   });
 
+  test('no dob supplied reports not_provided and behaves as before', async () => {
+    seedExclusion({ npi: '0000000000', dob: '19820311' });
+
+    const result = await service.resolveExclusion({
+      lastname: 'ABAD-SANTOS',
+      firstname: 'CRISELDA',
+      state: 'CA'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.match).toBe('name_state');
+    expect(result.dobStatus).toBe('not_provided');
+  });
+
+  test('matching dob confirms a name+state match (MMDDYYYY input flipped)', async () => {
+    seedExclusion({ npi: '0000000000', dob: '19820311' });
+
+    const result = await service.resolveExclusion({
+      lastname: 'ABAD-SANTOS',
+      firstname: 'CRISELDA',
+      state: 'CA',
+      dob: '03/11/1982'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.match).toBe('name_state');
+    expect(result.dobStatus).toBe('confirmed');
+    expect(result.notes.join(' ')).toMatch(/dob confirmed/i);
+    expect(result.exclusion.type).toBe('1128b4');
+  });
+
+  test('dob mismatch downgrades the candidate to UNVERIFIED but still reports it', async () => {
+    seedExclusion({ npi: '0000000000', dob: '19820311' });
+
+    const result = await service.resolveExclusion({
+      lastname: 'ABAD-SANTOS',
+      firstname: 'CRISELDA',
+      state: 'CA',
+      dob: '1970-01-01'
+    });
+
+    expect(result.verdict).toBe('UNVERIFIED');
+    expect(result.match).toBe('name_state');
+    expect(result.dobStatus).toBe('mismatch');
+    // The candidate is never silently ignored: its details stay reported.
+    expect(result.exclusion).not.toBeNull();
+    expect(result.exclusion.type).toBe('1128b4');
+    expect(result.notes.join(' ')).toMatch(/date of birth disagreed/i);
+  });
+
+  test('row without dob stays EXCLUDED with dobStatus unavailable when dob was supplied', async () => {
+    seedExclusion({ npi: '0000000000', dob: null });
+
+    const result = await service.resolveExclusion({
+      lastname: 'ABAD-SANTOS',
+      firstname: 'CRISELDA',
+      state: 'CA',
+      dob: '03/11/1982'
+    });
+
+    expect(result.verdict).toBe('EXCLUDED');
+    expect(result.dobStatus).toBe('unavailable');
+    expect(result.notes.join(' ')).toMatch(/could not be confirmed/i);
+  });
+
   test('only reinstated name matches are CLEAR with reinstated noted', async () => {
     seedExclusion({ npi: '0000000000', reindate: '20260301' });
 
@@ -166,6 +232,7 @@ describe('GET /api/v1/providers/:npi/verification', () => {
     });
     expect(data.identity.name.last.value).toBe('AHUJA');
     expect(data.exclusion.verdict).toBe('CLEAR');
+    expect(data.exclusion.dobStatus).toBeNull();
     expect(data.flagsSummary).toBe('no flags found');
     expect(data.terms).toBe(
       'This report states what public sources published as of the dates shown. ' +
