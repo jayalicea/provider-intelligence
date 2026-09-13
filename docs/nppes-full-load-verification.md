@@ -3,21 +3,36 @@
 Record of the measurements behind the backpressure refactor of
 `tools/nppes-ingest.js`. Read together with `docs/nppes-v2-notes.md`.
 
-## What could not be verified here, and why
+## Production result: the national load completed
 
-The refactor was **not** verified against the real dissemination file
-(`data/nppes/npidata_pfile_20050523-20260809.csv`, 11.4 GB, ~8.5M rows).
-Two blockers, both environmental:
+The refactored loader ran the real full load on the maintainer's machine
+on 2026-09-13, against
+`data/nppes/npidata_pfile_20050523-20260809.csv` (11.4 GB, August 2026
+V.2 dissemination file), on the merged refactor (`4c16327`, `for await`
+confirmed present in the file before the run):
 
-- `data/` is gitignored, so the real file is not in the repo and is not
-  present in a fresh checkout.
-- `download.cms.gov` is refused by this environment's egress policy
-  (HTTP 403 on the proxy CONNECT for every NPPES URL), so the file could
-  not be re-fetched.
+```
+INGEST_OK parsed=9726865 inserted=9726865 table=9726865
+```
 
-Anyone with the real file should re-run the command in "Reproducing"
-below against it and append the result. The numbers here come from a
-generated stand-in, not from production data.
+All three counts agree, which is the loader's own self-check. TRUNCATE-
+first idempotency held: the preceding 25,000-row smoke load was replaced
+rather than added to, which a failed truncate would have exposed as
+~9,751,865 rows.
+
+**9,726,865 is the expected full-file count, not an anomaly.** The
+earlier "7 to 8 million" estimate was counting *active* NPIs; the
+dissemination file also carries deactivated enumerations, and the total
+including those is ~9.7M.
+
+## What was measured in the development container instead
+
+The before/after comparison below could not use the real file — `data/`
+is gitignored so it is absent from a fresh checkout, and
+`download.cms.gov` is refused by that environment's egress policy (HTTP
+403 on the proxy CONNECT for every NPPES URL). A generated stand-in was
+used for the A/B. The production run above is the real-file evidence;
+the fixture runs below are what isolate the memory behaviour.
 
 ## Substitute fixture
 
@@ -34,6 +49,10 @@ Y-flagged / N-only / empty taxonomy slots so all three
 
 Database: stock PostgreSQL 16.13, defaults untouched (`fsync=on`,
 `synchronous_commit=on`, `shared_buffers=128MB`, `max_wal_size=1GB`).
+
+Note the fixture is 8,000,000 rows / 4.54 GB against the production
+file's 9,726,865 rows / 11.4 GB — the row counts are close, the byte
+volume is not, because only the mapped columns carry values.
 
 ## Results
 
