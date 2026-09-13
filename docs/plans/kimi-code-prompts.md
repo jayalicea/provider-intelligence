@@ -4,6 +4,20 @@ How to use this file: each prompt below is meant to be pasted into a fresh Kimi 
 
 ---
 
+## RUNTIME ROUTING (read first)
+
+Prompts that reference local paths (data/, tools/, docs/), localhost ports, or the
+database run ONLY in Kimi Code on this machine (terminal TUI or `kimi web` UI).
+Kimi Agent and Agent Swarm in the Kimi app run in cloud sandboxes with NO access
+to this repo or PC; a repo-shaped prompt sent there produces a synthetic rebuild
+and downloadable files, never commits. Use cloud agents only for self-contained
+research and document tasks with all inputs pasted or attached, and expect
+deliverables as files to ingest afterward. Historical example: the NPPES V.2
+pipeline prompt succeeded in Kimi Code (real-file INGEST_OK) and was separately
+launched in the app sandbox, producing a redundant synthetic duplicate.
+
+---
+
 ## PROMPT A: Resume and finish the platform (run at 2 PM window)
 
 Resume the Provider Intelligence Platform. git log shows phases 1 and 2 committed (grounding docs in AGENTS.md and CORRECTIONS.md, analytics service with group-performance, ranking, trends, benchmark endpoints). A previous session died mid Phase 3: the working tree contains uncommitted frontend work in client/ (modified App.jsx, index.css, vite.config.js, index.html, package files, plus new src/api, src/components, src/hooks, src/pages directories). That uncommitted work is valuable and irreplaceable; protecting it is your first job.

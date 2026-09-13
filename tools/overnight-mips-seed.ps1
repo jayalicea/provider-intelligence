@@ -7,6 +7,9 @@ param(
   [int]$PerState = 500
 )
 
+# Normalize: -File binding can deliver the state list as one comma-joined string.
+$States = @($States | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 $ErrorActionPreference = 'Continue'
 $project  = 'C:\Users\casalab\provider-intelligence'
 $log      = "$project\logs\mips-seed.log"
