@@ -2,6 +2,28 @@
 
 This document defines user stories and a phased roadmap for the next version of the Provider Intelligence Platform, building on the current Express + PostgreSQL backend and React frontend (provider search, provider detail, MIPS dashboard, Care Compare quality measures).
 
+Status as of 2026-09-14. No phase below has been executed as a phase, but the
+client has grown routes and one story has been satisfied incidentally, and the
+names now collide. Three clarifications:
+
+- **Story 3.2 (printable provider summary) is effectively shipped.** A print
+  stylesheet lives at the end of `client/src/index.css` and `docs/DESIGN.md`
+  section 8 makes the one-page Provider 360 print report normative. Phase A
+  should be re-scoped accordingly rather than re-estimating it at 0.5 weekend.
+- **The shipped `/watchlist` route is an exclusion watchlist**, backed by
+  `GET /api/v1/intelligence/exclusion-watchlist`: it lists cached providers
+  carrying an OIG LEIE or state Medicaid exclusion match. It is not Story 2.1's
+  user-curated MIPS watchlist, which is still unbuilt, and it holds no per-user
+  state, so it does not resolve Tension 1.
+- **The shipped `/providers/:npi/360`, `/cohort`, `/upload-roster` and
+  `/coverage` routes** are exclusion-screening and coverage-reporting surfaces,
+  unrelated to the stories below.
+
+Everything else in Phase A0 through Phase C remains open, including Phase A0
+itself, which is the prerequisite for every story that involves a year or a
+percentile. CSV export (Story 3.1) is not built: the only CSV handling in the
+client is roster upload, which is an input path, not an export.
+
 ## Personas
 
 1. **Practice Manager (PM)**: Runs a small medical practice, tracks the MIPS scores of their own providers, wants early warning when performance slips.

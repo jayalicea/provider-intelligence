@@ -8,6 +8,43 @@ Findings are ordered by severity. Where the provided materials were insufficient
 
 ---
 
+## Status as of 2026-09-14
+
+The findings below are preserved as written. This banner records what has since
+changed in the code; it does not edit the findings themselves. Verify against
+`src/services/analyticsService.js` and `src/config/init.sql` before relying on
+any line of it.
+
+**Resolved.**
+
+| Finding | Evidence in the current code |
+|---|---|
+| C1 rolling-vintage trends | `getTrends` returns a `warning` field stating that `performance_year` values are request labels on a rolling CMS vintage, and the MIPS dashboard renders the same text as a persistent banner. The underlying data limitation is unchanged and cannot be fixed without real per-year vintages (V2_ROADMAP Phase A0). |
+| C2 NULL scores rank first | `RANK() OVER (ORDER BY m.final_score DESC NULLS LAST)`, with `m.final_score IS NOT NULL` filtering the window source. An unscored target returns a null rank with a reason. |
+| C3 percentile denominator counts nulls | Numerator and denominator are both `COUNT(m.final_score) OVER ()` over scored rows only. |
+| H1 `num()` returns NaN | `num` is `const n = Number(v); return Number.isFinite(n) ? n : null;`. |
+| H2 unscored provider classified bottom quartile | `getBenchmark` returns an explicit `status: 'unscored'` instead of falling through the quartile chain. |
+| H3 `peer_count` counts unscored peers | `COUNT(m.final_score) AS peer_count`. |
+| H4 no index coverage | `init.sql` creates `idx_mips_npi_year` on `(npi, performance_year)` and `idx_mips_year_npi` on `(performance_year, npi)`. The precomputed rank/percentile materialization the finding also asks for is **not** built; it remains V2_ROADMAP work. |
+| H5 no uniqueness on `(npi, performance_year)` | `mips_performance_scores` declares `UNIQUE(npi, performance_year)`. |
+| M2 unvalidated `npis` | `Array.isArray` plus a string-element check, an explicit empty-array rejection, both raising a 400, and a 5,000-element cap. |
+| M3 `provider_count` overstates scored population | A `scoredCount` is returned alongside the row count. |
+| M4 single-row STDDEV unspecified | Pinned by a regression test asserting null rather than NaN. |
+
+**Still open.** M1 (generic error messages with no `cause` and no status
+differentiation), M5 (taxonomy normalization and the interpolated-fragment
+maintainability note), M6 (undocumented `RANK()` tie policy and the
+percentile tie convention; the duplicate-row half of the finding is closed by
+H5's unique constraint), and L1 through L5.
+
+**Evidence gaps now closed.** The DDL exists at `src/config/init.sql`, so index
+coverage and the `(npi, performance_year)` uniqueness question are both
+answerable rather than assumed. The route-layer validation question is
+answerable from `src/controllers/`. The ingest-coercion question is answerable
+from `src/services/cmsDataService.js`.
+
+---
+
 ## Critical
 
 ### C1. getTrends and all multi-year comparisons are meaningless against the rolling-vintage dataset

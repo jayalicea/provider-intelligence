@@ -2,6 +2,26 @@
 
 **How to use:** Paste the block below into a coding or planning agent working in the Provider Intelligence Platform repo. Set the inputs first. The prompt plans and builds a per-provider verification dossier and packages it for revenue.
 
+Status as of 2026-09-14, against the prompt's own prerequisites and build
+tasks:
+
+- Prerequisite 2 (CODE_REVIEW criticals C1, C2, C3 and highs H1, H2, H3) is
+  **done**; see the status banner in `docs/CODE_REVIEW.md`.
+- Prerequisite 3 (SECURITY_REVIEW P0 gaps) is **not done**; see the status
+  banner in `docs/SECURITY_REVIEW.md`. Nothing built on this prompt should be
+  sold before those close.
+- Build task 1 (ingest exclusions) is **done for exclusions**, as
+  `oig_exclusions` and `state_exclusions` loaded by offline jobs in `tools/`.
+  State license status is **not** ingested.
+- Build task 2 (conservative entity resolution) is **done**, in
+  `src/services/exclusionService.js`, with the rules written up in
+  `docs/method-statement.md`.
+- Build task 3 (`GET /providers/:npi/verification`) **exists**, at
+  `/api/v1/providers/:npi/verification`. It is cache-only and carries no
+  license status.
+- Build task 4 (per-lookup metering and API keys) is **not started**, which
+  follows from prerequisite 3 being open.
+
 **Inputs to set before running**
 1. Repo path and whether the agent may run the database:
 2. First target buyer (credentialing / onboarding / vendor-risk):

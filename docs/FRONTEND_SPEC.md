@@ -2,6 +2,36 @@
 
 A minimal React frontend blueprint for the Provider Intelligence Platform. The backend is Node.js/Express + PostgreSQL and is already live. This document covers routes, pages, components, API contracts, state handling, and visual style.
 
+## Status as of 2026-09-14
+
+**This is the pre-build blueprint, kept as the record of what was planned. It
+is not a description of the shipped client.** Read it with three corrections in
+mind:
+
+1. **Every response shape marked UNVERIFIED below was a hypothesis, and several
+   were wrong.** They have since been checked against the live backend. The
+   reconciliation, file by file, is in `client/ADOPTION_NOTES.md`, and the real
+   paths and shapes are tabulated in `docs/README.md` section 4. Neither is
+   duplicated here. The short version: search takes `terms`, not `query`, and
+   returns no `total`/`page`/`limit`; `mips-trends` returns parallel arrays,
+   not records; quality rows carry no `facilityName` and no `footnote`;
+   `mips-performance` carries no `paymentAdjustmentPct`; and every path sits
+   under `/api/v1`, with quality measures mounted on the providers router at
+   `/api/v1/providers/quality-measures/:facilityId`, not at a top-level
+   `/quality-measures/:facilityId`.
+2. **The stack differs from section 1.** The shipped client is JavaScript, not
+   TypeScript; React 19 with react-router v7; and a plain fetch hook
+   (`src/hooks/useFetch.js`) rather than TanStack Query. Those were deliberate
+   choices by the session that built it, kept rather than rewritten. The `.ts`
+   interface blocks below are therefore documentation of intent, not of code.
+3. **`docs/DESIGN.md` supersedes section 6 on every visual matter**, including
+   the palette. The shipped client uses the DESIGN tokens (teal `#0F6B5C`
+   accent on a `#F5F7F6` ground), not the slate-blue palette in section 6.
+
+The route table in section 3 is also incomplete: the shipped app adds
+`/providers/:npi/360`, `/cohort`, `/watchlist`, `/upload-roster` and
+`/coverage`, none of which existed when this was written.
+
 ## 1. Overview and Stack
 
 - React 18+ with TypeScript
@@ -416,8 +446,11 @@ Badge backgrounds use the base color at low opacity (e.g. 10-12% tint of success
 
 ## 7. Verification Checklist Before Build
 
-1. Confirm `GET /providers/search` response envelope (`results`, `total`, `page`, `limit`) against the live backend. Currently UNVERIFIED.
-2. Confirm provider detail field names, especially address fields. Currently UNVERIFIED.
-3. Confirm MIPS endpoints return camelCase keys normalized from the QPP Experience dataset. Currently UNVERIFIED.
-4. Confirm quality measure field names and the exact set of `comparedToNational` strings and footnote codes present in data. Currently UNVERIFIED.
-5. Confirm the `POST /providers/bulk-data` request/response contract before building any admin UI for it. Currently UNVERIFIED.
+Items 1 through 4 were carried out before the client was built; the findings
+are in `client/ADOPTION_NOTES.md`. Item 5 was not, and remains open.
+
+1. ~~Confirm `GET /providers/search` response envelope (`results`, `total`, `page`, `limit`) against the live backend.~~ **Done, and the hypothesis was wrong**: the envelope is `{ success, data, count }` with no pagination fields, so the results table reports a count rather than "Page X of Y".
+2. ~~Confirm provider detail field names, especially address fields.~~ **Done.**
+3. ~~Confirm MIPS endpoints return camelCase keys normalized from the QPP Experience dataset.~~ **Done**, with the caveat that `mips-trends` returns parallel arrays rather than records and the client reshapes them.
+4. ~~Confirm quality measure field names and the exact set of `comparedToNational` strings and footnote codes present in data.~~ **Done, and the hypothesis was partly wrong**: live rows carry no `footnote` field at all, so the footnote column and its crosswalk tooltips specified in section 4.4 are not buildable against this endpoint.
+5. Confirm the `POST /providers/bulk-data` request/response contract before building any admin UI for it. **Still UNVERIFIED**, and note that `docs/SECURITY_REVIEW.md` P0-1 rates this endpoint the highest risk in the design; settle the authentication question before building a UI for it.

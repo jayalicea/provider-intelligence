@@ -1,5 +1,8 @@
 # NPPES V.2 Reference Notes (from the August 2026 dissemination bundle)
 
+Layout facts accurate as of 2026-05-12 (readme revision date); load status
+below accurate as of 2026-09-13.
+
 Distilled from NPPES_Data_Dissemination_Readme_v.2.pdf (updated 2026-05-12),
 NPPES_Data_Dissemination_CodeValues.pdf (updated 2025-02-01), and the real file
 headers in data/nppes/. Read this before the full nppes_providers load or any
@@ -44,9 +47,17 @@ work on the reference files.
 
 ## The reference files (all keyed on NPI, all future child tables)
 
-- npidata_pfile (11.4 GB, 330 cols): main provider file. Already ingested in
-  smoke-test form (25k rows); full load is a 20 to 30 minute job in a quiet
-  window.
+- npidata_pfile (11.4 GB, 330 cols): main provider file. **Fully loaded as of
+  2026-09-13**: `INGEST_OK parsed=9726865 inserted=9726865 table=9726865`
+  against `npidata_pfile_20050523-20260809.csv`. The earlier note here said
+  the file was ingested only in smoke-test form at 25,000 rows; that smoke
+  load was replaced by the national load, which is the truncate-first
+  behaviour the loader is built on. Measurements, the memory-behaviour A/B,
+  and the per-column integrity checks are in
+  `docs/nppes-full-load-verification.md`. 9,726,865 is the expected full-file
+  count: it includes deactivated enumerations, which is why it exceeds the
+  count of active NPIs. The published figure in
+  `client/src/data/coverage.json` matches.
 - othername_pfile (~48 MB, 4 cols: NPI, Other Name, Type Code, Created Date):
   alternate names for Type 2 organizations. HIGH VALUE for Package B: excluded
   businesses are matched by name, and DBAs/former names are exactly what

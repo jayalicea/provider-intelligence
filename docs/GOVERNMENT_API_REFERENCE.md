@@ -8,6 +8,17 @@ This document describes how the Node.js/Express backend of the Provider Intellig
 
 Every claim below is grounded in live verification or official documentation. Anything not confirmed is explicitly marked **UNVERIFIED**. Source URLs are cited inline throughout.
 
+Verified as of the dates stated inline; the dataset IDs in Section B were last
+refreshed 2026-07, and this file was last reviewed against the code on
+2026-09-14. Government dataset IDs and row counts change without notice, so
+re-verify before relying on a figure.
+
+This file covers the three request-time APIs only. The three bulk sources the
+platform also loads (the NPPES dissemination file, the OIG LEIE, and the state
+Medicaid exclusion lists) are files rather than APIs; they are documented in
+`docs/nppes-v2-notes.md`, `docs/adr/0002-file-based-leie-pipeline.md` and
+`docs/adr/0004-open-sanctions-state-lists.md`.
+
 ---
 
 ## Section A: CMS QPP Experience dataset
@@ -151,6 +162,11 @@ Care Compare (Medicare Compare) datasets are served through a DKAN-style datasto
 | HCAHPS State | 84jm-wiui |
 | HAI National | yd3s-jyhd |
 | HAI State | k2ze-bqvw |
+
+`src/config/api-config.js` carries one further measure-family ID that this
+document does not independently verify: `yv7e-xc69` (Timely and Effective Care,
+Hospital). Treat it as **UNVERIFIED** here until it is checked the same way as
+the rows above.
 
 ### Auth and keys
 

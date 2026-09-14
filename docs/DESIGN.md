@@ -4,6 +4,11 @@ Everything in this file is normative for the frontend build (Prompt A, Phase 3).
 Where docs/FRONTEND_SPEC.md and this file conflict on visual matters, this file wins.
 The live backend response shapes remain the only authority on data.
 
+Checked against the shipped client on 2026-09-14: the tokens in section 2 match
+`client/src/index.css`, and the navigation in section 4 matches the routes in
+`client/src/App.jsx`. Section 6 of FRONTEND_SPEC.md still carries the older
+slate-blue palette and is superseded by section 2 here.
+
 ## 1. Brand frame
 
 Working product name: ProviderLens (placeholder, easy to change later).
@@ -79,6 +84,13 @@ Every value that comes from a government source renders with its as-of context.
 Pattern: value + small muted line under it: "CMS QPP Experience, accessed 2026-09-12".
 Where the API returns null with a footnote reason, render the gray "Not reported"
 plus the footnote reason as a tooltip, never a dash or a zero.
+
+Caveat as of 2026-09-14: the live Care Compare rows the backend returns carry
+no `footnote` field, so on that surface the tooltip half of this rule has no
+data to render. The gray "Not reported" state is still required; the reason
+tooltip appears only where a source actually supplies one. Adding it back means
+joining the CMS Footnote Crosswalk dataset (`y9us-9xdf`), which is not wired
+up.
 
 ## 4. Page copy deck
 

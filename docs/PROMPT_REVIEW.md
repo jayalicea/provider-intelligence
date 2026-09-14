@@ -2,6 +2,14 @@
 
 Red team analysis of the resume prompt for an autonomous coding agent. Findings are grouped into (1) ambiguities, (2) ordering problems, (3) missing instructions. Each finding quotes the exact problem wording, explains the failure mode, and gives exact replacement wording. A full corrected rewrite of the prompt is at the end.
 
+Status as of 2026-09-14: this review is a closed historical artifact, retained
+for the technique rather than for any pending action. The prompt it reviews now
+lives at `docs/_archive/resume-prompt.md`, the corrected rewrite at the end of
+this file was saved as `docs/_archive/final-resume-prompt_0912.md`, and that
+corrected prompt was executed on 2026-09-12. The execution record, including
+the Phase 0 top-up counts and the page-by-page verification results the review
+asked for, is in `SUMMARY.md` at the repository root.
+
 ---
 
 ## 1. Ambiguities
