@@ -76,9 +76,9 @@ export const api = {
     return data.data
   },
 
-  getCohort: async ({ state, taxonomy, minScore }) => {
+  getCohort: async ({ state, taxonomy, minScore, source, name }) => {
     const { data } = await http.get('/intelligence/cohort', {
-      params: { state, taxonomy, minScore },
+      params: { state, taxonomy, minScore, source, name },
     })
     return { results: data.data ?? [], count: data.count ?? 0 }
   },
