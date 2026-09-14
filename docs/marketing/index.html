@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Provider data with a paper trail</title>
+<!--
+  Static proof page. Built from docs/plans/gtm-productized-services.md §6 and
+  the tokens in docs/DESIGN.md.
+
+  Deliberately self-contained: inline CSS, no scripts, no fonts, no analytics,
+  no network calls of any kind. Drop it on any static host.
+
+  It carries NO live data and NO endpoint paths. Every figure below is the
+  vintage recorded in client/src/data/coverage.json; if that file changes, this
+  page must be updated to match. The sample record is illustrative and does not
+  describe a real provider.
+-->
+<style>
+  /* Tokens per docs/DESIGN.md §2 */
+  :root {
+    --bg: #f5f7f6;
+    --surface: #ffffff;
+    --surface-sunken: #eef2f1;
+    --border: #dce3e8;
+    --border-strong: #c7d2d9;
+    --text: #1c2b33;
+    --text-muted: #5b6b75;
+    --primary: #0f6b5c;
+    --primary-wash: #eef5f3;
+    --unscored: #8a9aa5;
+    --elev-raised: 0 1px 1px rgba(28, 43, 51, .04), 0 2px 6px rgba(28, 43, 51, .05);
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+    --space-5: 24px; --space-6: 32px; --space-7: 48px;
+    --radius: 6px; --radius-pill: 999px;
+    --container: 1000px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--primary); }
+  .wrap { max-width: var(--container); margin: 0 auto; padding: 0 var(--space-5); }
+
+  header.masthead { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .masthead-inner {
+    display: flex; align-items: center; gap: var(--space-4);
+    min-height: 56px; flex-wrap: wrap;
+  }
+  .brand { font-size: 16px; font-weight: 600; color: var(--primary); }
+  .tag {
+    font-size: 11px; font-weight: 600; letter-spacing: .04em;
+    color: var(--primary); background: var(--primary-wash);
+    border: 1px solid rgba(15,107,92,.25); border-radius: var(--radius-pill);
+    padding: 3px 10px; margin-left: auto;
+  }
+
+  .hero { padding: var(--space-7) 0 var(--space-6); }
+  h1 {
+    font-size: 34px; font-weight: 600; line-height: 1.15;
+    letter-spacing: -.02em; margin: 0 0 var(--space-3); max-width: 20ch;
+  }
+  .lede { font-size: 17px; color: var(--text-muted); margin: 0; max-width: 62ch; }
+
+  section { margin-bottom: var(--space-7); }
+  h2 {
+    font-size: 13px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin: 0 0 var(--space-4); padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 16px; font-weight: 600; margin: 0 0 var(--space-2); }
+  p { margin: 0 0 var(--space-3); }
+  .muted { color: var(--text-muted); }
+  .note { font-size: 13px; color: var(--unscored); margin-top: var(--space-2); }
+
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
+  figure {
+    margin: 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--elev-raised); overflow: hidden;
+  }
+  figure img { display: block; width: 100%; height: auto; background: var(--surface-sunken); }
+  figcaption { padding: var(--space-3) var(--space-4); font-size: 13px; color: var(--text-muted); }
+  figcaption strong { display: block; color: var(--text); font-weight: 600; margin-bottom: 2px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--elev-raised);
+    padding: var(--space-5);
+  }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+  th, td { text-align: left; padding: 10px var(--space-3); border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--text-muted); background: var(--surface-sunken); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .mono { font-family: Consolas, 'SF Mono', Menlo, monospace; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .asof { display: block; font-size: 11px; color: var(--unscored); margin-top: 2px; }
+  .table-scroll { overflow-x: auto; }
+
+  blockquote {
+    margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4);
+    background: var(--surface-sunken); border-left: 3px solid var(--border-strong);
+    border-radius: 0 var(--radius) var(--radius) 0; font-size: 14px;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+  blockquote cite { display: block; font-style: normal; font-size: 12px; color: var(--unscored); margin-top: var(--space-2); }
+
+  .statement {
+    background: var(--primary-wash); border: 1px solid rgba(15,107,92,.25);
+    border-radius: var(--radius); padding: var(--space-5); font-size: 16px;
+  }
+  .statement strong { font-weight: 600; }
+
+  footer.pagefoot { background: var(--surface); border-top: 1px solid var(--border); padding: var(--space-6) 0; }
+  .contact { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); align-items: baseline; }
+  .contact .label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); display: block; }
+
+  @media (max-width: 640px) { h1 { font-size: 27px; } .wrap { padding: 0 var(--space-4); } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <span class="brand">ProviderLens</span>
+    <span class="tag">Public data only</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="hero">
+    <h1>Provider data with a paper trail.</h1>
+    <p class="lede">
+      Every value carries the government source it came from and the date it
+      was accessed. Where the source publishes nothing, the answer is
+      &ldquo;not reported&rdquo; &mdash; never a zero, never a guess.
+    </p>
+  </div>
+
+  <section>
+    <h2>1 &middot; What it looks like</h2>
+    <div class="shots">
+      <figure>
+        <img src="images/screenshot-provider-detail.png" alt="Provider detail view with provenance lines under each field" width="1200" height="800">
+        <figcaption><strong>Provider detail</strong>Identity fields, each with its source and access date.</figcaption>
+      </figure>
+      <figure>
+        <img src="images/screenshot-mips-performance.png" alt="MIPS performance view with category score bars" width="1200" height="800">
+        <figcaption><strong>MIPS performance</strong>Category scores as published by CMS, including CMS&rsquo;s own risk adjustment.</figcaption>
+      </figure>
+      <figure>
+        <img src="images/screenshot-quality-measures.png" alt="Hospital quality measures table with national comparison badges" width="1200" height="800">
+        <figcaption><strong>Hospital quality</strong>Care Compare measures with the national comparison stated in words.</figcaption>
+      </figure>
+    </div>
+    <p class="note">
+      Screenshots are redacted before publication. Replace the placeholder files
+      in <span class="mono">images/</span> with the redacted exports.
+    </p>
+  </section>
+
+  <section>
+    <h2>2 &middot; One record, every field sourced</h2>
+    <div class="card">
+      <p class="muted">
+        An illustrative record, not a real provider. The point is the right-hand
+        column: no field appears without the source that published it and the
+        date it was read.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Field</th><th>Value</th><th>Source &amp; as-of</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>NPI</td>
+              <td class="mono">1234567890</td>
+              <td>NPI Registry (NIH Clinical Tables)<span class="asof">accessed 2026-09-12</span></td>
+            </tr>
+            <tr>
+              <td>Primary taxonomy</td>
+              <td>Internal Medicine Physician <span class="mono">207R00000X</span></td>
+              <td>NUCC healthcare provider taxonomy<span class="asof">code set as of 2026-09-13</span></td>
+            </tr>
+            <tr>
+              <td>Practice address</td>
+              <td>100 Main St, Baltimore, MD 21201</td>
+              <td>NPI Registry (NIH Clinical Tables)<span class="asof">accessed 2026-09-12</span></td>
+            </tr>
+            <tr>
+              <td>MIPS final score</td>
+              <td class="mono">87.5</td>
+              <td>CMS QPP Experience<span class="asof">rolling vintage, accessed 2026-09-12</span></td>
+            </tr>
+            <tr>
+              <td>Hospital complication rate</td>
+              <td class="muted">Not reported</td>
+              <td>CMS Care Compare<span class="asof">footnote-coded at source, accessed 2026-09-12</span></td>
+            </tr>
+            <tr>
+              <td>Federal exclusion</td>
+              <td>No record found</td>
+              <td>HHS OIG LEIE<span class="asof">file as of 2026-09-12</span></td>
+            </tr>
+            <tr>
+              <td>State exclusion</td>
+              <td>No record found</td>
+              <td>State Medicaid exclusion lists, 38 jurisdictions<span class="asof">as of 2026-09-13</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        Coverage at the dates above: 9,726,865 providers in the national
+        registry (August 2026 file), 84,001 federal exclusion records, 82,929
+        state exclusion records across 38 jurisdictions, and 2,342 hospitals
+        with cached quality measures. Federal exclusions and the provider
+        registry refresh monthly; state lists follow each publisher&rsquo;s own
+        schedule.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>3 &middot; How it is checked</h2>
+    <p class="muted">
+      The platform is reviewed adversarially &mdash; the reviews are written to
+      find what is wrong, ranked by severity, and the findings are tracked
+      rather than closed quietly. Two examples, both since fixed in the code:
+    </p>
+
+    <blockquote>
+      <p>
+        &ldquo;The project docs state the CMS QPP Experience dataset is a single
+        rolling vintage with no year column&hellip; Two requests for the same NPI
+        with <span class="mono">year = 2022</span> and
+        <span class="mono">year = 2023</span> can produce two rows containing the
+        identical underlying CMS vintage, labeled differently&hellip; A compliance
+        team acts on a fabricated trend.&rdquo;
+      </p>
+      <cite>Adversarial code review, finding C1 &mdash; multi-year trends on a rolling vintage</cite>
+    </blockquote>
+
+    <blockquote>
+      <p>
+        &ldquo;In PostgreSQL, <span class="mono">ORDER BY x DESC</span> sorts NULLs
+        first by default. Rows with <span class="mono">final_score IS NULL</span>
+        &hellip; receive rank 1, ahead of every legitimately scored provider&hellip;
+        unscored providers are presented as the best performers in the
+        nation.&rdquo;
+      </p>
+      <cite>Adversarial code review, finding C2 &mdash; null scores ranked first</cite>
+    </blockquote>
+
+    <blockquote>
+      <p>
+        &ldquo;The platform currently serves only public US government data: the
+        NPI Registry (public under FOIA), the CMS MIPS QPP Experience dataset,
+        and Care Compare hospital measures. No patient data, no user account
+        data, no claims data is present.&rdquo;
+      </p>
+      <cite>Security review &sect;1 &mdash; current PHI posture</cite>
+    </blockquote>
+
+    <p class="note">
+      The same security review records a hardening backlog for anything beyond
+      the public-data app. That backlog is open work, not a completed
+      checklist, and is shared in full on request.
+    </p>
+  </section>
+
+  <section>
+    <div class="statement">
+      <strong>Built entirely on public CMS and NIH data. No PHI handled.</strong>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap contact">
+    <span>
+      <span class="label">Email</span>
+      <a href="mailto:REPLACE_WITH_CONTACT_EMAIL">REPLACE_WITH_CONTACT_EMAIL</a>
+    </span>
+    <span>
+      <span class="label">Book a call</span>
+      <a href="REPLACE_WITH_CALENDAR_LINK">REPLACE_WITH_CALENDAR_LINK</a>
+    </span>
+    <span class="note" style="margin:0">
+      Figures on this page carry the access dates shown. Values may be stale or
+      incorrect at the source; always verify against the source directly.
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>
