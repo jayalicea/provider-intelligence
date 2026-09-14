@@ -79,6 +79,8 @@ Voice rules: concise, direct, operational, no hype, no em-dashes. Sell curiosity
 
 ## 6. Proof page outline (one page)
 
+Built as `docs/marketing/index.html` on 2026-09-14.
+
 Note on item 2, as of 2026-09-14: the `detail.png`, `mips.png` and
 `quality.png` screenshots this outline planned to reuse were deleted in the
 final cleanup of the Prompt A session and were never committed, so a proof page
