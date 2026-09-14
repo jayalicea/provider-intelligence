@@ -34,7 +34,7 @@ function buildStats() {
   return [
     {
       key: 'providers',
-      label: 'Providers indexed',
+      label: 'Providers searchable nationally',
       value: compact(nppes?.records ?? 0),
       title: asOfTitle(nppes),
     },
