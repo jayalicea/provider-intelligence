@@ -339,9 +339,9 @@ async function query(text, params = []) {
       } else if (String(p).startsWith('%')) {
         const term = String(p).replace(/%/g, '').toLowerCase();
         rows = rows.filter(r =>
-          String(r.provider_last_name_legal || '').toLowerCase().includes(term) ||
-          String(r.provider_first_name || '').toLowerCase().includes(term) ||
-          String(r.provider_org_name_legal_business || '').toLowerCase().includes(term));
+          String(r.last_name || '').toLowerCase().includes(term) ||
+          String(r.first_name || '').toLowerCase().includes(term) ||
+          String(r.legal_business_name || '').toLowerCase().includes(term));
       } else {
         const prefix = String(p).replace(/%$/, '');
         rows = rows.filter(p2 =>

@@ -168,9 +168,9 @@ class IntelligenceService {
           params.push(`%${term.toLowerCase()}%`);
           const i = params.length;
           conditions.push(
-            `(lower(p.provider_last_name_legal) LIKE $${i}` +
-            ` OR lower(p.provider_first_name) LIKE $${i}` +
-            ` OR lower(p.provider_org_name_legal_business) LIKE $${i})`
+            `(lower(p.last_name) LIKE $${i}` +
+            ` OR lower(p.first_name) LIKE $${i}` +
+            ` OR lower(p.legal_business_name) LIKE $${i})`
           );
         }
       }
@@ -181,11 +181,11 @@ class IntelligenceService {
 
       const query = `
         SELECT
-          p.npi, p.entity_type_code, p.provider_first_name,
-          p.provider_middle_name, p.provider_last_name_legal,
-          p.provider_org_name_legal_business, p.practice_city,
-          p.practice_state, p.primary_taxonomy_code, p.primary_taxonomy_desc,
-          p.ingested_at,
+          p.npi, p.entity_type_code, p.first_name,
+          p.middle_name, p.last_name,
+          p.legal_business_name, p.practice_city,
+          p.practice_state, p.primary_taxonomy_code,
+          p.as_of,
           m.performance_year, m.final_score, m.sync_timestamp AS mips_sync_timestamp
         FROM nppes_providers p
         LEFT JOIN mips_performance_scores m
@@ -293,8 +293,8 @@ class IntelligenceService {
         }
 
         const name = row.entity_type_code === '2'
-          ? row.provider_org_name_legal_business || null
-          : [row.provider_first_name, row.provider_middle_name, row.provider_last_name_legal]
+          ? row.legal_business_name || null
+          : [row.first_name, row.middle_name, row.last_name]
               .filter(Boolean).join(' ') || null;
 
         return {
@@ -308,7 +308,7 @@ class IntelligenceService {
           enrichable,
           exclusion,
           provenance: {
-            identityAsOf: formatAsOf(row.ingested_at),
+            identityAsOf: formatAsOf(row.as_of),
             mipsAsOf: row.performance_year !== null && row.performance_year !== undefined
               ? formatAsOf(row.mips_sync_timestamp)
               : null,

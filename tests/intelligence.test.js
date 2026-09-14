@@ -204,15 +204,15 @@ function seedNationalProvider(overrides = {}) {
   mockDb._stores.nppesProviders.set(String(npi), {
     npi: String(npi),
     entity_type_code: '1',
-    provider_first_name: 'KANWALJIT',
-    provider_middle_name: 'SINGH',
-    provider_last_name_legal: 'AHUJA',
-    provider_org_name_legal_business: null,
+    first_name: 'KANWALJIT',
+    middle_name: 'SINGH',
+    last_name: 'AHUJA',
+    legal_business_name: null,
     practice_city: 'TESTVILLE',
     practice_state: 'CA',
     primary_taxonomy_code: '207RC0005X',
-    primary_taxonomy_desc: 'Internal Medicine - Cardiovascular Disease',
-    ingested_at: new Date('2026-09-13T00:00:00Z'),
+    primary_taxonomy_description: 'Internal Medicine - Cardiovascular Disease',
+    as_of: new Date('2026-09-13T00:00:00Z'),
     ...overrides
   });
 }
@@ -260,15 +260,15 @@ describe('GET /api/v1/intelligence/cohort?source=national', () => {
     seedNationalProvider({
       npi: '1000000002',
       primary_taxonomy_code: '390200000X',
-      primary_taxonomy_desc: 'Student in an Organized Health Care Education/Training Program'
+      primary_taxonomy_description: 'Student in an Organized Health Care Education/Training Program'
     });
     seedNationalProvider({
       npi: '1000000003',
       entity_type_code: '2',
-      provider_first_name: null,
-      provider_middle_name: null,
-      provider_last_name_legal: null,
-      provider_org_name_legal_business: 'ACME HEALTH SYSTEM',
+      first_name: null,
+      middle_name: null,
+      last_name: null,
+      legal_business_name: 'ACME HEALTH SYSTEM',
       primary_taxonomy_code: '207RC0005X'
     });
 
@@ -288,8 +288,8 @@ describe('GET /api/v1/intelligence/cohort?source=national', () => {
     seedNationalProvider({ npi: '1000000001' });
     seedNationalProvider({
       npi: '1000000002',
-      provider_first_name: 'JANE',
-      provider_last_name_legal: 'DOE'
+      first_name: 'JANE',
+      last_name: 'DOE'
     });
 
     const res = await request(app)
