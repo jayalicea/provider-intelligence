@@ -160,6 +160,17 @@ boot. `DB_PASSWORD` must be set in `.env` or compose fails fast.
 - [docs/mockup/dashboard-mockup.html](docs/mockup/dashboard-mockup.html) -
   static visual mockup of the dashboard.
 
+### Decision records
+
+- [docs/adr/](docs/adr/) - architecture decision records, in context /
+  decision / consequences form: [0001](docs/adr/0001-cache-first-api-design.md)
+  cache-first API design,
+  [0002](docs/adr/0002-file-based-leie-pipeline.md) file-based LEIE pipeline,
+  [0003](docs/adr/0003-jsonb-populate-recordset-loaders.md) the shared bulk
+  loader insert pattern and count rule, and
+  [0004](docs/adr/0004-open-sanctions-state-lists.md) state exclusion list
+  sourcing.
+
 ### Reviews and roadmap
 
 - [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) - adversarial review of
