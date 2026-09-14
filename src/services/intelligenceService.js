@@ -4,7 +4,8 @@ const {
   verdictFromNpiRow,
   isValidNpi,
   formatAsOf,
-  formatLeieDate
+  formatLeieDate,
+  stateExclusionPayload
 } = require('./exclusionService');
 
 // Watchlist window bounds, shared with the controller's validation.
@@ -139,6 +140,184 @@ class IntelligenceService {
       });
     } catch (error) {
       logger.error('Error building cohort intelligence:', error);
+      throw new Error('Failed to build cohort intelligence');
+    }
+  }
+
+  /**
+   * National cohort over nppes_providers (full NPPES load) instead of the
+   * legacy providers cache. Same row contract as getCohort, plus per-row
+   * verdict/enrichable: a row with no exclusion record in either registry is
+   * 'unscreened' and enrichable; any EXCLUDED or reinstatement-derived CLEAR
+   * is final and not enrichable.
+   *
+   * filters: { state (required 2-letter), taxonomy (optional code prefix),
+   *            name (optional space-separated terms, OR'd across name
+   *            columns, case-insensitive substring), minScore (optional) }
+   */
+  async getNationalCohort({ state, taxonomy = null, name = null, minScore = null }) {
+    try {
+      const conditions = ['upper(p.practice_state) = $1'];
+      const params = [state.toUpperCase()];
+      if (taxonomy) {
+        params.push(`${taxonomy.toUpperCase()}%`);
+        conditions.push(`p.primary_taxonomy_code LIKE $${params.length}`);
+      }
+      if (name) {
+        for (const term of String(name).split(/\s+/).filter(Boolean)) {
+          params.push(`%${term.toLowerCase()}%`);
+          const i = params.length;
+          conditions.push(
+            `(lower(p.provider_last_name_legal) LIKE $${i}` +
+            ` OR lower(p.provider_first_name) LIKE $${i}` +
+            ` OR lower(p.provider_org_name_legal_business) LIKE $${i})`
+          );
+        }
+      }
+      if (minScore !== null) {
+        params.push(minScore);
+        conditions.push(`m.final_score >= $${params.length}`);
+      }
+
+      const query = `
+        SELECT
+          p.npi, p.entity_type_code, p.provider_first_name,
+          p.provider_middle_name, p.provider_last_name_legal,
+          p.provider_org_name_legal_business, p.practice_city,
+          p.practice_state, p.primary_taxonomy_code, p.primary_taxonomy_desc,
+          p.ingested_at,
+          m.performance_year, m.final_score, m.sync_timestamp AS mips_sync_timestamp
+        FROM nppes_providers p
+        LEFT JOIN mips_performance_scores m
+          ON m.npi = p.npi
+         AND m.performance_year = (
+           SELECT MAX(performance_year) FROM mips_performance_scores
+           WHERE npi = p.npi
+         )
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY p.npi ASC
+        LIMIT 500
+      `;
+
+      const result = await db.query(query, params);
+      const rows = result.rows;
+
+      const npis = rows.map(r => String(r.npi));
+      const [exclusionResult, stateResult, maxAsOfResult] = await Promise.all([
+        db.query('SELECT * FROM oig_exclusions WHERE npi = ANY($1)', [npis]),
+        db.query('SELECT * FROM state_exclusions WHERE npi = ANY($1)', [npis]),
+        db.query('SELECT max(as_of) AS as_of FROM oig_exclusions')
+      ]);
+      const defaultAsOf = maxAsOfResult.rows[0]
+        ? formatAsOf(maxAsOfResult.rows[0].as_of)
+        : null;
+
+      const groupByNpi = sourceRows => {
+        const map = new Map();
+        for (const row of sourceRows || []) {
+          const key = String(row.npi);
+          if (!map.has(key)) map.set(key, []);
+          map.get(key).push(row);
+        }
+        return map;
+      };
+      const leieByNpi = groupByNpi(exclusionResult.rows);
+      const stateByNpi = groupByNpi(stateResult.rows);
+
+      return rows.map(row => {
+        const npi = String(row.npi);
+        let exclusion;
+        let exclusionAsOf = defaultAsOf;
+        let verdict;
+        let enrichable;
+
+        const leieRows = leieByNpi.get(npi) || [];
+        const active = leieRows.find(r => !isReinstatedRow(r));
+        const chosen = active || leieRows[0] || null;
+
+        if (chosen) {
+          // Registry LEIE verdict, exactly as the cached cohort builds it.
+          exclusion = verdictFromNpiRow(chosen, []);
+          exclusionAsOf = exclusion.exclusion
+            ? exclusion.exclusion.asOf
+            : (exclusion.reinstated ? exclusion.reinstated.asOf : defaultAsOf);
+        } else {
+          const sRows = stateByNpi.get(npi) || [];
+          const sActive = sRows.find(r =>
+            r.reinstatement_date === null || r.reinstatement_date === undefined);
+          const sChosen = sActive || sRows[0] || null;
+          if (sChosen) {
+            exclusionAsOf = formatAsOf(sChosen.as_of);
+            if (sActive) {
+              exclusion = {
+                verdict: 'EXCLUDED', match: 'npi', dobStatus: null,
+                exclusion: stateExclusionPayload(sChosen),
+                reinstated: null, notes: []
+              };
+            } else {
+              exclusion = {
+                verdict: 'CLEAR', match: 'npi', dobStatus: null,
+                exclusion: null,
+                reinstated: {
+                  registry: 'STATE',
+                  date: sChosen.reinstatement_date instanceof Date
+                    ? sChosen.reinstatement_date.toISOString().slice(0, 10)
+                    : String(sChosen.reinstatement_date),
+                  state: sChosen.state || null,
+                  source: sChosen.source_name || 'State Medicaid exclusion list',
+                  asOf: formatAsOf(sChosen.as_of)
+                },
+                notes: []
+              };
+            }
+          } else {
+            // No record in either registry: the scan found nothing, but the
+            // row is still open to deeper (name/DOB) enrichment.
+            exclusion = verdictFromNpiRow(null, []);
+          }
+        }
+
+        if (exclusion.verdict === 'EXCLUDED') {
+          verdict = 'EXCLUDED';
+          enrichable = false;
+        } else if (exclusion.reinstated) {
+          verdict = 'CLEAR';
+          enrichable = false;
+        } else if (chosen) {
+          // LEIE row existed but was reinstated: registry match, final clear.
+          verdict = 'CLEAR';
+          enrichable = false;
+        } else {
+          verdict = 'unscreened';
+          enrichable = true;
+        }
+
+        const name = row.entity_type_code === '2'
+          ? row.provider_org_name_legal_business || null
+          : [row.provider_first_name, row.provider_middle_name, row.provider_last_name_legal]
+              .filter(Boolean).join(' ') || null;
+
+        return {
+          npi,
+          name,
+          taxonomy: row.primary_taxonomy_code || null,
+          city: row.practice_city || null,
+          state: row.practice_state || null,
+          finalScore: num(row.final_score),
+          verdict,
+          enrichable,
+          exclusion,
+          provenance: {
+            identityAsOf: formatAsOf(row.ingested_at),
+            mipsAsOf: row.performance_year !== null && row.performance_year !== undefined
+              ? formatAsOf(row.mips_sync_timestamp)
+              : null,
+            exclusionAsOf
+          }
+        };
+      });
+    } catch (error) {
+      logger.error('Error building national cohort intelligence:', error);
       throw new Error('Failed to build cohort intelligence');
     }
   }
