@@ -9,6 +9,7 @@ const apiKeyAuth = require('./middleware/apiKeyAuth');
 const providerRoutes = require('./routes/providerRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const intelligenceRoutes = require('./routes/intelligenceRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 class App {
   constructor() {
@@ -102,6 +103,9 @@ class App {
 
     // Intelligence routes
     this.app.use('/api/v1/intelligence', intelligenceRoutes);
+
+    // Admin routes (key-protected on every method by apiKeyAuth)
+    this.app.use('/api/v1/admin', adminRoutes);
   }
 
   setupErrorHandling() {

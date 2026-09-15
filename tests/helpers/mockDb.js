@@ -8,6 +8,7 @@ const nppesProviders = new Map(); // npi -> row (national v2 table)
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
 const stateExclusions = []; // state_exclusions rows
+const apiUsage = [];        // api_usage metering rows
 let quality = [];            // quality_measures rows
 
 function reset() {
@@ -16,6 +17,7 @@ function reset() {
   mips.clear();
   exclusions.length = 0;
   stateExclusions.length = 0;
+  apiUsage.length = 0;
   quality = [];
   failCacheWrite = false;
 }
@@ -506,6 +508,57 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
+  // --- api_usage metering (tests/apikeys.test.js) ----------------------------
+
+  if (/^INSERT INTO api_usage \(key_label, endpoint, method, status\) VALUES \(\$1, \$2, \$3, \$4\)$/.test(sql)) {
+    apiUsage.push({
+      key_label: params[0],
+      endpoint: params[1],
+      method: params[2],
+      status: params[3],
+      created_at: new Date()
+    });
+    return { rows: [], rowCount: 1 };
+  }
+
+  // Per-key totals over the window. The window param is an interval string
+  // like '30 days'; the mock keeps every row (tests never backdate).
+  if (/FROM api_usage WHERE created_at >= now\(\) - \$1::interval/.test(sql) && /AS errors/.test(sql)) {
+    const groups = new Map();
+    for (const row of apiUsage) {
+      if (!groups.has(row.key_label)) {
+        groups.set(row.key_label, {
+          key_label: row.key_label, requests: 0, errors: 0,
+          first_used: row.created_at, last_used: row.created_at
+        });
+      }
+      const g = groups.get(row.key_label);
+      g.requests += 1;
+      if (Number(row.status) >= 400) g.errors += 1;
+      if (row.created_at < g.first_used) g.first_used = row.created_at;
+      if (row.created_at > g.last_used) g.last_used = row.created_at;
+    }
+    const rows = [...groups.values()].sort((a, b) => b.requests - a.requests).slice(0, 100);
+    return { rows, rowCount: rows.length };
+  }
+
+  // Per-endpoint breakdown over the same window
+  if (/FROM api_usage WHERE created_at >= now\(\) - \$1::interval/.test(sql)) {
+    const groups = new Map();
+    for (const row of apiUsage) {
+      const key = `${row.key_label}|${row.endpoint}|${row.method}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key_label: row.key_label, endpoint: row.endpoint,
+          method: row.method, requests: 0
+        });
+      }
+      groups.get(key).requests += 1;
+    }
+    const rows = [...groups.values()].sort((a, b) => b.requests - a.requests).slice(0, 500);
+    return { rows, rowCount: rows.length };
+  }
+
   throw new Error(`mockDb: unsupported SQL: ${sql}`);
 }
 
@@ -538,7 +591,8 @@ module.exports = {
     mips,
     get quality() { return quality; },
     exclusions,
-    stateExclusions
+    stateExclusions,
+    apiUsage
   },
   _reset: reset
 };

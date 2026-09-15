@@ -27,5 +27,14 @@ module.exports = function apiKeyAuth(req, res, next) {
   }
 
   req.apiKeyLabel = label;
+  res.on('finish', () => {
+    const route = req.route ? req.baseUrl + req.route.path : req.baseUrl + req.path;
+    apiKeyService.recordUsage({
+      keyLabel: label,
+      endpoint: route,
+      method: req.method,
+      status: res.statusCode
+    });
+  });
   next();
 };
