@@ -200,6 +200,14 @@ boot. `DB_PASSWORD` must be set in `.env` or compose fails fast.
 - [docs/plans/kimi-code-prompts.md](docs/plans/kimi-code-prompts.md) - the
   runbook of agent prompts and their runtime routing rules.
 
+### Marketing
+
+- [docs/marketing/index.html](docs/marketing/index.html) - the one-page proof
+  page, built to the outline in `docs/plans/gtm-productized-services.md`
+  section 6. Self-contained static HTML, no live data, no internal endpoints.
+  The three screenshot slots reference redacted captures that still need to be
+  taken.
+
 ### Archive
 
 - [docs/\_archive/resume-prompt.md](docs/_archive/resume-prompt.md) - the
