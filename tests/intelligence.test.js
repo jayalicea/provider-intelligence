@@ -1,5 +1,6 @@
 process.env.LOG_LEVEL = 'error';
 process.env.DB_PASSWORD = 'test';
+process.env.API_KEYS = 'ci-test:ci-secret';
 
 const request = require('supertest');
 
@@ -568,7 +569,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
     seedWatchlistRow({ daysAgo: 5, npi: '1760461826', display_name: 'DOE, JANE' });
 
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ npi: '1760461826' }, { npi: '1366446619' }] });
 
     expect(res.status).toBe(200);
@@ -581,7 +582,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
 
   test('an unusable row is UNVERIFIED, never CLEAR', async () => {
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ npi: 'not-an-npi' }] });
 
     expect(res.status).toBe(200);
@@ -591,7 +592,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
 
   test('rows carry the input identity back for reconciliation', async () => {
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ lastname: 'Doe', firstname: 'Jane', state: 'CA' }] });
 
     expect(res.body.data[0].input).toEqual({
@@ -601,19 +602,19 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
 
   test('an empty or missing rows array is rejected', async () => {
     const empty = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [] });
     expect(empty.status).toBe(400);
 
     const missing = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({});
     expect(missing.status).toBe(400);
   });
 
   test('a non-object row is rejected rather than silently skipped', async () => {
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ npi: '1366446619' }, 'garbage'] });
 
     expect(res.status).toBe(400);
@@ -624,7 +625,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
     const rows = Array.from({ length: 1001 }, () => ({ npi: '1366446619' }));
 
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows });
 
     expect(res.status).toBe(400);
