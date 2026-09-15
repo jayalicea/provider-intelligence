@@ -1,5 +1,10 @@
 # Security Review Responses
 
+The response log for [SECURITY_REVIEW.md](SECURITY_REVIEW.md): what has been
+done about that backlog, package by package, and what was deferred on purpose.
+The review file holds the findings and an inspection banner; this file holds
+the answers. Claims below were re-verified against the code on 2026-09-15.
+
 ## Package C: API keys and metering (2026-09-14)
 
 - **Write protection.** All non-GET endpoints under `/api/v1` require an

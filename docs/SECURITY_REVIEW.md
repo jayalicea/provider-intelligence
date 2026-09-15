@@ -1,6 +1,102 @@
 # Security Review: Provider Intelligence Platform
 
-Review scope: architecture as described in project CORRECTIONS.md, frontend spec, and phynpi.md. No source code, Dockerfile, or deployment configuration was available for inspection. This is a design-level review; findings based on stated facts are actionable, findings requiring code verification are marked as such.
+Review scope at the time of writing: architecture as described in project [CORRECTIONS.md](../CORRECTIONS.md), frontend spec, and `phynpi.md` (the original design document, known to contain errors; CORRECTIONS.md catalogues every divergence from the working code). No source code, Dockerfile, or deployment configuration was available for inspection. This is a design-level review; findings based on stated facts are actionable, findings requiring code verification are marked as such.
+
+## Status as of 2026-09-15
+
+The backlog below is preserved as written. Since it was written, the source
+code, the Dockerfile and the compose file all exist in this repository, so
+several findings can now be verified rather than assumed, and the Package C
+work of 2026-09-14 closed part of the P0 core. This banner records what
+inspection shows. **Much of the backlog is still open**, and nothing here
+should be read as a sign-off. What has been done about it deliberately, and
+what was consciously deferred, is recorded separately in
+[SECURITY_REVIEW_RESPONSES.md](SECURITY_REVIEW_RESPONSES.md); that file is the
+response log, this banner is the inspection result.
+
+**Addressed since the review.**
+
+- **P0-1 unauthenticated bulk ingest.** Closed as written.
+  `POST /api/v1/providers/bulk-data` is a non-GET route under `/api/v1`, so it
+  now requires a valid `X-API-Key` header (`src/middleware/apiKeyAuth.js`,
+  mounted in `src/app.js`). The three bulk *data loads* remain offline jobs in
+  `tools/` that do not use this endpoint, which is the pattern the finding
+  recommended.
+- **P0-2 no authentication layer.** Partially addressed, and the earlier
+  reading of "absent" no longer holds. `src/middleware/apiKeyAuth.js` gates
+  every non-GET request under `/api/v1`, and every method under
+  `/api/v1/admin`, against an env-seeded key set compared as SHA-256 digests
+  in constant time. **GET endpoints remain open by deliberate choice**, on the
+  stated posture that every upstream source is a free public government API.
+  What the finding asks for beyond this is still open: there is no OIDC or
+  managed identity, no short-lived tokens, no MFA for privileged roles, and no
+  key-management UI, so rotation is an env edit plus a restart. The `api_keys`
+  table exists by migration but is not read at runtime, so `revoked_at` is not
+  honored at authentication time.
+- **P0-5 / P1-6 audit logging.** Partially addressed. Every key-authenticated
+  request now writes an `api_usage` row carrying key label, endpoint pattern,
+  method and status, which supplies the actor identity the access log lacked,
+  and `GET /api/v1/admin/usage` reports it. It is still not an append-only
+  store under separate credentials, has no integrity protection, and covers
+  only key-authenticated traffic, so open GET reads leave no actor trail.
+
+**Now verifiable, and still open as written.**
+
+- **P0-3 no authorization model.** Confirmed absent. A valid key is a valid
+  key; there are no roles, and nothing distinguishes what a caller may see
+  beyond the admin path check.
+- **P0-4 TLS.** Nothing in the repository terminates TLS or enforces HTTPS,
+  and the `pg` pool is constructed without an `ssl` option, so
+  application-to-database traffic is unencrypted by default.
+- **P0-6 secrets handling.** `.env` is in both `.gitignore` and
+  `.dockerignore`, and `git log --all -- .env` returns nothing, so it appears
+  never to have been committed. There is still no secrets manager, no rotation
+  and no dev/prod separation, so the finding stands. The `API_KEYS` variable
+  added by Package C puts live API credentials in that same `.env`, which
+  widens what a leak of it costs.
+- **P1-1 in-memory rate limiter.** Confirmed: `src/middleware/rateLimiter.js`
+  is the hand-rolled fixed-window limiter, applied at 100 requests per minute
+  on the providers, analytics and intelligence routers. `express-rate-limit` is still absent from
+  `package.json`. The finding stands in full.
+- **P1-2 500 on not-found.** Confirmed for `GET /api/v1/providers/:npi`; see
+  CORRECTIONS.md, which documents the unreachable 404 branch. The newer
+  `GET /api/v1/providers/:npi/verification` does return a proper 404.
+- **P1-4 semantic input validation.** Partially addressed. NPI format is
+  checked as 10 digits (no Luhn check digit), offset is rejected when
+  negative, and `analyticsService.getGroupPerformance` validates the `npis`
+  array and caps it at 5,000. Numeric coercion now returns null rather than
+  NaN for non-finite values. Year ranges and taxonomy codes are still
+  unvalidated, and there is no schema-validation library.
+- **P1-5 encryption at rest and DB exposure.** No at-rest encryption story,
+  and `docker-compose.yml` publishes `5432:5432`, which is exactly the
+  exposure P2-3 says to avoid. The app and the loaders share one credential.
+
+**Changed since the review.**
+
+- **P1-3 security headers and CORS.** `helmet()` is applied in `src/app.js`,
+  at its defaults, with no explicit CSP configuration. `cors()` is configured
+  with `origin: process.env.CORS_ORIGIN || '*'` and does not set
+  `credentials: true`. The wildcard default is tolerable only while every
+  endpoint is anonymous public data; it must be narrowed to an allowlist
+  before any authenticated endpoint ships, as the finding says.
+- **P2-1 dependency hygiene.** `package-lock.json` is committed and the
+  Dockerfile uses `npm ci --omit=dev`. There is still no `npm audit` gate, no
+  Dependabot or Renovate configuration, and no CI in this repository at all.
+- **P2-3 Docker.** No longer hypothetical. Against the policy list in that
+  finding, the Dockerfile **does** avoid copying `.env`, sets no secrets via
+  `ENV`/`ARG`, installs with `npm ci --omit=dev`, and is accompanied by a
+  `.dockerignore`. It **does not** pin the base image by digest (`node:20-alpine`
+  is a mutable tag), **does not** set a non-root `USER`, is not multi-stage,
+  and declares no `HEALTHCHECK`. Compose sources secrets from the environment
+  rather than a committed file, but publishes the PostgreSQL port to the host.
+  There is no container scanning.
+
+**Unchanged and untouched.** P2-2 (log content redaction), P2-4 (BAAs,
+backups, incident response, de-identification) and P2-5 (cache integrity and
+provenance columns) are as written. On P2-5, note that the bulk tables do
+carry `source` and `as_of` provenance columns, though the request-time caches
+still carry `sync_timestamp` as a non-enumerable property rather than in an
+ordinary typed column.
 
 ## 1. Current PHI Posture
 
@@ -133,6 +229,11 @@ Design implication: because protected data is a plausible future state, the auth
 - What must change: Treat cache writes as privileged (writer role only, P1-5). Add a provenance column (source, load job ID) and consider signing or checksumming bulk-loaded rows. Keep TTL and provenance in ordinary typed columns, not non-enumerable properties.
 
 ## 3. Insufficient Materials (could not be assessed)
+
+Most of this section is answerable as of 2026-09-14, because the code, the
+Dockerfile and the compose file are now in the repository. See the status
+banner at the top of this file for what inspection found. The list is left as
+written so the original scope boundary of the review stays legible.
 
 The following could not be evaluated from the provided materials and require direct inspection:
 
