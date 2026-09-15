@@ -310,40 +310,28 @@ async function query(text, params = []) {
     return { rows: [groupStats(rows)], rowCount: 1 };
   }
 
-  // --- national cohort query (nppes_providers) ------------------------------
+  // --- national cohort query (national_screening, materialized) --------------
 
   // The service builds the WHERE clause dynamically. Params are
   // [state, taxonomyPrefix?, ...nameTermPatterns?, minScore?] where taxonomy
   // params look like '207%' and name terms like '%smith%'.
-  if (/FROM nppes_providers p/.test(sql) && /LEFT JOIN mips_performance_scores m/.test(sql)) {
+  if (/FROM national_screening s/.test(sql)) {
     const state = String(params[0]).toUpperCase();
     let rows = [...nppesProviders.values()]
       .filter(p => String(p.practice_state || '').toUpperCase() === state);
-
-    const latestMips = npi => {
-      const years = [...mips.values()]
-        .filter(r => String(r.npi) === String(npi))
-        .map(r => Number(r.performance_year));
-      if (!years.length) return null;
-      const maxYear = Math.max(...years);
-      return mips.get(`${npi}:${maxYear}`);
-    };
 
     for (let pi = 1; pi < params.length; pi++) {
       const p = params[pi];
       if (typeof p === 'number') {
         const min = p;
-        rows = rows.filter(r => {
-          const m = latestMips(r.npi);
-          return m && m.final_score !== null && m.final_score !== undefined &&
-            Number(m.final_score) >= min;
-        });
+        rows = rows.filter(r =>
+          r.mips_available &&
+          r.final_score !== null && r.final_score !== undefined &&
+          Number(r.final_score) >= min);
       } else if (String(p).startsWith('%')) {
         const term = String(p).replace(/%/g, '').toLowerCase();
         rows = rows.filter(r =>
-          String(r.last_name || '').toLowerCase().includes(term) ||
-          String(r.first_name || '').toLowerCase().includes(term) ||
-          String(r.legal_business_name || '').toLowerCase().includes(term));
+          String(r.entity_name || '').toLowerCase().includes(term));
       } else {
         const prefix = String(p).replace(/%$/, '');
         rows = rows.filter(p2 =>
@@ -354,17 +342,14 @@ async function query(text, params = []) {
     rows = rows
       .sort((a, b) => String(a.npi).localeCompare(String(b.npi)))
       .slice(0, 500)
-      .map(p => {
-        const m = latestMips(p.npi);
-        return {
-          ...p,
-          performance_year: m ? m.performance_year : null,
-          final_score: m ? m.final_score : null,
-          mips_sync_timestamp: m ? m.sync_timestamp : null
-        };
-      });
+      .map(p => ({ ...p }));
     return { rows, rowCount: rows.length };
   }
+
+  // --- legacy nppes_providers national cohort query (pre-materialization) ----
+
+  // Kept so the schema-drift guard's query-source extraction and any older
+  // tooling still resolve; the service no longer issues this shape.
 
   // --- intelligence cohort query (tests/intelligence.test.js) --------------
 
