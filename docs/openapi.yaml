@@ -1,0 +1,213 @@
+openapi: 3.1.0
+info:
+  title: Provider Intelligence Platform API
+  version: 1.0.0
+  description: >-
+    Provider search, MIPS performance, hospital quality, and exclusion
+    screening over free public government healthcare data (NPI Registry,
+    CMS QPP Experience, Care Compare, OIG LEIE, state Medicaid exclusion
+    lists). All GET endpoints are open (public-data posture); all non-GET
+    endpoints require an X-API-Key header, as does /api/v1/admin/usage.
+servers:
+  - url: http://localhost:3000/api/v1
+paths:
+  /providers/search:
+    get:
+      summary: Search providers
+      parameters:
+        - { name: terms, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string, pattern: '^[A-Za-z]{2}$' } }
+        - { name: city, in: query, schema: { type: string } }
+        - { name: taxonomy, in: query, schema: { type: string } }
+        - { name: maxResults, in: query, schema: { type: integer, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0, minimum: 0 } }
+      responses:
+        '200': { description: Matching providers, newest syncs first }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /providers/{npi}:
+    get:
+      summary: Provider detail by NPI
+      parameters:
+        - { name: npi, in: path, required: true, schema: { type: string, pattern: '^\d{10}$' } }
+        - { name: includeMips, in: query, schema: { type: string, enum: ['true'] } }
+      responses:
+        '200': { description: Provider identity plus optional mipsPerformance }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /providers/{npi}/verification:
+    get:
+      summary: Verification dossier (identity, exclusion, performance, flags)
+      parameters:
+        - { $ref: '#/components/parameters/Npi' }
+      responses:
+        '200':
+          description: '{ npi, identity, exclusion, performance, flagsSummary, terms }'
+  /providers/{npi}/mips-performance:
+    get:
+      summary: MIPS performance for one NPI and year
+      parameters:
+        - { $ref: '#/components/parameters/Npi' }
+        - { name: year, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: MIPS score object or null data when unscored }
+  /providers/{npi}/mips-trends:
+    get:
+      summary: Multi-year MIPS trend
+      parameters:
+        - { $ref: '#/components/parameters/Npi' }
+        - { name: startYear, in: query, schema: { type: integer, default: 2018 } }
+        - { name: endYear, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: '{ npi, trends, analysis }' }
+  /providers/bulk-data:
+    post:
+      summary: Bulk provider MIPS data (API key required)
+      security: [{ apiKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [npis]
+              properties:
+                npis: { type: array, items: { type: string, pattern: '^\d{10}$' } }
+                performanceYear: { type: integer }
+      responses:
+        '200': { description: '{ success, data: { totalRequested, ...mips } }' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /quality-measures/{facilityId}:
+    get:
+      summary: Hospital quality measures with national comparison
+      parameters:
+        - { name: facilityId, in: path, required: true, schema: { type: string } }
+        - { name: type, in: query, schema: { type: string, default: 'all' } }
+      responses:
+        '200': { description: Quality measure rows for the facility }
+  /analytics/group-performance:
+    get:
+      summary: Group MIPS statistics for up to 100 NPIs
+      parameters:
+        - { name: npis, in: query, required: true, schema: { type: string }, description: Comma-separated NPIs (max 100) }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Aggregate group statistics }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /analytics/ranking/{npi}:
+    get:
+      summary: Provider rank/percentile vs peers
+      parameters:
+        - { $ref: '#/components/parameters/Npi' }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+        - { name: taxonomy, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Ranking with null rank for unscored targets }
+  /analytics/trends/{npi}:
+    get:
+      summary: Multi-year MIPS scores with trend analysis and rolling-vintage warning
+      parameters:
+        - { $ref: '#/components/parameters/Npi' }
+        - { name: startYear, in: query, schema: { type: integer } }
+        - { name: endYear, in: query, schema: { type: integer } }
+  /analytics/benchmark/{npi}:
+    get:
+      summary: Provider score vs national average and quartiles
+      parameters:
+        - { $ref: '#/components/parameters/Npi' }
+        - { name: year, in: query, required: true, schema: { type: integer } }
+        - { name: taxonomy, in: query, schema: { type: string } }
+  /intelligence/cohort:
+    get:
+      summary: Cohort intelligence (cached or national source)
+      parameters:
+        - { name: source, in: query, schema: { type: string, enum: [cached, national], default: cached } }
+        - { name: state, in: query, required: true, schema: { type: string, pattern: '^[A-Za-z]{2}$' } }
+        - { name: taxonomy, in: query, schema: { type: string }, description: Cached description substring, or national taxonomy-code prefix when source=national }
+        - { name: name, in: query, schema: { type: string }, description: National mode only; space-separated terms matched against entity name }
+        - { name: minScore, in: query, schema: { type: number, minimum: 0, maximum: 100 } }
+      responses:
+        '200':
+          description: >-
+            Cached mode joins providers + latest MIPS + LEIE verdicts.
+            National mode reads the materialized national_screening table and
+            adds verdict (EXCLUDED | CLEAR | unscreened) and enrichable.
+            Rows are capped at 500.
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /intelligence/exclusion-watchlist:
+    get:
+      summary: Recently added, still-active LEIE exclusions
+      parameters:
+        - { name: state, in: query, schema: { type: string, pattern: '^[A-Za-z]{2}$' } }
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 365, default: 90 } }
+      responses:
+        '200':
+          description: >-
+            '{ success, data: [{ name, entityType, npi, city, state, zip,
+            exclusionType, exclusionDate, source, asOf }], count, windowDays,
+            state, capped }'
+  /intelligence/screen-roster:
+    post:
+      summary: Screen a roster of identities against both exclusion registries (API key required)
+      security: [{ apiKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                rows:
+                  type: array
+                  maxItems: 1000
+                  items:
+                    type: object
+                    properties:
+                      npi: { type: string }
+                      lastname: { type: string }
+                      firstname: { type: string }
+                      state: { type: string }
+                      dob: { type: string }
+                      organizationName: { type: string }
+      responses:
+        '200': { description: '{ success, data: [...], count, counts, submitted, truncated }' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /admin/usage:
+    get:
+      summary: Per-key and per-endpoint API usage from api_usage (API key required, every method)
+      security: [{ apiKey: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 90, default: 30 } }
+      responses:
+        '200':
+          description: '{ success, days, byKey: [{ key_label, requests, errors, first_used, last_used }], byEndpoint: [...], capped }'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  parameters:
+    Npi:
+      name: npi
+      in: path
+      required: true
+      schema: { type: string, pattern: '^\d{10}$' }
+  responses:
+    BadRequest:
+      description: Validation failure
+      content:
+        application/json:
+          schema: { type: object, properties: { error: { type: string } } }
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema: { type: object, properties: { error: { type: string, example: 'invalid or missing API key' } } }
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { type: object, properties: { success: { type: boolean, example: false }, error: { type: string } } }
