@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Continue'
 $project = 'C:\Users\casalab\provider-intelligence'
-$log     = "$project\logs\hospitals-wave2.log"
+$log     = "$project\logs\hospitals-wave3.log"
 $apiBase = 'http://localhost:3000/api/v1'
 $genInfo = 'xubh-q36u'
 Set-Location $project
@@ -28,9 +28,9 @@ function Get-Rows($limit, $offset){
   }
 }
 
-Log '=== hospital quality wave 2 started (offsets 600-3600) ==='
+Log '=== hospital quality wave 3 started (offsets 3600-6500) ==='
 $facs = New-Object System.Collections.Generic.List[string]
-for ($off = 600; $off -lt 3600; $off += 200) {
+for ($off = 3600; $off -lt 6500; $off += 200) {
     $rows = Get-Rows 200 $off
     if ($rows.Count -eq 0) { Log "no more rows at offset $off"; break }
     foreach ($r in $rows) {
@@ -48,5 +48,5 @@ foreach ($f in $facs) {
     Jitter 2000 4500
 }
 Write-Host ''
-Log '=== hospital quality wave 2 complete ==='
+Log '=== hospital quality wave 3 complete ==='
 Write-Host 'DONE. This window can be closed.'
