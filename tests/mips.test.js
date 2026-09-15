@@ -1,5 +1,6 @@
 process.env.LOG_LEVEL = 'error';
 process.env.DB_PASSWORD = 'test';
+process.env.API_KEYS = 'ci-test:ci-secret';
 
 const request = require('supertest');
 const nock = require('nock');
@@ -123,7 +124,7 @@ describe('POST /api/v1/providers/bulk-data', () => {
     mockMipsData('2222222222', [{ ...MIPS_ROW, npi: '2222222222', 'final score': '55' }]);
 
     const res = await request(app)
-      .post('/api/v1/providers/bulk-data')
+      .post('/api/v1/providers/bulk-data').set('X-API-Key', 'ci-secret')
       .send({ npis: ['1111111111', '2222222222'], performanceYear: 2023 });
 
     expect(res.status).toBe(200);
@@ -136,7 +137,7 @@ describe('POST /api/v1/providers/bulk-data', () => {
     mockMipsData('1111111111', [MIPS_ROW]);
 
     const res = await request(app)
-      .post('/api/v1/providers/bulk-data')
+      .post('/api/v1/providers/bulk-data').set('X-API-Key', 'ci-secret')
       .send({ npis: ['bad', '1111111111'], performanceYear: 2023 });
 
     expect(res.status).toBe(200);
@@ -147,7 +148,7 @@ describe('POST /api/v1/providers/bulk-data', () => {
 
   test('400 when npis is missing or not an array', async () => {
     const res = await request(app)
-      .post('/api/v1/providers/bulk-data')
+      .post('/api/v1/providers/bulk-data').set('X-API-Key', 'ci-secret')
       .send({ performanceYear: 2023 });
 
     expect(res.status).toBe(400);
@@ -155,7 +156,7 @@ describe('POST /api/v1/providers/bulk-data', () => {
 
   test('400 when no NPIs are valid', async () => {
     const res = await request(app)
-      .post('/api/v1/providers/bulk-data')
+      .post('/api/v1/providers/bulk-data').set('X-API-Key', 'ci-secret')
       .send({ npis: ['bad1', 'bad2'], performanceYear: 2023 });
 
     expect(res.status).toBe(400);
