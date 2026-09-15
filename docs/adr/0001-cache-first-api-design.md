@@ -132,10 +132,13 @@ API and coverage should follow demand.
   date, and never certifies current truth.
 - **The cache is a trust boundary.** Anything that can write a cache row can
   make the platform serve attacker-controlled data as authoritative CMS data.
-  This is why `SECURITY_REVIEW.md` ranks the unauthenticated
+  This is why `SECURITY_REVIEW.md` ranked the then-unauthenticated
   `POST /providers/bulk-data` endpoint as the single highest design risk, and
   why bulk loading is deliberately an offline job rather than an HTTP endpoint
-  (ADR 0002).
+  (ADR 0002). As of 2026-09-14 that endpoint, like every other non-GET route
+  under `/api/v1`, requires an `X-API-Key` header; reads stay open by design,
+  which is the posture this ADR assumes. The trust boundary argument is
+  unchanged, and it is the reason the write path had to be closed.
 - **A cache miss is slower than a passthrough**, because it pays the upstream
   latency plus an insert. Accepted: misses are the minority and the insert is
   what makes the next thousand reads cheap.
