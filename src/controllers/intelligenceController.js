@@ -12,12 +12,22 @@ class IntelligenceController {
   }
 
   /**
-   * GET /api/v1/intelligence/cohort?state=&taxonomy=&minScore=
-   * Joined providers + latest MIPS + LEIE verdicts for one state.
+   * GET /api/v1/intelligence/cohort?state=&taxonomy=&minScore=&source=&name=
+   * source=cached: joined providers + latest MIPS + LEIE verdicts for one
+   * state. source=national: same contract over the full nppes_providers load,
+   * with state Medicaid exclusions and per-row verdict/enrichable.
    */
   async getCohort(req, res) {
     try {
-      const { state, taxonomy, minScore } = req.query;
+      const { state, taxonomy, minScore, name } = req.query;
+      const source = req.query.source || 'cached';
+
+      if (source !== 'cached' && source !== 'national') {
+        return res.status(400).json({
+          success: false,
+          error: 'source must be one of: cached, national'
+        });
+      }
 
       if (!state || !/^[A-Za-z]{2}$/.test(state)) {
         return res.status(400).json({
@@ -37,11 +47,18 @@ class IntelligenceController {
         }
       }
 
-      const data = await this.intelligenceService.getCohort({
-        state: state.toUpperCase(),
-        taxonomy: taxonomy || null,
-        minScore: min
-      });
+      const data = source === 'national'
+        ? await this.intelligenceService.getNationalCohort({
+          state: state.toUpperCase(),
+          taxonomy: taxonomy || null,
+          name: name || null,
+          minScore: min
+        })
+        : await this.intelligenceService.getCohort({
+          state: state.toUpperCase(),
+          taxonomy: taxonomy || null,
+          minScore: min
+        });
 
       res.json({
         success: true,

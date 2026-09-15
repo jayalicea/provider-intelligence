@@ -395,6 +395,50 @@ textarea:focus-visible,
   color: var(--text-muted);
 }
 
+.field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Segmented two-option switch (e.g. cached / national source picker). */
+.source-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.source-toggle-option {
+  border: none;
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.source-toggle-option + .source-toggle-option {
+  border-left: 1px solid var(--border-strong);
+}
+
+.source-toggle-option:hover {
+  background: var(--surface-hover);
+}
+
+.source-toggle-option.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Screening cell in the national cohort table: badge plus per-row action. */
+.screen-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
 .btn {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);

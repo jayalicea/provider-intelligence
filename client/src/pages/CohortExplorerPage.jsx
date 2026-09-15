@@ -13,31 +13,77 @@ const US_STATES = [
   'WV', 'WI', 'WY',
 ]
 
-function CohortSkeleton() {
+function CohortSkeleton({ columns = 6 }) {
+  const widths = ['70%', '80%', '50%', '40%', '40%', '40%']
   return (
     <>
       {[0, 1, 2].map((i) => (
         <tr className="skeleton-row" key={i} aria-hidden="true">
           <td><span className="skeleton-line" /></td>
-          <td><span className="skeleton-line" style={{ width: '70%' }} /></td>
-          <td><span className="skeleton-line" style={{ width: '80%' }} /></td>
-          <td><span className="skeleton-line" style={{ width: '50%' }} /></td>
-          <td><span className="skeleton-line" style={{ width: '40%' }} /></td>
-          <td><span className="skeleton-line" style={{ width: '40%' }} /></td>
+          {Array.from({ length: columns - 1 }, (_, j) => (
+            <td key={j}>
+              <span className="skeleton-line" style={{ width: widths[j % widths.length] }} />
+            </td>
+          ))}
         </tr>
       ))}
     </>
   )
 }
 
+function ScreeningCell({ row, onScreen, screenState }) {
+  const { loading, error } = screenState ?? {}
+  const hit = row.exclusion?.exclusion
+  const title = hit ? `${hit.registry ?? 'registry'} as of ${hit.asOf ?? 'unknown date'}` : undefined
+
+  let badge
+  if (row.verdict === 'EXCLUDED') {
+    badge = <span title={title}><VerdictBadge verdict="EXCLUDED" /></span>
+  } else if (row.verdict === 'CLEAR') {
+    badge = <VerdictBadge verdict="CLEAR" />
+  } else {
+    badge = <span className="badge badge-na badge-plain">Unscreened</span>
+  }
+
+  return (
+    <span className="screen-cell" onClick={(e) => e.stopPropagation()}>
+      {badge}{' '}
+      {row.enrichable ? (
+        <button
+          type="button"
+          className="btn btn-link"
+          disabled={loading}
+          onClick={() => onScreen(row.npi)}
+          title={error || undefined}
+        >
+          {loading ? 'Screening…' : error ? 'Screen failed' : 'Screen'}
+        </button>
+      ) : null}
+    </span>
+  )
+}
+
 export default function CohortExplorerPage() {
   const navigate = useNavigate()
+  const [source, setSource] = useState('cached')
   const [state, setState] = useState('')
   const [taxonomy, setTaxonomy] = useState('')
+  const [name, setName] = useState('')
   const [useMinScore, setUseMinScore] = useState(false)
   const [minScore, setMinScore] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [request, setRequest] = useState({ loading: false, error: null, results: [], count: 0 })
+  const [screening, setScreening] = useState({})
+
+  const national = source === 'national'
+
+  function switchSource(next) {
+    if (next === source) return
+    setSource(next)
+    setSubmitted(false)
+    setRequest({ loading: false, error: null, results: [], count: 0 })
+    setScreening({})
+  }
 
   async function runSearch(filters) {
     setRequest({ loading: true, error: null, results: [], count: 0 })
@@ -52,25 +98,86 @@ export default function CohortExplorerPage() {
   function handleSubmit(event) {
     event.preventDefault()
     if (!/^[A-Za-z]{2}$/.test(state)) return
-    const filters = { state: state.toUpperCase() }
+    const filters = { state: state.toUpperCase(), source }
     if (taxonomy.trim()) filters.taxonomy = taxonomy.trim()
-    if (useMinScore && minScore !== '') filters.minScore = Number(minScore)
+    if (national) {
+      if (name.trim()) filters.name = name.trim()
+    } else if (useMinScore && minScore !== '') {
+      filters.minScore = Number(minScore)
+    }
     setSubmitted(true)
     runSearch(filters)
   }
 
+  async function screenRow(npi) {
+    setScreening((prev) => ({ ...prev, [npi]: { loading: true, error: null } }))
+    try {
+      const verification = await api.getVerification(npi)
+      setRequest((prev) => ({
+        ...prev,
+        results: prev.results.map((row) => {
+          if (row.npi !== npi) return row
+          return {
+            ...row,
+            verdict: verification.exclusion?.verdict ?? 'UNVERIFIED',
+            exclusion: verification.exclusion ?? row.exclusion,
+            finalScore: verification.performance?.finalScore ?? row.finalScore,
+            enrichable: false,
+          }
+        }),
+      }))
+      setScreening((prev) => ({ ...prev, [npi]: { loading: false, error: null } }))
+    } catch (error) {
+      setScreening((prev) => ({ ...prev, [npi]: { loading: false, error } }))
+    }
+  }
+
   const stateInvalid = state !== '' && !/^[A-Za-z]{2}$/.test(state)
+
+  const emptyCopy = national
+    ? {
+        title: 'No providers matched',
+        description:
+          'No providers matched. The national registry covers active NPPES registrations — try broadening the state filter or shortening the taxonomy prefix.',
+      }
+    : {
+        title: 'No providers in this cohort',
+        description:
+          'No cached providers matched these filters for the selected state. Try broadening the taxonomy filter or choose another state.',
+      }
 
   return (
     <section>
       <h1 className="page-title">Cohort explorer</h1>
       <p className="muted">
-        Screen every cached provider in a state against the OIG LEIE, with
-        latest MIPS scores where reported.
+        {national
+          ? 'Query the national NPI Registry directly, then screen rows against the OIG LEIE on demand.'
+          : 'Screen every cached provider in a state against the OIG LEIE, with latest MIPS scores where reported.'}
       </p>
 
       <form className="card" onSubmit={handleSubmit}>
         <div className="filter-panel">
+          <div className="field">
+            <span className="field-label" id="source-label">Source</span>
+            <div className="source-toggle" role="group" aria-labelledby="source-label">
+              <button
+                type="button"
+                className={`source-toggle-option${!national ? ' is-active' : ''}`}
+                aria-pressed={!national}
+                onClick={() => switchSource('cached')}
+              >
+                Cached
+              </button>
+              <button
+                type="button"
+                className={`source-toggle-option${national ? ' is-active' : ''}`}
+                aria-pressed={national}
+                onClick={() => switchSource('national')}
+              >
+                National
+              </button>
+            </div>
+          </div>
           <label className="field">
             <span className="field-label">State (required)</span>
             <select
@@ -86,44 +193,62 @@ export default function CohortExplorerPage() {
             </select>
           </label>
           <label className="field">
-            <span className="field-label">Taxonomy</span>
+            <span className="field-label">
+              {national ? 'Taxonomy code prefix' : 'Taxonomy'}
+            </span>
             <input
               className="input"
               value={taxonomy}
               onChange={(e) => setTaxonomy(e.target.value)}
-              placeholder="e.g. Internal Medicine"
+              placeholder={national ? 'e.g. 207' : 'e.g. Internal Medicine'}
             />
+            {national && (
+              <span className="field-hint">207 matches 207RC0005X</span>
+            )}
           </label>
-          <label className="field">
-            <span className="field-label">Minimum MIPS score (optional)</span>
-            <span className="mips-filter">
-              <input
-                type="checkbox"
-                checked={useMinScore}
-                onChange={(e) => setUseMinScore(e.target.checked)}
-                aria-label="Enable minimum MIPS score filter"
-              />
+          {national && (
+            <label className="field">
+              <span className="field-label">Name terms (optional)</span>
               <input
                 className="input"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={minScore}
-                onChange={(e) => setMinScore(e.target.value)}
-                disabled={!useMinScore}
-                placeholder="0–100"
-                style={{ width: 100 }}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Smith Jane"
               />
-            </span>
-          </label>
+            </label>
+          )}
+          {!national && (
+            <label className="field">
+              <span className="field-label">Minimum MIPS score (optional)</span>
+              <span className="mips-filter">
+                <input
+                  type="checkbox"
+                  checked={useMinScore}
+                  onChange={(e) => setUseMinScore(e.target.checked)}
+                  aria-label="Enable minimum MIPS score filter"
+                />
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={minScore}
+                  onChange={(e) => setMinScore(e.target.value)}
+                  disabled={!useMinScore}
+                  placeholder="0–100"
+                  style={{ width: 100 }}
+                />
+              </span>
+            </label>
+          )}
         </div>
         {stateInvalid && (
           <p className="dob-mismatch" role="alert">State must be a 2-letter code.</p>
         )}
         <p style={{ marginTop: 12 }}>
           <button type="submit" className="btn btn-primary" disabled={!state || stateInvalid}>
-            Run cohort screen
+            {national ? 'Search national registry' : 'Run cohort screen'}
           </button>
         </p>
       </form>
@@ -135,30 +260,34 @@ export default function CohortExplorerPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th className="num">MIPS</th><th>Integrity</th>
+                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th className="num">MIPS</th>
+                {national && <th>Screening</th>}<th>Integrity</th>
               </tr>
             </thead>
-            <tbody><CohortSkeleton /></tbody>
+            <tbody><CohortSkeleton columns={national ? 7 : 6} /></tbody>
           </table>
         </div>
       )}
 
       {!request.loading && !request.error && submitted && request.results.length === 0 && (
-        <EmptyState
-          title="No providers in this cohort"
-          description="No cached providers matched these filters for the selected state. Try broadening the taxonomy filter or choose another state."
-        />
+        <EmptyState title={emptyCopy.title} description={emptyCopy.description} />
       )}
 
       {!request.loading && !request.error && request.results.length > 0 && (
         <div className="table-region">
           <p className="results-count">
-            {request.count} provider{request.count === 1 ? '' : 's'} (capped at 500 per screen)
+            {request.count} provider{request.count === 1 ? '' : 's'}
+            {national && request.count === 500
+              ? ' (capped at 500 — narrow the filters to see fewer)'
+              : national
+                ? ' (capped at 500 per search)'
+                : ' (capped at 500 per screen)'}
           </p>
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th className="num">MIPS</th><th>Integrity</th>
+                <th>Name</th><th>NPI</th><th>Taxonomy</th><th>City</th><th className="num">MIPS</th>
+                {national && <th>Screening</th>}<th>Integrity</th>
               </tr>
             </thead>
             <tbody>
@@ -181,6 +310,15 @@ export default function CohortExplorerPage() {
                       ? row.finalScore
                       : <span className="score-null">Not reported</span>}
                   </td>
+                  {national && (
+                    <td>
+                      <ScreeningCell
+                        row={row}
+                        onScreen={screenRow}
+                        screenState={screening[row.npi]}
+                      />
+                    </td>
+                  )}
                   <td><VerdictBadge verdict={row.exclusion?.verdict ?? 'UNVERIFIED'} /></td>
                 </tr>
               ))}
@@ -192,7 +330,11 @@ export default function CohortExplorerPage() {
       {!submitted && !request.loading && (
         <EmptyState
           title="Start with a state"
-          description="Pick a state and run the screen. Results are drawn from the local cache of public NPI Registry and OIG LEIE data."
+          description={
+            national
+              ? 'Pick a state and search the national NPI Registry. Screening verdicts are added per row on demand.'
+              : 'Pick a state and run the screen. Results are drawn from the local cache of public NPI Registry and OIG LEIE data.'
+          }
         />
       )}
     </section>

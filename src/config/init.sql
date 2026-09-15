@@ -147,3 +147,24 @@ CREATE INDEX idx_quality_facility ON quality_measures(facility_id);
 -- the ON CONFLICT upsert in cacheQualityMeasures targets.
 CREATE UNIQUE INDEX idx_quality_facility_measure_source
     ON quality_measures(facility_id, measure_id, data_source);
+
+-- Package C: API keys (provisioned ahead of the key-management UI; keys are
+-- env-seeded into memory at startup for now) and per-request usage metering.
+CREATE TABLE IF NOT EXISTS api_keys (
+    key_hash  TEXT PRIMARY KEY,
+    label     TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS api_usage (
+    id         BIGSERIAL PRIMARY KEY,
+    key_label  TEXT NOT NULL,
+    endpoint   TEXT NOT NULL,
+    method     TEXT NOT NULL,
+    status     INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON api_usage (created_at);
+CREATE INDEX IF NOT EXISTS idx_api_usage_key_label ON api_usage (key_label, created_at);

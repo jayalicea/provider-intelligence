@@ -4,16 +4,20 @@
 // logic under test behaves as it does against Postgres.
 
 const providers = new Map(); // npi -> row
+const nppesProviders = new Map(); // npi -> row (national v2 table)
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
 const stateExclusions = []; // state_exclusions rows
+const apiUsage = [];        // api_usage metering rows
 let quality = [];            // quality_measures rows
 
 function reset() {
   providers.clear();
+  nppesProviders.clear();
   mips.clear();
   exclusions.length = 0;
   stateExclusions.length = 0;
+  apiUsage.length = 0;
   quality = [];
   failCacheWrite = false;
   queryLog.length = 0;
@@ -310,6 +314,62 @@ async function query(text, params = []) {
     return { rows: [groupStats(rows)], rowCount: 1 };
   }
 
+  // --- national cohort query (nppes_providers) ------------------------------
+
+  // The service builds the WHERE clause dynamically. Params are
+  // [state, taxonomyPrefix?, ...nameTermPatterns?, minScore?] where taxonomy
+  // params look like '207%' and name terms like '%smith%'.
+  if (/FROM nppes_providers p/.test(sql) && /LEFT JOIN mips_performance_scores m/.test(sql)) {
+    const state = String(params[0]).toUpperCase();
+    let rows = [...nppesProviders.values()]
+      .filter(p => String(p.practice_state || '').toUpperCase() === state);
+
+    const latestMips = npi => {
+      const years = [...mips.values()]
+        .filter(r => String(r.npi) === String(npi))
+        .map(r => Number(r.performance_year));
+      if (!years.length) return null;
+      const maxYear = Math.max(...years);
+      return mips.get(`${npi}:${maxYear}`);
+    };
+
+    for (let pi = 1; pi < params.length; pi++) {
+      const p = params[pi];
+      if (typeof p === 'number') {
+        const min = p;
+        rows = rows.filter(r => {
+          const m = latestMips(r.npi);
+          return m && m.final_score !== null && m.final_score !== undefined &&
+            Number(m.final_score) >= min;
+        });
+      } else if (String(p).startsWith('%')) {
+        const term = String(p).replace(/%/g, '').toLowerCase();
+        rows = rows.filter(r =>
+          String(r.last_name || '').toLowerCase().includes(term) ||
+          String(r.first_name || '').toLowerCase().includes(term) ||
+          String(r.legal_business_name || '').toLowerCase().includes(term));
+      } else {
+        const prefix = String(p).replace(/%$/, '');
+        rows = rows.filter(p2 =>
+          String(p2.primary_taxonomy_code || '').startsWith(prefix));
+      }
+    }
+
+    rows = rows
+      .sort((a, b) => String(a.npi).localeCompare(String(b.npi)))
+      .slice(0, 500)
+      .map(p => {
+        const m = latestMips(p.npi);
+        return {
+          ...p,
+          performance_year: m ? m.performance_year : null,
+          final_score: m ? m.final_score : null,
+          mips_sync_timestamp: m ? m.sync_timestamp : null
+        };
+      });
+    return { rows, rowCount: rows.length };
+  }
+
   // --- intelligence cohort query (tests/intelligence.test.js) --------------
 
   // Joined providers + latest-year MIPS scan. The service builds the WHERE
@@ -436,6 +496,15 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
+  // state_exclusions: batched NPI scan for the national cohort endpoint
+  if (/^SELECT \* FROM state_exclusions WHERE npi = ANY\(\$1\)$/.test(sql)) {
+    const wanted = new Set((params[0] || []).map(String));
+    const rows = stateExclusions
+      .filter(r => wanted.has(String(r.npi)))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   // state_exclusions: entity_name (any published variant) + state
   if (/^SELECT \* FROM state_exclusions WHERE upper\(regexp_replace\(entity_name/.test(sql)) {
     const variants = params[0];
@@ -470,6 +539,57 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
+  // --- api_usage metering (tests/apikeys.test.js) ----------------------------
+
+  if (/^INSERT INTO api_usage \(key_label, endpoint, method, status\) VALUES \(\$1, \$2, \$3, \$4\)$/.test(sql)) {
+    apiUsage.push({
+      key_label: params[0],
+      endpoint: params[1],
+      method: params[2],
+      status: params[3],
+      created_at: new Date()
+    });
+    return { rows: [], rowCount: 1 };
+  }
+
+  // Per-key totals over the window. The window param is an interval string
+  // like '30 days'; the mock keeps every row (tests never backdate).
+  if (/FROM api_usage WHERE created_at >= now\(\) - \$1::interval/.test(sql) && /AS errors/.test(sql)) {
+    const groups = new Map();
+    for (const row of apiUsage) {
+      if (!groups.has(row.key_label)) {
+        groups.set(row.key_label, {
+          key_label: row.key_label, requests: 0, errors: 0,
+          first_used: row.created_at, last_used: row.created_at
+        });
+      }
+      const g = groups.get(row.key_label);
+      g.requests += 1;
+      if (Number(row.status) >= 400) g.errors += 1;
+      if (row.created_at < g.first_used) g.first_used = row.created_at;
+      if (row.created_at > g.last_used) g.last_used = row.created_at;
+    }
+    const rows = [...groups.values()].sort((a, b) => b.requests - a.requests).slice(0, 100);
+    return { rows, rowCount: rows.length };
+  }
+
+  // Per-endpoint breakdown over the same window
+  if (/FROM api_usage WHERE created_at >= now\(\) - \$1::interval/.test(sql)) {
+    const groups = new Map();
+    for (const row of apiUsage) {
+      const key = `${row.key_label}|${row.endpoint}|${row.method}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key_label: row.key_label, endpoint: row.endpoint,
+          method: row.method, requests: 0
+        });
+      }
+      groups.get(key).requests += 1;
+    }
+    const rows = [...groups.values()].sort((a, b) => b.requests - a.requests).slice(0, 500);
+    return { rows, rowCount: rows.length };
+  }
+
   throw new Error(`mockDb: unsupported SQL: ${sql}`);
 }
 
@@ -498,11 +618,13 @@ module.exports = {
   pool: {},
   _stores: {
     providers,
+    nppesProviders,
     mips,
     get quality() { return quality; },
     exclusions,
     stateExclusions,
-    queryLog
+    queryLog,
+    apiUsage
   },
   _reset: reset
 };

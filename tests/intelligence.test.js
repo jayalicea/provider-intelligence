@@ -1,5 +1,6 @@
 process.env.LOG_LEVEL = 'error';
 process.env.DB_PASSWORD = 'test';
+process.env.API_KEYS = 'ci-test:ci-secret';
 
 const request = require('supertest');
 
@@ -199,6 +200,201 @@ describe('GET /api/v1/intelligence/cohort', () => {
   });
 });
 
+function seedNationalProvider(overrides = {}) {
+  const npi = overrides.npi || '1366446619';
+  mockDb._stores.nppesProviders.set(String(npi), {
+    npi: String(npi),
+    entity_type_code: '1',
+    first_name: 'KANWALJIT',
+    middle_name: 'SINGH',
+    last_name: 'AHUJA',
+    legal_business_name: null,
+    practice_city: 'TESTVILLE',
+    practice_state: 'CA',
+    primary_taxonomy_code: '207RC0005X',
+    primary_taxonomy_description: 'Internal Medicine - Cardiovascular Disease',
+    as_of: new Date('2026-09-13T00:00:00Z'),
+    ...overrides
+  });
+}
+
+function seedStateExclusion(overrides = {}) {
+  mockDb._stores.stateExclusions.push({
+    state: 'CA',
+    source_name: 'California Medicaid Exclusion List',
+    source_url: 'https://example.test/ca-excl',
+    entity_name: 'DOE, JANE',
+    npi: '1366446619',
+    exclusion_type: 'fraud',
+    exclusion_date: '2025-06-01',
+    reinstatement_date: null,
+    as_of: '2026-09-10',
+    ...overrides
+  });
+}
+
+describe('GET /api/v1/intelligence/cohort?source=national', () => {
+  test('400 for an unsupported source', async () => {
+    const res = await request(app).get('/api/v1/intelligence/cohort?state=CA&source=bogus');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/source/i);
+  });
+
+  test('400 for missing or bad state in national mode', async () => {
+    const missing = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national');
+    expect(missing.status).toBe(400);
+
+    const bad = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CALI');
+    expect(bad.status).toBe(400);
+  });
+
+  test('400 for a bad minScore in national mode', async () => {
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA&minScore=101');
+    expect(res.status).toBe(400);
+  });
+
+  test('filters by state and taxonomy prefix; names individual vs org', async () => {
+    seedNationalProvider({ npi: '1000000001' });
+    seedNationalProvider({
+      npi: '1000000002',
+      primary_taxonomy_code: '390200000X',
+      primary_taxonomy_description: 'Student in an Organized Health Care Education/Training Program'
+    });
+    seedNationalProvider({
+      npi: '1000000003',
+      entity_type_code: '2',
+      first_name: null,
+      middle_name: null,
+      last_name: null,
+      legal_business_name: 'ACME HEALTH SYSTEM',
+      primary_taxonomy_code: '207RC0005X'
+    });
+
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA&taxonomy=207');
+
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(2);
+    const byNpi = Object.fromEntries(res.body.data.map(r => [r.npi, r]));
+    expect(byNpi['1000000001'].name).toBe('KANWALJIT SINGH AHUJA');
+    expect(byNpi['1000000001'].taxonomy).toBe('207RC0005X');
+    expect(byNpi['1000000003'].name).toBe('ACME HEALTH SYSTEM');
+    expect(byNpi['1000000002']).toBeUndefined();
+  });
+
+  test('name terms filter across name columns', async () => {
+    seedNationalProvider({ npi: '1000000001' });
+    seedNationalProvider({
+      npi: '1000000002',
+      first_name: 'JANE',
+      last_name: 'DOE'
+    });
+
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA&name=doe');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.map(r => r.npi)).toEqual(['1000000002']);
+  });
+
+  test('LEIE exclusion attaches with registry payload and LEIE wins over state', async () => {
+    seedNationalProvider({ npi: '1760461826' });
+    seedExclusion({ npi: '1760461826' });
+    seedStateExclusion({ npi: '1760461826' });
+
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA');
+
+    const row = res.body.data.find(r => r.npi === '1760461826');
+    expect(row.verdict).toBe('EXCLUDED');
+    expect(row.enrichable).toBe(false);
+    expect(row.exclusion.verdict).toBe('EXCLUDED');
+    expect(row.exclusion.exclusion).toEqual({
+      registry: 'LEIE',
+      type: '1128b4',
+      date: '2025-01-20',
+      source: 'UPDATED.csv',
+      asOf: '2026-09-12'
+    });
+    expect(row.provenance.exclusionAsOf).toBe('2026-09-12');
+  });
+
+  test('state exclusion attaches when not in the LEIE', async () => {
+    seedNationalProvider({ npi: '1366446619' });
+    seedStateExclusion({ npi: '1366446619' });
+
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA');
+
+    const row = res.body.data.find(r => r.npi === '1366446619');
+    expect(row.verdict).toBe('EXCLUDED');
+    expect(row.enrichable).toBe(false);
+    expect(row.exclusion.exclusion).toEqual({
+      registry: 'STATE',
+      type: 'fraud',
+      date: '2025-06-01',
+      state: 'CA',
+      sourceName: 'California Medicaid Exclusion List',
+      sourceUrl: 'https://example.test/ca-excl',
+      source: 'California Medicaid Exclusion List',
+      asOf: '2026-09-10'
+    });
+    expect(row.provenance.exclusionAsOf).toBe('2026-09-10');
+  });
+
+  test('no exclusion and no MIPS -> unscreened and enrichable; MIPS fills finalScore', async () => {
+    seedNationalProvider({ npi: '1000000001' });
+    seedNationalProvider({ npi: '1000000002' });
+    seedMips('1000000002', 2025, 91.25);
+
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA');
+
+    const plain = res.body.data.find(r => r.npi === '1000000001');
+    expect(plain.verdict).toBe('unscreened');
+    expect(plain.enrichable).toBe(true);
+    expect(plain.finalScore).toBeNull();
+    expect(plain.exclusion.verdict).toBe('CLEAR');
+    expect(plain.provenance.identityAsOf).toBe('2026-09-13');
+    expect(plain.provenance.mipsAsOf).toBeNull();
+
+    const scored = res.body.data.find(r => r.npi === '1000000002');
+    expect(scored.finalScore).toBe(91.25);
+    expect(scored.verdict).toBe('unscreened');
+    expect(scored.enrichable).toBe(true);
+    expect(scored.provenance.mipsAsOf).toBe('2026-09-11');
+  });
+
+  test('reinstated LEIE row is CLEAR and not enrichable', async () => {
+    seedNationalProvider({ npi: '1234567890' });
+    seedExclusion({ npi: '1234567890', reindate: '20260301' });
+
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA');
+
+    const row = res.body.data.find(r => r.npi === '1234567890');
+    expect(row.verdict).toBe('CLEAR');
+    expect(row.enrichable).toBe(false);
+    expect(row.exclusion.verdict).toBe('CLEAR');
+    expect(row.exclusion.reinstated.date).toBe('2026-03-01');
+  });
+
+  test('result is capped at 500 rows', async () => {
+    for (let i = 0; i < 600; i++) {
+      seedNationalProvider({ npi: String(2000000000 + i) });
+    }
+
+    const res = await request(app)
+      .get('/api/v1/intelligence/cohort?source=national&state=CA');
+
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(500);
+  });
+});
+
 describe('GET /api/v1/providers/:npi/verification performance block', () => {
   test('includes cached MIPS scores with provenance when cached', async () => {
     seedProvider({ npi: '1366446619' });
@@ -373,7 +569,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
     seedWatchlistRow({ daysAgo: 5, npi: '1760461826', display_name: 'DOE, JANE' });
 
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ npi: '1760461826' }, { npi: '1366446619' }] });
 
     expect(res.status).toBe(200);
@@ -386,7 +582,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
 
   test('an unusable row is UNVERIFIED, never CLEAR', async () => {
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ npi: 'not-an-npi' }] });
 
     expect(res.status).toBe(200);
@@ -396,7 +592,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
 
   test('rows carry the input identity back for reconciliation', async () => {
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ lastname: 'Doe', firstname: 'Jane', state: 'CA' }] });
 
     expect(res.body.data[0].input).toEqual({
@@ -406,19 +602,19 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
 
   test('an empty or missing rows array is rejected', async () => {
     const empty = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [] });
     expect(empty.status).toBe(400);
 
     const missing = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({});
     expect(missing.status).toBe(400);
   });
 
   test('a non-object row is rejected rather than silently skipped', async () => {
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows: [{ npi: '1366446619' }, 'garbage'] });
 
     expect(res.status).toBe(400);
@@ -429,7 +625,7 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
     const rows = Array.from({ length: 1001 }, () => ({ npi: '1366446619' }));
 
     const res = await request(app)
-      .post('/api/v1/intelligence/screen-roster')
+      .post('/api/v1/intelligence/screen-roster').set('X-API-Key', 'ci-secret')
       .send({ rows });
 
     expect(res.status).toBe(400);
