@@ -1,6 +1,6 @@
 # Provider Intelligence Platform
 
-Accurate as of 2026-09-14. This file describes the backend; the project front
+Accurate as of 2026-09-15. This file describes the backend; the project front
 door is the root [README.md](../README.md), and the decisions behind the
 architecture are recorded in [docs/adr/](adr/).
 
@@ -32,8 +32,8 @@ There is no repository layer; services query the database directly through the
 shared `pg` pool.
 
 - **Express server**: HTTP routing, request validation, error handling middleware.
-- **PostgreSQL 15 database**: Local persistence. `src/config/init.sql` creates `providers`, `provider_addresses`, `provider_taxonomies`, `mips_performance_scores`, `quality_measures` and `api_request_log`. There is no bulk-import job-state table. The three bulk tables (`nppes_providers`, `oig_exclusions`, `state_exclusions`) are created by their loaders in `tools/`, not by `init.sql`.
-- **Service layer**: Business logic, combining cached rows with live upstream API data. `npiService`, `cmsDataService`, `analyticsService`, `exclusionService`, `intelligenceService`. There is no separate repository layer; services issue their own queries through `src/config/database.js`.
+- **PostgreSQL 15 database**: Local persistence. `src/config/init.sql` creates `providers`, `provider_addresses`, `provider_taxonomies`, `mips_performance_scores`, `quality_measures` and `api_request_log`; dated files under `src/config/migrations/` add later objects, including `api_keys` and `api_usage`. There is no bulk-import job-state table. The three bulk tables (`nppes_providers`, `oig_exclusions`, `state_exclusions`) are created by their loaders in `tools/`, not by `init.sql`.
+- **Service layer**: Business logic, combining cached rows with live upstream API data. `npiService`, `cmsDataService`, `analyticsService`, `exclusionService`, `intelligenceService`, `apiKeyService`. There is no separate repository layer; services issue their own queries through `src/config/database.js`.
 - **Caching layer**: PostgreSQL itself is the cache. There is no in-process cache and no `node-cache` dependency: a read is served from the `providers`, `mips_performance_scores` or `quality_measures` table when the row is fresh, and fetched upstream and written back when it is not. Freshness is decided per source from the row's `sync_timestamp`: 24 hours for NPI identity, 1 hour for MIPS performance. Request coalescing (deduplicating concurrent identical in-flight requests) is **not implemented**; concurrent misses for the same key each go upstream. Rationale and consequences: [ADR 0001](adr/0001-cache-first-api-design.md).
 
 ### Upstream API constraints that drive caching
@@ -117,7 +117,8 @@ shared `pg` pool.
    psql -U admin -c "CREATE DATABASE provider_intelligence;"
    ```
 
-5. Run the schema initialization script:
+5. Run the schema initialization script, then the dated migrations in
+   `src/config/migrations/` in filename order:
 
    ```bash
    psql -U admin -d provider_intelligence -f src/config/init.sql
@@ -137,7 +138,12 @@ shared `pg` pool.
    PORT=3000
    CORS_ORIGIN=http://localhost:5173
    LOG_LEVEL=info
+   API_KEYS=local:some-long-random-string
    ```
+
+   `API_KEYS` is a comma-separated list of `label:key` pairs, parsed at
+   startup by `src/services/apiKeyService.js`. If it is unset, every write and
+   every admin request returns 401 while GET endpoints keep working.
 
    Upstream base URLs, dataset IDs and cache TTLs are **not** environment
    variables. Base URLs and dataset IDs live in `src/config/api-config.js`; the
@@ -165,6 +171,14 @@ Two unauthenticated utility routes sit outside the versioned prefix:
 itself written without the `/api/v1` prefix, so treat this file as the
 authority on paths.
 
+**Authentication.** `src/middleware/apiKeyAuth.js` is mounted on `/api/v1`.
+Every non-GET request, and every request of any method under
+`/api/v1/admin`, requires an `X-API-Key` header matching a `label:key` pair
+from the `API_KEYS` environment variable; a miss returns 401. GET endpoints
+outside `/admin` stay open, deliberately, on the posture that every upstream
+source is free public government data. Authenticated requests are metered into
+`api_usage`.
+
 Every handler returns the same envelope: `{ "success": true, "data": ... }`,
 with `count` added on list responses, and
 `{ "success": false, "error": "..." }` on failure. There is no `page`, `limit`
@@ -181,7 +195,7 @@ server-side pagination.
 | GET | `/api/v1/providers/:npi/mips-performance` | Optional `year` query param, defaulting to last year. |
 | GET | `/api/v1/providers/:npi/mips-trends` | Optional `startYear` (default 2018) and `endYear`. |
 | GET | `/api/v1/providers/quality-measures/:facilityId` | Care Compare measures. Mounted on the **providers** router, not on a top-level `/quality-measures`. |
-| POST | `/api/v1/providers/bulk-data` | Bulk operation. Unauthenticated; see `docs/SECURITY_REVIEW.md` P0-1 before exposing it. |
+| POST | `/api/v1/providers/bulk-data` | Bulk operation. Requires `X-API-Key` as of 2026-09-14; the wider concerns in `docs/SECURITY_REVIEW.md` P0-1 (quotas, row caps, schema validation per row) are still open. |
 
 ### Analytics routes (`src/routes/analyticsRoutes.js`)
 
@@ -196,9 +210,15 @@ server-side pagination.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/v1/intelligence/cohort` | Joined providers, latest MIPS and exclusion verdicts for a state. |
+| GET | `/api/v1/intelligence/cohort` | Joined providers, latest MIPS and exclusion verdicts for a state. `source=cached` (default) reads the request-time cache; `source=national` runs the same contract over the full `nppes_providers` load. Any other value is a 400. |
 | GET | `/api/v1/intelligence/exclusion-watchlist` | Cached providers carrying an exclusion match. |
-| POST | `/api/v1/intelligence/screen-roster` | Screens parsed roster rows against the LEIE and the state Medicaid exclusion lists. |
+| POST | `/api/v1/intelligence/screen-roster` | Screens parsed roster rows against the LEIE and the state Medicaid exclusion lists. Requires `X-API-Key`. |
+
+### Admin routes (`src/routes/adminRoutes.js`)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/v1/admin/usage` | Per-key request totals and per-endpoint breakdowns over the last `days=N`. Key-protected like every `/admin` path, including on GET. |
 
 ### Response shape notes
 

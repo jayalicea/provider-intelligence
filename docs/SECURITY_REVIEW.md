@@ -2,38 +2,61 @@
 
 Review scope at the time of writing: architecture as described in project [CORRECTIONS.md](../CORRECTIONS.md), frontend spec, and `phynpi.md` (the original design document, known to contain errors; CORRECTIONS.md catalogues every divergence from the working code). No source code, Dockerfile, or deployment configuration was available for inspection. This is a design-level review; findings based on stated facts are actionable, findings requiring code verification are marked as such.
 
-## Status as of 2026-09-14
+## Status as of 2026-09-15
 
 The backlog below is preserved as written. Since it was written, the source
 code, the Dockerfile and the compose file all exist in this repository, so
-several findings can now be verified rather than assumed. This banner records
-what inspection shows. **Most of the backlog is still open**, and nothing here
-should be read as a sign-off.
+several findings can now be verified rather than assumed, and the Package C
+work of 2026-09-14 closed part of the P0 core. This banner records what
+inspection shows. **Much of the backlog is still open**, and nothing here
+should be read as a sign-off. What has been done about it deliberately, and
+what was consciously deferred, is recorded separately in
+[SECURITY_REVIEW_RESPONSES.md](SECURITY_REVIEW_RESPONSES.md); that file is the
+response log, this banner is the inspection result.
+
+**Addressed since the review.**
+
+- **P0-1 unauthenticated bulk ingest.** Closed as written.
+  `POST /api/v1/providers/bulk-data` is a non-GET route under `/api/v1`, so it
+  now requires a valid `X-API-Key` header (`src/middleware/apiKeyAuth.js`,
+  mounted in `src/app.js`). The three bulk *data loads* remain offline jobs in
+  `tools/` that do not use this endpoint, which is the pattern the finding
+  recommended.
+- **P0-2 no authentication layer.** Partially addressed, and the earlier
+  reading of "absent" no longer holds. `src/middleware/apiKeyAuth.js` gates
+  every non-GET request under `/api/v1`, and every method under
+  `/api/v1/admin`, against an env-seeded key set compared as SHA-256 digests
+  in constant time. **GET endpoints remain open by deliberate choice**, on the
+  stated posture that every upstream source is a free public government API.
+  What the finding asks for beyond this is still open: there is no OIDC or
+  managed identity, no short-lived tokens, no MFA for privileged roles, and no
+  key-management UI, so rotation is an env edit plus a restart. The `api_keys`
+  table exists by migration but is not read at runtime, so `revoked_at` is not
+  honored at authentication time.
+- **P0-5 / P1-6 audit logging.** Partially addressed. Every key-authenticated
+  request now writes an `api_usage` row carrying key label, endpoint pattern,
+  method and status, which supplies the actor identity the access log lacked,
+  and `GET /api/v1/admin/usage` reports it. It is still not an append-only
+  store under separate credentials, has no integrity protection, and covers
+  only key-authenticated traffic, so open GET reads leave no actor trail.
 
 **Now verifiable, and still open as written.**
 
-- **P0-1 unauthenticated bulk ingest.** `POST /api/v1/providers/bulk-data` is
-  registered in `src/routes/providerRoutes.js` with no authentication. The
-  finding stands. Note that the three bulk *data loads* are offline jobs in
-  `tools/` and do not use this endpoint, which is the pattern the finding
-  recommends; the endpoint itself is still exposed.
-- **P0-2 no authentication layer.** Confirmed absent. No auth middleware
-  exists anywhere in `src/`.
-- **P0-3 no authorization model.** Confirmed absent.
+- **P0-3 no authorization model.** Confirmed absent. A valid key is a valid
+  key; there are no roles, and nothing distinguishes what a caller may see
+  beyond the admin path check.
 - **P0-4 TLS.** Nothing in the repository terminates TLS or enforces HTTPS,
   and the `pg` pool is constructed without an `ssl` option, so
   application-to-database traffic is unencrypted by default.
-- **P0-5 / P1-6 audit logging.** `src/app.js` logs method, URL, IP, user agent,
-  status and duration per request through winston. That is an access log, not
-  an audit log: there is no actor identity, no separate append-only store, and
-  no integrity protection.
 - **P0-6 secrets handling.** `.env` is in both `.gitignore` and
   `.dockerignore`, and `git log --all -- .env` returns nothing, so it appears
   never to have been committed. There is still no secrets manager, no rotation
-  and no dev/prod separation, so the finding stands.
+  and no dev/prod separation, so the finding stands. The `API_KEYS` variable
+  added by Package C puts live API credentials in that same `.env`, which
+  widens what a leak of it costs.
 - **P1-1 in-memory rate limiter.** Confirmed: `src/middleware/rateLimiter.js`
   is the hand-rolled fixed-window limiter, applied at 100 requests per minute
-  on all three routers. `express-rate-limit` is still absent from
+  on the providers, analytics and intelligence routers. `express-rate-limit` is still absent from
   `package.json`. The finding stands in full.
 - **P1-2 500 on not-found.** Confirmed for `GET /api/v1/providers/:npi`; see
   CORRECTIONS.md, which documents the unreachable 404 branch. The newer
