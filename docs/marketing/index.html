@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProviderLens: provider data with a paper trail</title>
+<meta name="description" content="Provider data pipelines built on public CMS and NIH sources, with source and as-of date on every field.">
+<meta name="robots" content="noindex">
+<!--
+  Proof page, built to the outline in docs/plans/gtm-productized-services.md
+  section 6. Self-contained on purpose: one file, no external CSS, no fonts, no
+  scripts, no network calls, so it can be opened from disk or dropped on any
+  static host.
+
+  Design tokens are taken verbatim from docs/DESIGN.md section 2. One
+  deliberate extension: the hero headline uses the 40px/600 "single KPI value"
+  size from that section rather than the 22px H1 size, because this is a
+  marketing surface rather than a data surface. Every other size, colour,
+  spacing step and radius is a DESIGN token.
+
+  Contents rules honoured here: no live data, no real provider identities, no
+  API paths or internal endpoints, and no coverage figure that disagrees with
+  client/src/data/coverage.json. The screenshot slots reference filenames that
+  do not exist yet; see the note in the QA section.
+-->
+<style>
+  :root {
+    /* Colour, docs/DESIGN.md section 2 */
+    --bg: #F5F7F6;
+    --surface: #FFFFFF;
+    --surface-sunken: #EEF2F1;
+    --surface-hover: #F7FAF9;
+    --border: #DCE3E8;
+    --border-strong: #C7D2D9;
+    --text: #1C2B33;
+    --text-muted: #5B6B75;
+    --primary: #0F6B5C;
+    --primary-hover: #0A5448;
+    --primary-wash: #EEF5F3;
+    --success: #2E7D32;
+    --success-wash: #EDF5ED;
+    --warning: #B26A00;
+    --warning-wash: #FBF3E6;
+    --error: #C62828;
+    --error-wash: #FBEEEE;
+    --unscored: #8A9AA5;
+    --unscored-wash: #F0F3F4;
+
+    /* Elevation, three levels, neutral tinted, never encoding data */
+    --elev-raised: 0 1px 1px rgba(28, 43, 51, .04), 0 2px 6px rgba(28, 43, 51, .05);
+
+    /* Spacing, 8px grid with a 4px half step */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+
+    --radius: 6px;
+    --radius-sm: 4px;
+    --radius-pill: 999px;
+
+    --font: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: Consolas, "SFMono-Regular", Menlo, monospace;
+
+    --measure: 1140px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 14px/1.45 var(--font);
+  }
+
+  .wrap {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+
+  /* ---------- Header ---------- */
+
+  .masthead {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .masthead .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    justify-content: space-between;
+    padding-block: var(--space-4);
+  }
+
+  .wordmark {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  /* ---------- Badges, one shape for every status ---------- */
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+
+  .badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: currentColor;
+    flex: none;
+  }
+
+  .badge-plain::before { display: none; }
+
+  .badge-accent  { color: var(--primary);  background: var(--primary-wash);  border-color: #CBE0DA; }
+  .badge-success { color: var(--success);  background: var(--success-wash);  border-color: #C9E0CA; }
+  .badge-warning { color: var(--warning);  background: var(--warning-wash);  border-color: #EDD7B0; }
+  .badge-na      { color: var(--unscored); background: var(--unscored-wash); border-color: var(--border); }
+
+  /* ---------- Hero ---------- */
+
+  .hero { padding-block: var(--space-7) var(--space-6); }
+
+  .hero h1 {
+    margin: 0 0 var(--space-4);
+    font-size: 40px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    max-width: 20ch;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 68ch;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  /* ---------- Stat band ---------- */
+
+  .statband {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-raised);
+    overflow: hidden;
+    margin-top: var(--space-6);
+  }
+
+  .stat { background: var(--surface); padding: var(--space-4) var(--space-5); }
+
+  .stat dt {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-2);
+  }
+
+  .stat dd {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+  }
+
+  .stat .vintage {
+    display: block;
+    margin-top: var(--space-2);
+    font: 400 12px/1.4 var(--font);
+    color: var(--text-muted);
+  }
+
+  .band-caption {
+    margin: var(--space-3) 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ---------- Sections ---------- */
+
+  section { padding-block: var(--space-7); }
+
+  section + section { border-top: 1px solid var(--border); }
+
+  h2 {
+    margin: 0 0 var(--space-2);
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .section-sub {
+    margin: 0 0 var(--space-5);
+    max-width: 72ch;
+    color: var(--text-muted);
+  }
+
+  h3 {
+    margin: 0 0 var(--space-2);
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  /* ---------- Screenshot slots ---------- */
+
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-5);
+  }
+
+  .shot {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-raised);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .shot figure { margin: 0; }
+
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    background: var(--surface-sunken);
+    border-bottom: 1px solid var(--border);
+    /* Alt text stands in until the redacted captures are dropped in. */
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .shot figcaption { padding: var(--space-4) var(--space-5); }
+
+  .shot p {
+    margin: var(--space-2) 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* ---------- Tables ---------- */
+
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--elev-raised);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 640px;
+  }
+
+  caption {
+    caption-side: top;
+    text-align: left;
+    padding: var(--space-4) var(--space-5) 0;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  th, td {
+    padding: 11px 24px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--border);
+  }
+
+  thead th {
+    background: var(--surface-sunken);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-strong);
+  }
+
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+
+  tbody tr:hover { background: var(--surface-hover); }
+
+  tbody th {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .mono {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .src { color: var(--text-muted); }
+
+  .redacted {
+    background: var(--surface-sunken);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  /* ---------- QA evidence ---------- */
+
+  .quotes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-5);
+  }
+
+  .quote {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-raised);
+    padding: var(--space-5);
+  }
+
+  .quote .doc {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-3);
+  }
+
+  .quote blockquote {
+    margin: 0 0 var(--space-3);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .quote blockquote p { margin: 0 0 var(--space-3); }
+  .quote blockquote p:last-child { margin-bottom: 0; }
+
+  .quote .gloss {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ---------- Compliance panel ---------- */
+
+  .panel {
+    background: var(--primary-wash);
+    border: 1px solid #CBE0DA;
+    border-radius: var(--radius);
+    padding: var(--space-5);
+  }
+
+  .panel p { margin: 0 0 var(--space-3); max-width: 76ch; }
+  .panel p:last-child { margin-bottom: 0; }
+  .panel .headline { font-weight: 600; font-size: 16px; }
+
+  /* ---------- Footer ---------- */
+
+  footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding-block: var(--space-6);
+  }
+
+  .contact {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-5);
+    margin-bottom: var(--space-5);
+  }
+
+  .contact dt {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-2);
+  }
+
+  .contact dd { margin: 0; }
+
+  .placeholder {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    background: var(--surface-sunken);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 2px 8px;
+    display: inline-block;
+  }
+
+  .fineprint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text-muted);
+    max-width: 88ch;
+  }
+
+  a { color: var(--primary); }
+  a:hover { color: var(--primary-hover); }
+
+  :focus-visible {
+    outline: 2px solid var(--surface);
+    box-shadow: 0 0 0 4px var(--primary);
+    border-radius: var(--radius-sm);
+  }
+
+  @media print {
+    body { background: var(--surface); }
+    .statband, .shot, .quote, .table-scroll { box-shadow: none; }
+    section { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="wordmark">ProviderLens</p>
+    <span class="badge badge-accent badge-plain">Public data only</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- 1. Headline -->
+  <section class="hero">
+    <div class="wrap">
+      <h1>Provider data with a paper trail.</h1>
+      <p class="lede">
+        Most commercial provider extracts hand you a value and ask you to trust it.
+        Every field here arrives with the source that published it and the date it
+        was read, because a credentialing file, a roster screen and an audit all
+        need to answer the same question: <strong>who said this, and when</strong>.
+        Built on public CMS and NIH datasets, by one engineer, with the review
+        documents to show for it.
+      </p>
+
+      <dl class="statband">
+        <div class="stat">
+          <dt>NPPES providers</dt>
+          <dd>9,726,865</dd>
+          <span class="vintage">August 2026 dissemination file, V.2 layout. Includes deactivated enumerations.</span>
+        </div>
+        <div class="stat">
+          <dt>Federal exclusion records</dt>
+          <dd>84,001</dd>
+          <span class="vintage">OIG LEIE, as of 2026-09-12.</span>
+        </div>
+        <div class="stat">
+          <dt>State exclusion records</dt>
+          <dd>82,929</dd>
+          <span class="vintage">38 jurisdictions, as of 2026-09-13.</span>
+        </div>
+      </dl>
+      <p class="band-caption">
+        Figures are measured counts from the loaded tables, not estimates. Hospital
+        quality measures and MIPS scores are cached per facility and per provider on
+        demand rather than bulk loaded, so their coverage grows with use and each
+        cached value carries its own access date instead of a shared dataset vintage.
+      </p>
+    </div>
+  </section>
+
+  <!-- 2. Three redacted screenshots -->
+  <section>
+    <div class="wrap">
+      <h2>What the running platform looks like</h2>
+      <p class="section-sub">
+        Screenshots from the working dashboard, client identifiers redacted. Note
+        what is under every value in each one: a small muted line naming the source
+        and the access date.
+      </p>
+
+      <div class="shots">
+
+        <article class="shot">
+          <figure>
+            <img src="detail.png" width="1200" height="750"
+                 alt="Provider detail view, identifiers redacted. Each identity field carries a small muted source and access-date line beneath it.">
+            <figcaption>
+              <h3>Provider detail</h3>
+              <p>
+                Identity, taxonomy, practice location and exclusion verdict on one
+                screen. Every field carries its source line. Missing values render
+                as a gray "Not available" rather than a blank or a zero.
+              </p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article class="shot">
+          <figure>
+            <img src="mips.png" width="1200" height="750"
+                 alt="MIPS performance view, identifiers redacted, showing category score bars and a persistent banner about rolling-vintage year labels.">
+            <figcaption>
+              <h3>MIPS performance</h3>
+              <p>
+                Final score and category breakdown, with a permanent banner stating
+                that the year labels are request vintages on a rolling CMS dataset.
+                The limitation is on the screen, not buried in a footnote.
+              </p>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article class="shot">
+          <figure>
+            <img src="quality.png" width="1200" height="750"
+                 alt="Hospital quality measures table, facility redacted, with national comparison badges and an as-of column.">
+            <figcaption>
+              <h3>Hospital quality measures</h3>
+              <p>
+                Measure, score, national comparison and as-of date. Comparison
+                badges carry words as well as colour. A suppressed score reads
+                "Not reported", never a dash and never a zero.
+              </p>
+            </figcaption>
+          </figure>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Sample provenance row -->
+  <section>
+    <div class="wrap">
+      <h2>One row, every field sourced</h2>
+      <p class="section-sub">
+        This is the deliverable shape: one provider, one row, with two columns that
+        most extracts leave out. Identity is redacted, and the values are
+        illustrative. The right-hand columns are the point.
+      </p>
+
+      <div class="table-scroll">
+        <table>
+          <caption>Sample screening row. Identity redacted; values illustrative, not drawn from any real record.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Field</th>
+              <th scope="col">Value</th>
+              <th scope="col">Source</th>
+              <th scope="col">As of</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">NPI</th>
+              <td><span class="redacted">redacted</span></td>
+              <td class="src">NPPES, via the NIH NPI Registry</td>
+              <td class="mono src">2026-09-12</td>
+            </tr>
+            <tr>
+              <th scope="row">Legal name</th>
+              <td><span class="redacted">redacted</span></td>
+              <td class="src">NPPES, via the NIH NPI Registry</td>
+              <td class="mono src">2026-09-12</td>
+            </tr>
+            <tr>
+              <th scope="row">Primary taxonomy</th>
+              <td>Physician / Internal Medicine</td>
+              <td class="src">NPPES, via the NIH NPI Registry</td>
+              <td class="mono src">2026-09-12</td>
+            </tr>
+            <tr>
+              <th scope="row">Practice state</th>
+              <td>MD</td>
+              <td class="src">NPPES, via the NIH NPI Registry</td>
+              <td class="mono src">2026-09-12</td>
+            </tr>
+            <tr>
+              <th scope="row">Federal exclusion</th>
+              <td><span class="badge badge-success">Clear</span></td>
+              <td class="src">OIG LEIE, monthly file</td>
+              <td class="mono src">2026-09-12</td>
+            </tr>
+            <tr>
+              <th scope="row">State Medicaid exclusion</th>
+              <td><span class="badge badge-success">Clear</span></td>
+              <td class="src">State Medicaid exclusion lists, 38 jurisdictions checked</td>
+              <td class="mono src">2026-09-13</td>
+            </tr>
+            <tr>
+              <th scope="row">MIPS final score</th>
+              <td class="mono">84.20</td>
+              <td class="src">CMS Quality Payment Program Experience, single rolling vintage</td>
+              <td class="mono src">2026-09-12</td>
+            </tr>
+            <tr>
+              <th scope="row">Hospital complication rate</th>
+              <td><span class="badge badge-na">Not reported</span></td>
+              <td class="src">CMS Care Compare. Suppressed at source: too few cases to report</td>
+              <td class="mono src">2026-09-12</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="band-caption">
+        The last two rows are the ones worth arguing about. A rolling-vintage score
+        is labeled as one rather than presented as a clean year-over-year series,
+        and a suppressed measure stays suppressed instead of being coerced into a
+        number. A screening verdict is <strong>Excluded</strong>,
+        <strong>Clear</strong> or <strong>Unverified</strong>; an identity that
+        could not be checked is never reported as clear.
+      </p>
+    </div>
+  </section>
+
+  <!-- 4. QA evidence -->
+  <section>
+    <div class="wrap">
+      <h2>The work was reviewed, adversarially</h2>
+      <p class="section-sub">
+        Two review documents ship with the platform and are available on request.
+        Excerpts below are headers and scope statements; the findings themselves,
+        open and closed, stay with the code.
+      </p>
+
+      <div class="quotes">
+
+        <article class="quote">
+          <p class="doc">Code review, analytics service</p>
+          <blockquote>
+            <p>"Adversarial Code Review: Provider Intelligence Platform Analytics Service"</p>
+            <p>"Findings are ordered by severity. Where the provided materials were insufficient to judge a concern, that is stated explicitly."</p>
+          </blockquote>
+          <p class="gloss">
+            A line-by-line review of the statistics code, hunting for the failure
+            that matters most here: a confident wrong number. The critical findings
+            were about null handling, rankings and rolling-vintage year labels, and
+            they are closed. Each one has a regression test.
+          </p>
+        </article>
+
+        <article class="quote">
+          <p class="doc">Security review, PHI posture</p>
+          <blockquote>
+            <p>"The platform currently serves only public US government data. No patient data, no user account data, no claims data is present."</p>
+            <p>"Because protected data is a plausible future state, the auth, logging, and encryption gaps should be fixed before the feature that introduces protected data ships, not after."</p>
+          </blockquote>
+          <p class="gloss">
+            A written hardening backlog, ordered by priority, with the HIPAA
+            obligations that would attach the moment protected data entered the
+            system. The current answer is that none has, and the engagement gates
+            below keep it that way.
+          </p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Data and compliance statement -->
+  <section>
+    <div class="wrap">
+      <h2>Data and compliance</h2>
+      <div class="panel">
+        <p class="headline">
+          Built entirely on public CMS and NIH data. No PHI handled. BAA available
+          for scoped engagements.
+        </p>
+        <p>
+          Engagements are public-data-only by default, so no Business Associate
+          Agreement is triggered. If a scope would require receiving protected
+          health information, the BAA is signed first, before any data moves.
+        </p>
+        <p>
+          Screening output is a diligence aid compiled from public sources. It is
+          not legal advice and is not a consumer report. Screening used for
+          credentialing, employment or other eligibility decisions may implicate
+          the Fair Credit Reporting Act and state screening laws; applicability is
+          confirmed before any output is sold into those use cases.
+        </p>
+        <p>
+          Every report carries this sentence, verbatim: <em>this report states what
+          public sources published as of the dates shown. It does not certify any
+          provider's status.</em>
+        </p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- 6. Footer -->
+<footer>
+  <div class="wrap">
+    <dl class="contact">
+      <div>
+        <dt>Email</dt>
+        <dd><span class="placeholder">[email address]</span></dd>
+      </div>
+      <div>
+        <dt>Book a call</dt>
+        <dd><span class="placeholder">[calendar link]</span></dd>
+      </div>
+      <div>
+        <dt>Typical first engagement</dt>
+        <dd>A single dataset, fixed scope, fixed price.</dd>
+      </div>
+    </dl>
+    <p class="fineprint">
+      ProviderLens is a working product name. Sources: NPPES and the NIH NPI
+      Registry, the CMS Quality Payment Program Experience dataset, CMS Care
+      Compare, the HHS OIG List of Excluded Individuals and Entities, and state
+      Medicaid exclusion lists. Values may be stale or incorrect at the source;
+      always verify against the source directly. Counts and vintages on this page
+      are those published in the platform's coverage registry and were current at
+      2026-09-15.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
