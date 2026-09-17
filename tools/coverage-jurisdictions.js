@@ -35,6 +35,18 @@ const JURISDICTIONS = {
 };
 const EXPECTED_ROWS = 51;
 
+const NAME_TO_CODE = Object.fromEntries(
+  Object.entries(JURISDICTIONS).map(([code, name]) => [name.toUpperCase(), code])
+);
+
+// state_exclusions.state holds full state names ('Texas'), not codes ('TX').
+function stateToCode(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim().toUpperCase();
+  if (JURISDICTIONS[s]) return s;
+  return NAME_TO_CODE[s] || null;
+}
+
 const DEFAULT_SURVEY = path.join('data', 'exclusions', 'state-exclusion-survey.md');
 const DEFAULT_OUT = path.join('client', 'src', 'data', 'coverage.json');
 
@@ -126,7 +138,10 @@ async function loadCounts() {
        FROM state_exclusions GROUP BY upper(state)`
     );
     const byState = {};
-    for (const row of r.rows) byState[row.state] = row;
+    for (const row of r.rows) {
+      const code = stateToCode(row.state);
+      if (code) byState[code] = row;
+    }
     return byState;
   } finally {
     await c.end();
@@ -180,6 +195,13 @@ async function main() {
   const ingested = jurisdictions.filter(j => j.records > 0).length;
   const total = jurisdictions.reduce((a, j) => a + j.records, 0);
   console.log(`jurisdictions=${jurisdictions.length} ingested=${ingested} records=${total}`);
+
+  if (total === 0 || ingested === 0) {
+    console.error('COVERAGE_FAILED every jurisdiction measured zero records;');
+    console.error('state_exclusions is empty or unreachable. Refusing to write an');
+    console.error('all-zero table over the published registry figures.');
+    process.exit(1);
+  }
 
   if (args.dryRun) {
     console.log('COVERAGE_DRY_RUN no changes written');

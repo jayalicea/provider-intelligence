@@ -80,5 +80,465 @@
       ]
     }
   ],
-  "jurisdictions": []
+  "jurisdictions": [
+    {
+      "code": "AK",
+      "name": "Alaska",
+      "status": "extracted",
+      "records": 304,
+      "sourceName": "Alaska Department of Health - US Alaska Medical Assistance Excluded Provider List",
+      "sourceUrl": "https://health.alaska.gov/Commissioner/Pages/ProgramIntegrity/default.aspx",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "AL",
+      "name": "Alabama",
+      "status": "extracted",
+      "records": 2099,
+      "sourceName": "US Alabama Medicaid Suspended Providers",
+      "sourceUrl": "https://medicaid.alabama.gov/content/8.0_Fraud/8.7_Suspended_Providers.aspx",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "AR",
+      "name": "Arkansas",
+      "status": "extracted",
+      "records": 2496,
+      "sourceName": "Arkansas Department of Human Services - US Arkansas Medicaid Excluded Provider List",
+      "sourceUrl": "https://dhs.arkansas.gov/dhs/portal/Exclusions/PublicSearch/",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "AZ",
+      "name": "Arizona",
+      "status": "extracted",
+      "records": 203,
+      "sourceName": "Arizona Health Care Cost Containment System - US Arizona Medicaid Suspensions and Terminations",
+      "sourceUrl": "https://www.azahcccs.gov/Fraud/Providers/actions.html",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "CA",
+      "name": "California",
+      "status": "extracted",
+      "records": 23471,
+      "sourceName": "Department of Health Care Services - US California Medicaid Suspended and ineligible providers",
+      "sourceUrl": "https://mcweb.apps.prd.cammis.medi-cal.ca.gov/references/sandi",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "CO",
+      "name": "Colorado",
+      "status": "extracted",
+      "records": 315,
+      "sourceName": "Colorado Department of Health Care Policy & Financing - US Colorado Medicaid Terminated Provider List",
+      "sourceUrl": "https://hcpf.colorado.gov/provider-termination",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "CT",
+      "name": "Connecticut",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://portal.ct.gov/dss/quality-assurance/quality-assurance-administrative-actions-list",
+      "asOf": null
+    },
+    {
+      "code": "DC",
+      "name": "District of Columbia",
+      "status": "extracted",
+      "records": 25,
+      "sourceName": "DC Office of Contracting and Procurement - US Washington DC Excluded Parties List",
+      "sourceUrl": "https://ocp.dc.gov/page/excluded-parties-list",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "DE",
+      "name": "Delaware",
+      "status": "extracted",
+      "records": 1423,
+      "sourceName": "Delaware Health and Social Services - US Delaware Medicaid Sanctioned Providers",
+      "sourceUrl": "https://medicaid.dhss.delaware.gov/provider/Home/ProgramIntegrityLanding/tabid/2102/Default.aspx",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "FL",
+      "name": "Florida",
+      "status": "blocked",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://apps.ahca.myflorida.com/dm_web/",
+      "asOf": null
+    },
+    {
+      "code": "GA",
+      "name": "Georgia",
+      "status": "extracted",
+      "records": 1313,
+      "sourceName": "Georgia Department of Community Health - US Georgia Healthcare provider exclusions",
+      "sourceUrl": "https://dch.georgia.gov/office-inspector-general/georgia-oig-exclusions-list",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "HI",
+      "name": "Hawaii",
+      "status": "extracted",
+      "records": 195,
+      "sourceName": "Hawai'i Department of Human Services, Med-QUEST Division - US Hawaii Medicaid Exclusions and Reinstatements",
+      "sourceUrl": "https://medquest.hawaii.gov/en/plans-providers/provider-exclusion-reinstatement-list.html",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "IA",
+      "name": "Iowa",
+      "status": "extracted",
+      "records": 986,
+      "sourceName": "Iowa Health & Human Services - US Iowa Medicaid Terminated Provider List",
+      "sourceUrl": "https://hhs.iowa.gov/programs/welcome-iowa-medicaid/provider-services/excluded-individuals-and-entities",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "ID",
+      "name": "Idaho",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://healthandwelfare.idaho.gov/providers/idaho-medicaid-providers/information-medicaid-providers",
+      "asOf": null
+    },
+    {
+      "code": "IL",
+      "name": "Illinois",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://hfs.illinois.gov/oig/sanctionslist.html",
+      "asOf": null
+    },
+    {
+      "code": "IN",
+      "name": "Indiana",
+      "status": "needs_human_review",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://www.in.gov/fssa/ompp/provider-information/termination-of-provider-participation-in-medicaid-and-chip",
+      "asOf": null
+    },
+    {
+      "code": "KS",
+      "name": "Kansas",
+      "status": "extracted",
+      "records": 205,
+      "sourceName": "Kansas Department of Health and Environment - US Kansas Medicaid Terminated Provider List",
+      "sourceUrl": "https://www.kdhe.ks.gov/172/Medicaid",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "KY",
+      "name": "Kentucky",
+      "status": "extracted",
+      "records": 390,
+      "sourceName": "Kentucky Department for Medicaid Services - US Kentucky Terminated and Excluded Providers",
+      "sourceUrl": "https://www.chfs.ky.gov/agencies/dms/dpi/pe/Pages/terminated.aspx",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "LA",
+      "name": "Louisiana",
+      "status": "extracted",
+      "records": 3774,
+      "sourceName": "US Louisiana Department of Health Adverse Actions List",
+      "sourceUrl": "https://adverseactions.ldh.la.gov/SelSearch/",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "MA",
+      "name": "Massachusetts",
+      "status": "extracted",
+      "records": 289,
+      "sourceName": "US Massachusetts Suspensions and Exclusions from MassHealth",
+      "sourceUrl": "https://www.mass.gov/info-details/learn-about-suspended-or-excluded-masshealth-providers",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "MD",
+      "name": "Maryland",
+      "status": "extracted",
+      "records": 1589,
+      "sourceName": "Maryland Department of Health - US Maryland Sanctioned Providers",
+      "sourceUrl": "https://health.maryland.gov/mmcp/provider/Pages/sanctioned_list.aspx",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "ME",
+      "name": "Maine",
+      "status": "extracted",
+      "records": 1108,
+      "sourceName": "Maine Department of Health and Human Services - US Maine Medicaid Excluded Providers",
+      "sourceUrl": "https://mainecare.maine.gov/mhpviewer.aspx?FID=MEEX",
+      "asOf": "2026-09-09"
+    },
+    {
+      "code": "MI",
+      "name": "Michigan",
+      "status": "extracted",
+      "records": 4139,
+      "sourceName": "Michigan Department of Health & Human Services - US Michigan Medicaid Sanctioned Provider List",
+      "sourceUrl": "https://www.michigan.gov/mdhhs/doing-business/providers/providers/billingreimbursement/list-of-sanctioned-providers",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "MN",
+      "name": "Minnesota",
+      "status": "extracted",
+      "records": 1409,
+      "sourceName": "US Minnesota Health Care Programs Excluded Providers",
+      "sourceUrl": "http://www.dhs.state.mn.us/main/idcplg?IdcService=GET_DYNAMIC_CONVERSION&RevisionSelectionMethod=LatestReleased&dDocName=DHS-295094",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "MO",
+      "name": "Missouri",
+      "status": "extracted",
+      "records": 257,
+      "sourceName": "Missouri Medicaid Audit & Compliance - US Missouri Medicaid Provider Terminations",
+      "sourceUrl": "https://mmac.mo.gov/providers/provider-sanctions/",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "MS",
+      "name": "Mississippi",
+      "status": "extracted",
+      "records": 216,
+      "sourceName": "Mississippi Division of Medicaid - US Mississippi Medicaid Terminated Provider List",
+      "sourceUrl": "https://medicaid.ms.gov/providers/provider-terminations/",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "MT",
+      "name": "Montana",
+      "status": "extracted",
+      "records": 172,
+      "sourceName": "Montana Department of Public Health & Human Services - US Montana Medicaid Excluded and Terminated Providers",
+      "sourceUrl": "https://dphhs.mt.gov/montanahealthcareprograms/terminatedexcludedproviders",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "NC",
+      "name": "North Carolina",
+      "status": "extracted",
+      "records": 159,
+      "sourceName": "NC Medicaid Division of Health Benefits - US North Carolina Excluded Providers List",
+      "sourceUrl": "https://medicaid.ncdhhs.gov/providers/excluded-providers",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "ND",
+      "name": "North Dakota",
+      "status": "extracted",
+      "records": 188,
+      "sourceName": "North Dakota Health and Human Services - US North Dakota Medicaid Terminated Provider List",
+      "sourceUrl": "https://www.hhs.nd.gov/healthcare/medicaid/provider/compliance/fraud-and-abuse",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "NE",
+      "name": "Nebraska",
+      "status": "extracted",
+      "records": 1416,
+      "sourceName": "Nebraska Department of Health and Human Services - US Nebraska Medicaid Sanctioned Providers",
+      "sourceUrl": "https://dhhs.ne.gov/Pages/Program-Integrity-Sanctioned-Providers.aspx",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "NH",
+      "name": "New Hampshire",
+      "status": "extracted",
+      "records": 72,
+      "sourceName": "New Hampshire Department of Health & Human Services - US New Hampshire Medicaid Exclusion and Sanction List",
+      "sourceUrl": "https://www.dhhs.nh.gov/programs-services/medicaid/medicaid-provider-relations",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "NJ",
+      "name": "New Jersey",
+      "status": "extracted",
+      "records": 3331,
+      "sourceName": "New Jersey Office of the State Comptroller - US New Jersey Ineligible Medicaid Providers",
+      "sourceUrl": "https://www.njoag.gov/about/divisions-and-offices/office-of-the-insurance-fraud-prosecutor-home/medicaid-fraud-control-unit/",
+      "asOf": "2026-08-15"
+    },
+    {
+      "code": "NM",
+      "name": "New Mexico",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "NV",
+      "name": "Nevada",
+      "status": "extracted",
+      "records": 635,
+      "sourceName": "Nevada Department of Health and Human Services Division of Health Care Financing and Policy - US Nevada Medicaid Sanctions",
+      "sourceUrl": "https://dhcfp.nv.gov/Providers/PI/PSExclusions/",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "NY",
+      "name": "New York",
+      "status": "extracted",
+      "records": 8952,
+      "sourceName": "New York State Office of the Medicaid Inspector General - US New York State Medicaid Exclusions",
+      "sourceUrl": "https://omig.ny.gov/medicaid-fraud/medicaid-exclusions",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "OH",
+      "name": "Ohio",
+      "status": "extracted",
+      "records": 2060,
+      "sourceName": "Ohio Department of Medicaid - US Ohio Medicaid Excluded and Suspended Providers",
+      "sourceUrl": "https://medicaid.ohio.gov/wps/portal/gov/medicaid/resources-for-providers/enrollment-and-support/provider-enrollment/provider-exclusion-and-suspension-list",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "OK",
+      "name": "Oklahoma",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "OR",
+      "name": "Oregon",
+      "status": "extracted",
+      "records": 132,
+      "sourceName": "Oregon Health Authority's Program Integrity Audit Unit - US Oregon State Medicaid Fraud Convictions",
+      "sourceUrl": "https://www.oregon.gov/oha/FOD/PIAU/Pages/Convictions.aspx",
+      "asOf": "2026-08-04"
+    },
+    {
+      "code": "PA",
+      "name": "Pennsylvania",
+      "status": "extracted",
+      "records": 5882,
+      "sourceName": "Department of Human Services - US Pennsylvania Medicheck list",
+      "sourceUrl": "https://www.pa.gov/agencies/dhs/report-fraud/medicheck-list",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "RI",
+      "name": "Rhode Island",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "SC",
+      "name": "South Carolina",
+      "status": "extracted",
+      "records": 1328,
+      "sourceName": "South Carolina Department of Health and Human Services - US South Carolina Excluded Providers",
+      "sourceUrl": "https://www.scdhhs.gov/fraud",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "SD",
+      "name": "South Dakota",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "TN",
+      "name": "Tennessee",
+      "status": "extracted",
+      "records": 21,
+      "sourceName": "TennCare Office of Program Integrity - US Tennessee Terminated Providers List",
+      "sourceUrl": "https://www.tn.gov/tenncare/fraud-and-abuse/program-integrity.html",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "TX",
+      "name": "Texas",
+      "status": "extracted",
+      "records": 11851,
+      "sourceName": "The Texas Health & Human Services Commissions (Commission) Office of Inspector General (OIG) - US Texas Medicaid Provider Exclusions",
+      "sourceUrl": "https://oig.hhsc.state.tx.us/oigportal2/Exclusions/ctl/DOW/mid/384",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "UT",
+      "name": "Utah",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "VA",
+      "name": "Virginia",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "VT",
+      "name": "Vermont",
+      "status": "blocked",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": "https://dvha.vermont.gov/providers/medicaid-excluded-providers",
+      "asOf": null
+    },
+    {
+      "code": "WA",
+      "name": "Washington",
+      "status": "extracted",
+      "records": 233,
+      "sourceName": "Washington State Health Care Authority - US Washington State Provider Termination and Exclusion List",
+      "sourceUrl": "https://www.hca.wa.gov/billers-providers-partners/become-apple-health-provider/provider-termination-and-exclusion-list",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "WI",
+      "name": "Wisconsin",
+      "status": "not_maintained",
+      "records": 0,
+      "sourceName": null,
+      "sourceUrl": null,
+      "asOf": null
+    },
+    {
+      "code": "WV",
+      "name": "West Virginia",
+      "status": "extracted",
+      "records": 165,
+      "sourceName": "Medicaid Management Information System - US West Virginia Medicaid Provider Exclusions and Terminations",
+      "sourceUrl": "https://www.wvmmis.com/SitePages/Medicaid%20Provider%20SanctionedExclusion",
+      "asOf": "2026-09-01"
+    },
+    {
+      "code": "WY",
+      "name": "Wyoming",
+      "status": "extracted",
+      "records": 126,
+      "sourceName": "Wyoming Department of Health - US Wyoming Medicaid Provider Exclusion List",
+      "sourceUrl": "https://health.wyo.gov/healthcarefin/medicaid/",
+      "asOf": "2026-09-01"
+    }
+  ]
 }
