@@ -139,6 +139,21 @@ CREATE INDEX idx_providers_npi ON providers(npi);
 CREATE INDEX idx_providers_name ON providers(name_last, name_first);
 CREATE INDEX idx_providers_state ON providers(practice_state);
 CREATE INDEX idx_providers_taxonomy ON providers(primary_taxonomy_code);
+
+-- NUCC healthcare provider taxonomy crosswalk. NPPES ships taxonomy codes
+-- without descriptions, so this table is what turns a code into a label.
+-- Loaded by tools/taxonomy-ingest.js; source records which code list a row
+-- came from (the NUCC CSV, the NIH Clinical Tables API, or a pinned file).
+CREATE TABLE IF NOT EXISTS taxonomy_codes (
+    code text PRIMARY KEY,
+    description text,
+    grouping text,
+    classification text,
+    specialization text,
+    source text,
+    as_of date
+);
+CREATE INDEX IF NOT EXISTS idx_taxonomy_codes_desc ON taxonomy_codes(lower(description));
 CREATE INDEX idx_mips_npi_year ON mips_performance_scores(npi, performance_year);
 CREATE INDEX idx_mips_year_npi ON mips_performance_scores(performance_year, npi);
 CREATE INDEX idx_quality_facility ON quality_measures(facility_id);

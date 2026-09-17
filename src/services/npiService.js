@@ -260,8 +260,16 @@ class NpiService {
    */
   async getCachedProvider(npi) {
     try {
+      // The taxonomy crosswalk supplies a label when the cached row has none:
+      // NPPES stores codes without descriptions, so a provider cached from a
+      // bulk load carries a bare code until taxonomy-ingest backfills it.
       const result = await db.query(
-        'SELECT * FROM providers WHERE npi = $1',
+        `SELECT p.*,
+                t.description AS taxonomy_crosswalk_description,
+                t.grouping AS taxonomy_crosswalk_grouping
+           FROM providers p
+           LEFT JOIN taxonomy_codes t ON t.code = p.primary_taxonomy_code
+          WHERE p.npi = $1`,
         [npi]
       );
 
@@ -299,8 +307,9 @@ class NpiService {
       },
       taxonomy: {
         code: row.primary_taxonomy_code || '',
-        description: row.primary_taxonomy_description || row.provider_type || '',
-        grouping: row.taxonomy_grouping || ''
+        description: row.primary_taxonomy_description ||
+          row.taxonomy_crosswalk_description || row.provider_type || '',
+        grouping: row.taxonomy_grouping || row.taxonomy_crosswalk_grouping || ''
       },
       license: {
         number: row.license_number || '',
