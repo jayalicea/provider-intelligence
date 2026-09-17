@@ -3,14 +3,31 @@
 Record of validating the compose stack (`docker-compose.yml`, `Dockerfile`)
 for the Provider Intelligence Platform.
 
-## Outcome, in short
+## 2026-09-17: full runtime validation on the maintainer's machine
+
+**Pass.** The stack was built, started, health-checked, and torn down on the
+Windows maintainer host (Docker Desktop, engine 29.7.2, compose v5.5.1).
+
+| Check | Result |
+|---|---|
+| `docker compose config` | **pass**, exit 0 |
+| `docker compose up -d --build` | **pass** — db and app containers created, db `healthy` before app start |
+| App container healthcheck | **pass** — `Up (healthy)` |
+| `GET /health` | **pass** — `{"status":"healthy",...}` |
+| `GET /api/v1/providers/search?state=MD&maxResults=5` | **pass** — HTTP 200 from the containerized app against the live NPI API |
+| `docker compose down` | **pass** — containers and network removed cleanly |
+
+The earlier "blocked" rows below refer to the build container's egress policy
+only; they are superseded.
+
+## Earlier attempt, in short
 
 **The stack could not be brought up in the build container, so the smoke tests
-were not run here.** The Docker daemon runs and compose resolves the
+were not run there.** The Docker daemon runs and compose resolves the
 configuration, but no image can be pulled: the Docker Hub layer CDN is refused
-by this environment's egress policy. Two genuine gaps were found and fixed by
-inspection and offline validation; the runbook below is what to execute on a
-host that can pull images.
+by that environment's egress policy. Two genuine gaps were found and fixed by
+inspection and offline validation; the runbook below is retained as a
+reference.
 
 ## What was validated here
 
