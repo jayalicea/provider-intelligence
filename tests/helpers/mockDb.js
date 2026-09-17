@@ -10,6 +10,7 @@ const exclusions = [];       // oig_exclusions rows
 const taxonomyCodes = new Map(); // taxonomy_codes rows, keyed by code
 const stateExclusions = []; // state_exclusions rows
 const apiUsage = [];        // api_usage metering rows
+const apiKeys = new Map();  // label -> api_keys row
 let quality = [];            // quality_measures rows
 
 function reset() {
@@ -20,6 +21,7 @@ function reset() {
   taxonomyCodes.clear();
   stateExclusions.length = 0;
   apiUsage.length = 0;
+  apiKeys.clear();
   quality = [];
   failCacheWrite = false;
   queryLog.length = 0;
@@ -548,6 +550,42 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
+  // --- api_keys (tests/apikeys.test.js) --------------------------------------
+
+  // Startup load: active keys only, revoked rows excluded.
+  if (/^SELECT key_hash, label FROM api_keys WHERE revoked_at IS NULL$/.test(sql)) {
+    const rows = [...apiKeys.values()]
+      .filter(r => r.revoked_at === null || r.revoked_at === undefined)
+      .map(r => ({ key_hash: r.key_hash, label: r.label }));
+    return { rows, rowCount: rows.length };
+  }
+
+  if (/^INSERT INTO api_keys \(key_hash, label\) VALUES \(\$1, \$2\)$/.test(sql)) {
+    const [keyHash, label] = params;
+    for (const row of apiKeys.values()) {
+      if (row.key_hash === keyHash) throw new Error('mockDb: duplicate key_hash');
+    }
+    apiKeys.set(String(label), {
+      key_hash: keyHash,
+      label: String(label),
+      created_at: new Date(),
+      revoked_at: null
+    });
+    return { rows: [], rowCount: 1 };
+  }
+
+  if (/^UPDATE api_keys SET revoked_at = now\(\) WHERE label = \$1/.test(sql)) {
+    const row = apiKeys.get(String(params[0]));
+    if (!row || row.revoked_at !== null) return { rows: [], rowCount: 0 };
+    row.revoked_at = new Date();
+    return { rows: [], rowCount: 1 };
+  }
+
+  if (/^SELECT label, created_at, revoked_at FROM api_keys ORDER BY created_at ASC$/.test(sql)) {
+    const rows = [...apiKeys.values()].map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   // --- api_usage metering (tests/apikeys.test.js) ----------------------------
 
   if (/^INSERT INTO api_usage \(key_label, endpoint, method, status\) VALUES \(\$1, \$2, \$3, \$4\)$/.test(sql)) {
@@ -634,7 +672,8 @@ module.exports = {
     exclusions,
     stateExclusions,
     queryLog,
-    apiUsage
+    apiUsage,
+    apiKeys
   },
   _reset: reset
 };

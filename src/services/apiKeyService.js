@@ -3,12 +3,14 @@ const db = require('../config/database');
 const { logger } = require('../utils/logger');
 
 /**
- * Env-seeded API key set (Package C, single-operator bootstrap).
+ * API key set (Package C).
  *
- * There is no key-management UI yet, so keys come from the API_KEYS env var
- * as comma-separated `label:key` pairs, loaded once at startup into memory.
- * Lookup compares SHA-256 digests with a constant-time comparison so key
- * material never sits in a plain-object map keyed by the raw secret.
+ * At startup the active (non-revoked) rows of the api_keys table are loaded
+ * into memory by loadFromDatabase(); if the table is unreadable or missing,
+ * the service falls back to keys from the API_KEYS env var (comma-separated
+ * `label:key` pairs). Lookup compares SHA-256 digests with a constant-time
+ * comparison so key material never sits in a plain-object map keyed by the
+ * raw secret, and never queries the database per request.
  *
  * Format: API_KEYS="billing:secret-one,partner:secret-two"
  */
@@ -39,8 +41,38 @@ function timingSafeEqualHex(a, b) {
 }
 
 class ApiKeyService {
-  constructor(index = keyIndex) {
+  constructor(index = parseEnvKeys(process.env.API_KEYS)) {
     this.index = index;
+    this.source = 'env';
+  }
+
+  /** Reload the in-memory set from the API_KEYS env var. */
+  useEnvKeys() {
+    this.index = parseEnvKeys(process.env.API_KEYS);
+    this.source = 'env';
+  }
+
+  /**
+   * Replace the in-memory key set with the active rows of the api_keys table.
+   * Revoked rows (revoked_at set) are excluded. On any database error the
+   * env-seeded set is kept and a warning is logged, so a missing table or a
+   * DB outage never takes down authentication.
+   */
+  async loadFromDatabase() {
+    try {
+      const { rows } = await db.query(
+        'SELECT key_hash, label FROM api_keys WHERE revoked_at IS NULL'
+      );
+      const index = new Map();
+      for (const row of rows) {
+        if (row.key_hash && row.label) index.set(String(row.key_hash), String(row.label));
+      }
+      this.index = index;
+      this.source = 'database';
+      logger.info(`apiKeyService: loaded ${index.size} active key(s) from api_keys`);
+    } catch (error) {
+      logger.warn(`apiKeyService: api_keys unreadable (${error.message}); using API_KEYS env keys`);
+    }
   }
 
   configured() {
@@ -109,3 +141,6 @@ class ApiKeyService {
 }
 
 module.exports = ApiKeyService;
+// Shared instance so the auth middleware and the admin controller agree on
+// the same in-memory key set.
+module.exports.shared = new ApiKeyService(keyIndex);

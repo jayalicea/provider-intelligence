@@ -6,6 +6,7 @@ const compression = require('compression');
 const { logger } = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
+const apiKeyService = require('./services/apiKeyService').shared;
 const providerRoutes = require('./routes/providerRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const intelligenceRoutes = require('./routes/intelligenceRoutes');
@@ -85,7 +86,6 @@ class App {
           '/providers/:npi/mips-performance': 'Get MIPS performance data',
           '/providers/:npi/mips-trends': 'Get MIPS performance trends over time',
           '/quality-measures/:facilityId': 'Get quality measures for a facility',
-          '/bulk-data': 'Bulk provider and MIPS data retrieval',
           '/analytics/group-performance': 'Group MIPS statistics for a set of NPIs',
           '/analytics/ranking/:npi': 'Provider rank/percentile vs peers, optionally by taxonomy',
           '/analytics/trends/:npi': 'Multi-year MIPS scores with trend analysis',
@@ -122,6 +122,9 @@ class App {
   }
 
   start(port = process.env.PORT || 3000) {
+    // Load active api_keys rows into memory; on failure the service keeps
+    // serving from the API_KEYS env set.
+    apiKeyService.loadFromDatabase();
     const server = this.app.listen(port, () => {
       logger.info(`Server started on port ${port}`);
     });

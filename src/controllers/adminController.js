@@ -1,6 +1,6 @@
 const ApiKeyService = require('../services/apiKeyService');
 
-const apiKeyService = new ApiKeyService();
+const apiKeyService = ApiKeyService.shared;
 
 class AdminController {
   /**
