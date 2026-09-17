@@ -1,7 +1,9 @@
 # Method Statement: Provider Exclusion Screening (Package B v1)
 
-Effective date: 2026-09-12. This statement ships with every screening
-deliverable produced by the Provider Intelligence Platform.
+Effective date: 2026-09-12. Revised 2026-09-14 to add the state Medicaid
+exclusion lists, which `src/services/exclusionService.js` now screens against
+alongside the LEIE. This statement ships with every screening deliverable
+produced by the Provider Intelligence Platform.
 
 ## Sources used
 
@@ -10,6 +12,15 @@ deliverable produced by the Provider Intelligence Platform.
   Health and Human Services Office of Inspector General. Local snapshot:
   84,001 rows loaded 2026-09-12; every value carries `source` (UPDATED.csv)
   and `as_of` (2026-09-12) provenance.
+- **State Medicaid exclusion lists**, 82,929 rows across **38 of 51
+  jurisdictions** (50 states plus the District of Columbia), loaded
+  2026-09-13. Each row carries its jurisdiction, the official `source_name`
+  and `source_url`, an `as_of` date set by the publishing state rather than
+  by the load, and a `leie_overlap` flag set when the same identity also
+  appears on the federal list. The lists are sourced via the OpenSanctions
+  public mirror of official state lists, not extracted from each state
+  directly; a deliverable built on this source is for evaluation and internal
+  screening, not for redistribution. See `docs/adr/0004-open-sanctions-state-lists.md`.
 - **NPI Registry (NIH Clinical Tables)**, used only for provider identity
   (name, credential, taxonomy, practice address). Identity values come from
   the platform's local cache of NPI Registry responses; each carries its
@@ -59,6 +70,15 @@ deliverable produced by the Provider Intelligence Platform.
   unchanged (`dobStatus: not_provided`). Name matches without a DOB check
   can still coincide with a different individual sharing the same name and
   state; NPI matches do not have this weakness.
+- **Thirteen jurisdictions have no state-level coverage.** A provider
+  excluded only by one of those states returns CLEAR against the state lists,
+  because no list for that jurisdiction was identified as publicly available.
+  Coverage is reported per jurisdiction rather than as a single national
+  claim.
+- **State list freshness is uneven and not controlled by this platform.**
+  Each state publishes on its own schedule, so one state's `as_of` can be
+  materially older than another's, and older than the LEIE snapshot beside
+  it. Every row carries its own date for exactly this reason.
 - **CLEAR means "no record in these sources as of the as-of date."** It is
   not a certification that a provider has never been, or will never be,
   excluded.

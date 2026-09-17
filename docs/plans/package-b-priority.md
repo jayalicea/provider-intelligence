@@ -1,6 +1,8 @@
 # Package B Priority Plan: Screening List Build
 
-Status: prioritized 2026-09-12 over Packages A and C.
+Status: prioritized 2026-09-12 over Packages A and C. Build sequence steps 1
+through 4 were completed on 2026-09-12 and 2026-09-13; the file names below
+are corrected to what was actually built.
 Reason: durable signals (exclusions, licenses) outlast MIPS; does not depend on the
 sunsetting MIPS program; tonight's MIPS-first seeding already feeds the demo story;
 smallest gap between current platform and a sellable artifact.
@@ -17,17 +19,23 @@ Out of scope for v1: license status (add-on later), monitoring over time, API ac
 
 ## Build sequence (this week, evenings and weekend)
 
-1. LEIE ingest. OIG publishes the LEIE as a monthly downloadable file
-   (OIG website, public, no key). Build tools/fetch-leie.ps1: download, parse,
-   load into a new oig_exclusions table keyed on NPI where present, with
-   source and as-of date columns. Scheduled refresh, not an HTTP endpoint.
-2. Screening script. tools/screen-roster.ps1 (or a small node script using the
-   project pg pool): reads a client roster CSV, matches on NPI first, falls back
-   to name plus state only when NPI is missing, prefers a miss over a false
-   clear, writes the flagged CSV with provenance columns.
+1. LEIE ingest. **Done.** OIG publishes the LEIE as a monthly downloadable
+   file (OIG website, public, no key). Built as `tools/leie-ingest.ps1`, not
+   the `tools/fetch-leie.ps1` name planned here: download, parse, load into
+   `oig_exclusions` keyed on NPI where present, with source and as-of date
+   columns. `tools/monthly-leie-refresh.ps1` runs the scheduled refresh. Not
+   an HTTP endpoint.
+2. Screening script. **Done.** Built as `tools/screen-roster.js`, a node
+   script using the project pg pool, not the `tools/screen-roster.ps1` name
+   planned here. Matches on NPI first, falls back to name plus state only when
+   NPI is missing, prefers a miss over a false clear, writes the flagged CSV
+   with provenance columns. The same logic is exposed at
+   `POST /api/v1/intelligence/screen-roster` and now also screens against the
+   state Medicaid exclusion lists, which this plan predates.
 3. Self-test. OIG publishes known excluded individuals; verify the matcher flags
    them by NPI and by name-fallback. Record results in the method statement.
-4. Method statement (one page, ships with every deliverable): sources used,
+4. Method statement. **Done**, at `docs/method-statement.md` (one page, ships
+   with every deliverable): sources used,
    as-of dates, match logic, known limitations, and the exact sentence:
    "This report states what public sources published as of the dates shown.
    It does not certify any provider's status."

@@ -1,5 +1,9 @@
 # Kimi Code Prompt Runbook
 
+Status as of 2026-09-14: Prompts A through E have all been run. The execution
+record for Prompt A is `SUMMARY.md` at the repository root. Every reference
+file listed at the end of this runbook still exists at the path given.
+
 How to use this file: each prompt below is meant to be pasted into a fresh Kimi Code session, in the order listed. Session settings for every run: model K2.8 Preview, thinking low, approvals auto (Never Ask). Probe quota first: kimi -p "Reply with exactly: QUOTA OK". Never run two sessions on this repo at once.
 
 ---
@@ -105,3 +109,9 @@ Reference files this runbook assumes in the repo:
 - docs/plans/gtm-productized-services.md (this file's companion, commit it with this one)
 - docs/plans/productized-services.md and docs/plans/verification-product.md (Claude's source prompts, save them here too)
 - docs/DESIGN.md and docs/mockup/dashboard-mockup.html (design system and visual mockup, Prompt A Phase 3 design authority)
+- docs/adr/ (the decision records behind the cache, the loaders and the
+  exclusion sources)
+
+Where a prompt above cites `phynpi.md`, treat CORRECTIONS.md at the repository
+root as the correction layer: `phynpi.md` is the original design document and
+is known to be wrong on endpoints, response shapes and dataset IDs.

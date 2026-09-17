@@ -79,8 +79,16 @@ Voice rules: concise, direct, operational, no hype, no em-dashes. Sell curiosity
 
 ## 6. Proof page outline (one page)
 
+Note on item 2, as of 2026-09-14: the `detail.png`, `mips.png` and
+`quality.png` screenshots this outline planned to reuse were deleted in the
+final cleanup of the Prompt A session and were never committed, so a proof page
+built from this outline needs fresh redacted captures rather than a file
+already in the repository.
+
 1. Headline: "Provider data with a paper trail."
-2. Three redacted screenshots of the running dashboard (reuse detail.png, mips.png, quality.png after repo cleanup).
+2. Three redacted screenshots of the running dashboard (recapture as
+   detail.png, mips.png, quality.png; the originals were deleted in the repo
+   cleanup and were never committed).
 3. One sample row showing every field with source and as-of date (discipline from GOVERNMENT_API_REFERENCE.md).
 4. Headers/excerpts of CODE_REVIEW.md and SECURITY_REVIEW.md as QA evidence.
 5. "Built entirely on public CMS and NIH data. No PHI handled. BAA available for scoped engagements."
@@ -93,7 +101,7 @@ Voice rules: concise, direct, operational, no hype, no em-dashes. Sell curiosity
 - Day 3 (2h, evening): send 3 emails; log statuses.
 - Day 4 (2h, evening): 2 more emails + 3 LinkedIn connection notes.
 - Day 5 (3h, weekend): polish proof page, wire calendar link, reply same-day to responses.
-- Day 6 (3h, weekend): start the OIG LEIE ingest build (public monthly flat file; fastest path to Package B existing).
+- Day 6 (3h, weekend): start the OIG LEIE ingest build (public monthly flat file; fastest path to Package B existing). **Done 2026-09-12**, and extended on 2026-09-13 with 38 state Medicaid exclusion lists; see `docs/method-statement.md`.
 - Day 7 (2h, weekend): book first discovery call, target on or before 2026-09-26.
 
 ## Honest expectations
