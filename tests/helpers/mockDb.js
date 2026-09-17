@@ -22,6 +22,7 @@ function reset() {
   apiUsage.length = 0;
   quality = [];
   failCacheWrite = false;
+  queryLog.length = 0;
 }
 
 const norm = sql => sql.replace(/\s+/g, ' ').trim();
@@ -79,8 +80,11 @@ function groupStats(rows) {
   return out;
 }
 
+const queryLog = [];
+
 async function query(text, params = []) {
   const sql = norm(text);
+  queryLog.push(sql);
 
   if (/^SELECT \* FROM providers WHERE npi = \$1$/.test(sql)) {
     const row = providers.get(String(params[0]));
@@ -468,6 +472,33 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
+  // Batched cohort passes: NPI against each registry, then one name-keyed pass.
+  if (/^SELECT \* FROM state_exclusions WHERE npi = ANY\(\$1\)$/.test(sql)) {
+    const wanted = new Set((params[0] || []).map(String));
+    const rows = stateExclusions.filter(r => wanted.has(String(r.npi))).map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  if (/^SELECT \* FROM oig_exclusions WHERE upper\(regexp_replace\(lastname, .* = ANY\(\$1\) AND upper\(state\) = ANY\(\$2\)$/.test(sql)) {
+    const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    const names = new Set(params[0] || []);
+    const states = new Set(params[1] || []);
+    const rows = exclusions
+      .filter(r => names.has(norm(r.lastname)) && states.has(norm(r.state)))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  if (/^SELECT \* FROM state_exclusions WHERE upper\(regexp_replace\(entity_name, .* = ANY\(\$1\) AND upper\(state\) = ANY\(\$2\)$/.test(sql)) {
+    const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9 ,]/g, '').replace(/\s+/g, ' ').trim();
+    const names = new Set(params[0] || []);
+    const states = new Set(params[1] || []);
+    const rows = stateExclusions
+      .filter(r => names.has(norm(r.entity_name)) && states.has(String(r.state || '').toUpperCase()))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   // state_exclusions: NPI exact match
   if (/^SELECT \* FROM state_exclusions WHERE npi = \$1$/.test(sql)) {
     const rows = stateExclusions.filter(r => r.npi === params[0]).map(r => ({ ...r }));
@@ -602,6 +633,7 @@ module.exports = {
     taxonomyCodes,
     exclusions,
     stateExclusions,
+    queryLog,
     apiUsage
   },
   _reset: reset

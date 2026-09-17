@@ -665,3 +665,143 @@ describe('POST /api/v1/intelligence/screen-roster', () => {
     expect(res.body.error).toMatch(/1000 row limit/);
   });
 });
+
+// --- cohort batching parity ------------------------------------------------
+
+// The batched scan must agree with resolveExclusion, the single-row
+// authority, on the same fixture. This is the parity that matters: the
+// cohort's verdict for a provider should be the verdict Provider 360 shows.
+describe('cohort exclusion scan parity with resolveExclusion', () => {
+  const ExclusionService = require('../src/services/exclusionService');
+
+  function seedCohortProvider({ npi, first, last, state = 'CA' }) {
+    mockDb._stores.providers.set(String(npi), {
+      npi: String(npi),
+      enumeration_type: 'Individual',
+      name_first: first, name_middle: '', name_last: last,
+      name_full: `${last}, ${first}`, name_credential: 'MD',
+      provider_type: 'Internal Medicine',
+      primary_taxonomy_code: '207R00000X',
+      primary_taxonomy_description: 'Internal Medicine',
+      practice_address_line1: '1 WAY', practice_city: 'FRESNO',
+      practice_state: state, practice_zipcode: '93720', practice_phone: '5595551212',
+      sync_timestamp: new Date()
+    });
+  }
+
+  function seedLeie(overrides) {
+    mockDb._stores.exclusions.push({
+      lastname: '', firstname: '', midname: '', busname: '', npi: null,
+      specialty: '', state: 'CA', excltype: '1128b4', excldate: '20250120',
+      reindate: null, dob: null, source: 'UPDATED.csv', as_of: '2026-09-12',
+      display_name: '', ...overrides
+    });
+  }
+
+  function seedState(overrides) {
+    mockDb._stores.stateExclusions.push({
+      state: 'CA',
+      source_name: 'CA DHCS Medi-Cal Suspended and Ineligible Provider List',
+      source_url: 'https://files.medi-cal.ca.gov/s.pdf',
+      entity_name: '', npi: null, exclusion_type: 'Suspension',
+      exclusion_date: '2025-06-02', reinstatement_date: null,
+      as_of: '2026-09-13', leie_overlap: false, ...overrides
+    });
+  }
+
+  test('every cohort verdict matches the single-row resolver', async () => {
+    // Clean, LEIE hit by NPI, state hit by NPI, reinstated, and an invalid
+    // NPI that only the name pass can decide.
+    seedCohortProvider({ npi: '1366446619', first: 'CLEAN', last: 'CASE' });
+    seedCohortProvider({ npi: '1760461826', first: 'FED', last: 'HIT' });
+    seedLeie({ npi: '1760461826', lastname: 'HIT', firstname: 'FED' });
+    seedCohortProvider({ npi: '1982736450', first: 'STATE', last: 'HIT' });
+    seedState({ npi: '1982736450', entity_name: 'HIT, STATE' });
+    seedCohortProvider({ npi: '1043566999', first: 'LIFTED', last: 'CASE' });
+    seedLeie({ npi: '1043566999', lastname: 'CASE', firstname: 'LIFTED', reindate: '20260301' });
+    seedCohortProvider({ npi: 'not-an-npi', first: 'NAMED', last: 'MATCH' });
+    seedLeie({ lastname: 'MATCH', firstname: 'NAMED', state: 'CA' });
+
+    const res = await request(app).get('/api/v1/intelligence/cohort').query({ state: 'CA' });
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(5);
+
+    const service = new ExclusionService();
+    for (const row of res.body.data) {
+      const single = await service.resolveExclusion({
+        npi: row.npi,
+        lastname: row.name.split(', ')[0],
+        firstname: row.name.split(', ')[1],
+        state: row.state,
+        dob: null
+      });
+      expect({ npi: row.npi, verdict: row.exclusion.verdict })
+        .toEqual({ npi: row.npi, verdict: single.verdict });
+      expect(row.exclusion.match).toBe(single.match);
+      expect(row.exclusion.dobStatus ?? null).toBe(single.dobStatus ?? null);
+      if (single.exclusion) {
+        expect(row.exclusion.exclusion.registry).toBe(single.exclusion.registry);
+        expect(row.exclusion.exclusion.asOf).toBe(single.exclusion.asOf);
+      } else {
+        expect(row.exclusion.exclusion).toBeNull();
+      }
+    }
+  });
+
+  test('a state-list hit is no longer invisible to the cohort', async () => {
+    seedCohortProvider({ npi: '1982736450', first: 'STATE', last: 'HIT' });
+    seedState({ npi: '1982736450', entity_name: 'HIT, STATE' });
+
+    const res = await request(app).get('/api/v1/intelligence/cohort').query({ state: 'CA' });
+
+    expect(res.body.data[0].exclusion.verdict).toBe('EXCLUDED');
+    expect(res.body.data[0].exclusion.exclusion.registry).toBe('STATE');
+    expect(res.body.data[0].exclusion.exclusion.sourceName).toMatch(/DHCS/);
+  });
+
+  test('a federal hit stays cited when both registries fire', async () => {
+    seedCohortProvider({ npi: '1760461826', first: 'BOTH', last: 'HIT' });
+    seedLeie({ npi: '1760461826', lastname: 'HIT', firstname: 'BOTH' });
+    seedState({ npi: '1760461826', entity_name: 'HIT, BOTH' });
+
+    const res = await request(app).get('/api/v1/intelligence/cohort').query({ state: 'CA' });
+
+    expect(res.body.data[0].exclusion.exclusion.registry).toBe('LEIE');
+    expect(res.body.data[0].exclusion.stateExclusion.registry).toBe('STATE');
+  });
+
+  test('the response shape is unchanged for a clean row', async () => {
+    seedCohortProvider({ npi: '1366446619', first: 'CLEAN', last: 'CASE' });
+
+    const res = await request(app).get('/api/v1/intelligence/cohort').query({ state: 'CA' });
+    const row = res.body.data[0];
+
+    expect(Object.keys(row).sort()).toEqual(
+      ['city', 'exclusion', 'finalScore', 'name', 'npi', 'provenance', 'state', 'taxonomy'].sort()
+    );
+    expect(Object.keys(row.provenance).sort())
+      .toEqual(['exclusionAsOf', 'identityAsOf', 'mipsAsOf'].sort());
+  });
+
+  test('the scan issues a fixed number of queries regardless of cohort size', async () => {
+    for (let i = 0; i < 5; i++) {
+      seedCohortProvider({ npi: String(1400000000 + i), first: 'A', last: `B${i}` });
+    }
+    mockDb._stores.queryLog.length = 0;
+    await request(app).get('/api/v1/intelligence/cohort').query({ state: 'CA' });
+    const small = mockDb._stores.queryLog.length;
+
+    for (let i = 5; i < 60; i++) {
+      seedCohortProvider({ npi: String(1400000000 + i), first: 'A', last: `B${i}` });
+    }
+    mockDb._stores.queryLog.length = 0;
+    const res = await request(app).get('/api/v1/intelligence/cohort').query({ state: 'CA' });
+    const large = mockDb._stores.queryLog.length;
+
+    expect(res.body.count).toBe(60);
+    // Twelve times the rows, the same number of round-trips. Resolving per row
+    // would cost at least two queries each.
+    expect(large).toBe(small);
+    expect(large).toBeLessThanOrEqual(5);
+  });
+});

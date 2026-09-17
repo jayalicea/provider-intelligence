@@ -5,7 +5,11 @@ const {
   isValidNpi,
   formatAsOf,
   formatLeieDate,
-  stateExclusionPayload
+  normalize,
+  isReinstated,
+  stateRowIsActive,
+  stateExclusionPayload,
+  nameVariants
 } = require('./exclusionService');
 
 // Watchlist window bounds, shared with the controller's validation.
@@ -84,46 +88,194 @@ class IntelligenceService {
       const result = await db.query(query, params);
       const rows = result.rows;
 
-      // Batch the exclusion scan: one query for every candidate NPI, plus
-      // one for the table-wide as_of used as provenance on CLEAR-by-scan rows.
+      // Batch the exclusion scan. Five queries total, whatever the row count:
+      // the cohort itself, an NPI pass against each registry, the table-wide
+      // as_of used as provenance on CLEAR-by-scan rows, and one name-keyed
+      // pass covering both registries for rows the NPI pass cannot decide.
+      // Resolving per row instead would cost at least two queries per row.
       const npis = rows.map(r => String(r.npi));
-      const [exclusionResult, maxAsOfResult] = await Promise.all([
-        db.query('SELECT * FROM oig_exclusions WHERE npi = ANY($1)', [npis]),
-        db.query('SELECT max(as_of) AS as_of FROM oig_exclusions')
-      ]);
+
+      // Name keys are only needed for rows without a usable NPI -- an NPI match
+      // is definitive, exactly as in resolveExclusion, so a row with a valid
+      // NPI never reaches the name pass.
+      const nameRows = rows.filter(r => !isValidNpi(String(r.npi)));
+      const lastNames = [...new Set(nameRows.map(r => normalize(r.name_last)).filter(Boolean))];
+      const states = [...new Set(nameRows.map(r => normalize(r.practice_state)).filter(Boolean))];
+      const entityNames = [...new Set(
+        nameRows.flatMap(r => nameVariants(r.name_last, r.name_first))
+      )];
+
+      const [exclusionResult, stateResult, maxAsOfResult, nameResult, stateNameResult] =
+        await Promise.all([
+          db.query('SELECT * FROM oig_exclusions WHERE npi = ANY($1)', [npis]),
+          db.query('SELECT * FROM state_exclusions WHERE npi = ANY($1)', [npis]),
+          db.query('SELECT max(as_of) AS as_of FROM oig_exclusions'),
+          lastNames.length && states.length
+            ? db.query(
+              "SELECT * FROM oig_exclusions WHERE upper(regexp_replace(lastname, '[^A-Z0-9 ]', '', 'g')) = ANY($1) AND upper(state) = ANY($2)",
+              [lastNames, states]
+            )
+            : Promise.resolve({ rows: [] }),
+          entityNames.length && states.length
+            ? db.query(
+              "SELECT * FROM state_exclusions WHERE upper(regexp_replace(entity_name, '[^A-Z0-9 ,]', '', 'g')) = ANY($1) AND upper(state) = ANY($2)",
+              [entityNames, states]
+            )
+            : Promise.resolve({ rows: [] })
+        ]);
+
       const defaultAsOf = maxAsOfResult.rows[0]
         ? formatAsOf(maxAsOfResult.rows[0].as_of)
         : null;
 
-      const byNpi = new Map();
-      for (const row of exclusionResult.rows || []) {
-        const key = String(row.npi);
-        if (!byNpi.has(key)) byNpi.set(key, []);
-        byNpi.get(key).push(row);
-      }
+      const groupBy = (result, keyOf) => {
+        const map = new Map();
+        for (const row of result.rows || []) {
+          const key = keyOf(row);
+          if (key === null) continue;
+          if (!map.has(key)) map.set(key, []);
+          map.get(key).push(row);
+        }
+        return map;
+      };
+
+      const byNpi = groupBy(exclusionResult, r => String(r.npi));
+      const stateByNpi = groupBy(stateResult, r => String(r.npi));
+      const leieByName = groupBy(nameResult, r => {
+        const last = normalize(r.lastname);
+        const first = normalize(r.firstname);
+        const state = normalize(r.state);
+        return last && first && state ? `${last}|${first}|${state}` : null;
+      });
+      const stateByName = groupBy(stateNameResult, r => {
+        const name = normalize(r.entity_name);
+        const state = normalize(r.state);
+        return name && state ? `${name}|${state}` : null;
+      });
+
+      // Mirrors the state branch of resolveExclusion for one grouped row set.
+      const stateVerdict = matches => {
+        const active = (matches || []).find(stateRowIsActive);
+        if (active) return { verdict: 'EXCLUDED', payload: stateExclusionPayload(active) };
+        return { verdict: 'CLEAR', payload: null };
+      };
 
       return rows.map(row => {
         const npi = String(row.npi);
         let exclusion;
         let exclusionAsOf = defaultAsOf;
 
-        if (!isValidNpi(npi)) {
-          exclusion = {
-            verdict: 'UNVERIFIED',
-            match: null,
-            dobStatus: null,
-            exclusion: null,
-            reinstated: null,
-            notes: [`NPI "${npi}" is not a usable 10-digit NPI; exclusion status could not be verified.`]
-          };
-        } else {
+        if (isValidNpi(npi)) {
+          // NPI pass. Definitive, so the name pass is never consulted here.
           const matches = byNpi.get(npi) || [];
           const active = matches.find(r => !isReinstatedRow(r));
           const chosen = active || matches[0] || null;
-          exclusion = verdictFromNpiRow(chosen, []);
-          if (chosen) exclusionAsOf = exclusion.exclusion
-            ? exclusion.exclusion.asOf
-            : (exclusion.reinstated ? exclusion.reinstated.asOf : defaultAsOf);
+          const leie = verdictFromNpiRow(chosen, []);
+          const state = stateVerdict(stateByNpi.get(npi));
+
+          if (leie.verdict === 'EXCLUDED') {
+            exclusion = { ...leie, stateExclusion: state.payload };
+          } else if (state.verdict === 'EXCLUDED') {
+            exclusion = {
+              verdict: 'EXCLUDED',
+              match: 'npi',
+              dobStatus: null,
+              exclusion: state.payload,
+              stateExclusion: state.payload,
+              reinstated: null,
+              notes: [`Matched by NPI on the ${state.payload.sourceName || 'state'} exclusion list.`]
+            };
+          } else {
+            exclusion = { ...leie, stateExclusion: null };
+          }
+
+          const cited = exclusion.exclusion || exclusion.reinstated;
+          if (cited) exclusionAsOf = cited.asOf || defaultAsOf;
+        } else {
+          // Name-keyed pass: the cohort carries no date of birth, so a match
+          // here reports dobStatus 'not_provided', the same value
+          // resolveExclusion returns when no DOB was supplied.
+          const last = normalize(row.name_last);
+          const first = normalize(row.name_first);
+          const state = normalize(row.practice_state);
+
+          if (!last || !first || !state) {
+            exclusion = {
+              verdict: 'UNVERIFIED',
+              match: null,
+              dobStatus: null,
+              exclusion: null,
+              stateExclusion: null,
+              reinstated: null,
+              notes: [`NPI "${npi}" is not a usable 10-digit NPI, and no usable name and state were cached, so exclusion status could not be verified.`]
+            };
+          } else {
+            const leieMatches = leieByName.get(`${last}|${first}|${state}`) || [];
+            const leieActive = leieMatches.find(r => !isReinstated(r));
+            const stateMatches = nameVariants(row.name_last, row.name_first)
+              .flatMap(v => stateByName.get(`${v}|${state}`) || []);
+            const stateHit = stateVerdict(stateMatches);
+
+            if (leieActive) {
+              exclusion = {
+                verdict: 'EXCLUDED',
+                match: 'name_state',
+                dobStatus: 'not_provided',
+                exclusion: {
+                  registry: 'LEIE',
+                  type: leieActive.excltype,
+                  date: formatLeieDate(leieActive.excldate),
+                  source: leieActive.source,
+                  asOf: formatAsOf(leieActive.as_of)
+                },
+                stateExclusion: stateHit.payload,
+                reinstated: null,
+                notes: []
+              };
+            } else if (stateHit.verdict === 'EXCLUDED') {
+              exclusion = {
+                verdict: 'EXCLUDED',
+                match: 'name_state',
+                dobStatus: 'unavailable',
+                exclusion: stateHit.payload,
+                stateExclusion: stateHit.payload,
+                reinstated: null,
+                notes: ['Matched by name and state on the ' +
+                  `${stateHit.payload.sourceName || 'state'} exclusion list. State ` +
+                  'lists carry no date of birth, so the identity could not be ' +
+                  'DOB-confirmed.']
+              };
+            } else if (leieMatches.length) {
+              exclusion = {
+                verdict: 'CLEAR',
+                match: 'name_state',
+                dobStatus: null,
+                exclusion: null,
+                stateExclusion: null,
+                reinstated: {
+                  date: formatLeieDate(leieMatches[0].reindate),
+                  source: leieMatches[0].source,
+                  asOf: formatAsOf(leieMatches[0].as_of)
+                },
+                notes: ['A prior exclusion record matched by name and state, ' +
+                  'but it has been reinstated; treated as clear as of the ' +
+                  'reinstatement date shown.']
+              };
+            } else {
+              exclusion = {
+                verdict: 'CLEAR',
+                match: 'name_state',
+                dobStatus: null,
+                exclusion: null,
+                stateExclusion: null,
+                reinstated: null,
+                notes: ['No exclusion record found for this name and state in the LEIE.']
+              };
+            }
+
+            const cited = exclusion.exclusion || exclusion.reinstated;
+            if (cited) exclusionAsOf = cited.asOf || defaultAsOf;
+          }
         }
 
         return {

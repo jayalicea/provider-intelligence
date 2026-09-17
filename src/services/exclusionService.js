@@ -442,4 +442,10 @@ module.exports.verdictFromNpiRow = verdictFromNpiRow;
 module.exports.isValidNpi = isValidNpi;
 module.exports.formatAsOf = formatAsOf;
 module.exports.formatLeieDate = formatLeieDate;
+// Shared with the batched cohort scan so the two paths cannot drift apart.
+module.exports.normalize = normalize;
+module.exports.isReinstated = isReinstated;
+module.exports.stateRowIsActive = stateRowIsActive;
 module.exports.stateExclusionPayload = stateExclusionPayload;
+module.exports.nameVariants = nameVariants;
+module.exports.formatStateDate = formatStateDate;
