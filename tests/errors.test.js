@@ -2,14 +2,13 @@ process.env.LOG_LEVEL = 'error';
 process.env.DB_PASSWORD = 'test';
 
 const request = require('supertest');
-const nock = require('nock');
 
 jest.mock('../src/config/database', () => require('./helpers/mockDb'));
 
 const mockDb = require('./helpers/mockDb');
 const {
   isolateNet, resetNet,
-  npiEnvelope, MIPS_ROW, QM_ROWS,
+  npiEnvelope,
   mockNpiSearch, mockMipsData, mockDatastore
 } = require('./helpers/apiMocks');
 

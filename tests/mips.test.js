@@ -3,7 +3,6 @@ process.env.DB_PASSWORD = 'test';
 process.env.API_KEYS = 'ci-test:ci-secret';
 
 const request = require('supertest');
-const nock = require('nock');
 
 jest.mock('../src/config/database', () => require('./helpers/mockDb'));
 

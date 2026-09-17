@@ -154,7 +154,6 @@ class ExclusionService {
    */
   async resolveLeieExclusion({ npi = null, lastname = null, firstname = null, state = null, dob = null } = {}) {
     const notes = [];
-    const identity = { npi, lastname, firstname, state, dob };
 
     try {
       // 1. NPI exact match (only when a syntactically valid NPI is given).

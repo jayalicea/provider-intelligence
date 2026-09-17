@@ -85,7 +85,7 @@ function describe(row) {
 function parseNuccCsv(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
   if (!lines.length) return [];
-  const header = parseLine(lines[0].replace(/^﻿/, ''))
+  const header = parseLine(lines[0].replace(/^\uFEFF/, ''))
     .map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
   const at = name => header.indexOf(name);
   const idx = {
