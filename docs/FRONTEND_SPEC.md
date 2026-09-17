@@ -52,7 +52,6 @@ All endpoints are relative to the configured base URL. Response shapes marked **
 | GET | `/providers/:npi/mips-performance` | Latest-year MIPS data (CMS QPP Experience dataset) | UNVERIFIED |
 | GET | `/providers/:npi/mips-trends` | Multi-year MIPS trend records | UNVERIFIED |
 | GET | `/quality-measures/:facilityId` | Care Compare quality measure rows | UNVERIFIED |
-| POST | `/providers/bulk-data` | Bulk export/ingest | UNVERIFIED |
 
 ### Expected Response Shapes
 
@@ -399,8 +398,10 @@ getProvider(npi: string): Promise<ProviderDetail>                       // GET /
 getMipsPerformance(npi: string): Promise<MipsPerformance>               // GET /providers/:npi/mips-performance
 getMipsTrends(npi: string): Promise<MipsTrendRecord[]>                  // GET /providers/:npi/mips-trends
 getQualityMeasures(facilityId: string): Promise<QualityMeasure[]>       // GET /quality-measures/:facilityId
-postBulkData(payload: unknown): Promise<unknown>                        // POST /providers/bulk-data
 ```
+
+(The former `POST /providers/bulk-data` endpoint was removed from the API on
+2026-09-17 per `docs/SECURITY_REVIEW.md` P0-1; bulk loads are offline jobs.)
 
 ## 5. State Management Note
 
@@ -414,7 +415,9 @@ Rationale:
 
 Suggested query keys: `['providers', 'search', params]`, `['providers', npi]`, `['providers', npi, 'mips-performance']`, `['providers', npi, 'mips-trends']`, `['quality-measures', facilityId]`.
 
-The bulk endpoint (`POST /providers/bulk-data`) is a mutation, not a query; if an admin UI is added later, use a React Query mutation with optimistic-free, explicit success/error feedback. It has no page in this blueprint.
+The former bulk endpoint (`POST /providers/bulk-data`) was removed from the API
+on 2026-09-17 per `docs/SECURITY_REVIEW.md` P0-1; bulk loads are offline jobs,
+and no admin UI should be built for that endpoint.
 
 ## 6. Visual Style
 
@@ -449,8 +452,8 @@ Badge backgrounds use the base color at low opacity (e.g. 10-12% tint of success
 Items 1 through 4 were carried out before the client was built; the findings
 are in `client/ADOPTION_NOTES.md`. Item 5 was not, and remains open.
 
-1. ~~Confirm `GET /providers/search` response envelope (`results`, `total`, `page`, `limit`) against the live backend.~~ **Done, and the hypothesis was wrong**: the envelope is `{ success, data, count }` with no pagination fields, so the results table reports a count rather than "Page X of Y".
+1. ~~Confirm `GET /providers/search` response envelope (`results`, `total`, `page`, `limit`) against the live backend.~~ **Done**: the envelope is `{ success, data, count, total, offset, limit }` (added 2026-09-17). The results table shows "N of M matching providers" from `total`; full "Page X of Y" navigation controls were not built.
 2. ~~Confirm provider detail field names, especially address fields.~~ **Done.**
 3. ~~Confirm MIPS endpoints return camelCase keys normalized from the QPP Experience dataset.~~ **Done**, with the caveat that `mips-trends` returns parallel arrays rather than records and the client reshapes them.
 4. ~~Confirm quality measure field names and the exact set of `comparedToNational` strings and footnote codes present in data.~~ **Done, and the hypothesis was partly wrong**: live rows carry no `footnote` field at all, so the footnote column and its crosswalk tooltips specified in section 4.4 are not buildable against this endpoint.
-5. Confirm the `POST /providers/bulk-data` request/response contract before building any admin UI for it. **Still UNVERIFIED**, and note that `docs/SECURITY_REVIEW.md` P0-1 rates this endpoint the highest risk in the design; settle the authentication question before building a UI for it.
+5. ~~Confirm the `POST /providers/bulk-data` request/response contract~~ **Moot (2026-09-17)**: the endpoint was removed per `docs/SECURITY_REVIEW.md` P0-1, so no admin UI will be built for it.

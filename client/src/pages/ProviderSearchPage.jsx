@@ -89,6 +89,7 @@ export default function ProviderSearchPage() {
       ) : (
         <ProviderResultsTable
           results={results}
+          total={mipsOnly ? undefined : data?.total}
           loading={loading}
           error={error}
           onRetry={refetch}

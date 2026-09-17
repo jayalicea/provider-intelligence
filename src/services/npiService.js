@@ -56,9 +56,15 @@ class NpiService {
         params
       );
 
+      // Envelope element 0 is the upstream total match count; thread it
+      // through so callers can render "Page X of Y".
+      const total = Array.isArray(response) && Number.isFinite(response[0])
+        ? response[0]
+        : 0;
+
       const providers = this.transformNpiResponse(response);
       await this.annotateMipsAvailability(providers);
-      return providers;
+      return { total, providers };
     } catch (error) {
       logger.error('Error searching NPI registry:', error);
       throw new Error('Failed to search provider registry');

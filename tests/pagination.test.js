@@ -73,6 +73,11 @@ describe('search pagination (offset)', () => {
     expect(res2.status).toBe(200);
     expect(res1.body.data).toHaveLength(500);
     expect(res2.body.data).toHaveLength(500);
+    expect(res1.body.total).toBe(500);
+    expect(res2.body.total).toBe(500);
+    expect(res1.body.limit).toBe(500);
+    expect(res1.body.offset).toBe(0);
+    expect(res2.body.offset).toBe(500);
 
     const npis1 = new Set(res1.body.data.map(p => p.npi));
     const npis2 = new Set(res2.body.data.map(p => p.npi));

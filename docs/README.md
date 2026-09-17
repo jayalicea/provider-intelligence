@@ -195,7 +195,9 @@ server-side pagination.
 | GET | `/api/v1/providers/:npi/mips-performance` | Optional `year` query param, defaulting to last year. |
 | GET | `/api/v1/providers/:npi/mips-trends` | Optional `startYear` (default 2018) and `endYear`. |
 | GET | `/api/v1/providers/quality-measures/:facilityId` | Care Compare measures. Mounted on the **providers** router, not on a top-level `/quality-measures`. |
-| POST | `/api/v1/providers/bulk-data` | Bulk operation. Requires `X-API-Key` as of 2026-09-14; the wider concerns in `docs/SECURITY_REVIEW.md` P0-1 (quotas, row caps, schema validation per row) are still open. |
+
+(The former `POST /api/v1/providers/bulk-data` was removed on 2026-09-17 per
+`docs/SECURITY_REVIEW.md` P0-1; bulk loads are offline jobs.)
 
 ### Analytics routes (`src/routes/analyticsRoutes.js`)
 

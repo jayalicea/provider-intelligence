@@ -25,6 +25,7 @@ function SkeletonRows() {
 
 export default function ProviderResultsTable({
   results,
+  total,
   loading,
   error,
   onRetry,
@@ -77,7 +78,9 @@ export default function ProviderResultsTable({
       <p className="results-count">
         {loading
           ? 'Searching the NPI Registry…'
-          : `${results.length} providers · NIH NPI Registry, accessed ${new Date().toISOString().slice(0, 10)}`}
+          : total != null && total > results.length
+            ? `${results.length} of ${total} matching providers · NIH NPI Registry, accessed ${new Date().toISOString().slice(0, 10)}`
+            : `${results.length} providers · NIH NPI Registry, accessed ${new Date().toISOString().slice(0, 10)}`}
       </p>
     </div>
   )

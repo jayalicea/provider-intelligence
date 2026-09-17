@@ -19,10 +19,10 @@ paths:
         - { name: state, in: query, schema: { type: string, pattern: '^[A-Za-z]{2}$' } }
         - { name: city, in: query, schema: { type: string } }
         - { name: taxonomy, in: query, schema: { type: string } }
-        - { name: maxResults, in: query, schema: { type: integer, default: 50 } }
-        - { name: offset, in: query, schema: { type: integer, default: 0, minimum: 0 } }
+        - { name: maxResults, in: query, schema: { type: integer, default: 50, minimum: 1, maximum: 500 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0, minimum: 0 }, description: offset + maxResults must not exceed 7500 (upstream limit) }
       responses:
-        '200': { description: Matching providers, newest syncs first }
+        '200': { description: '{ success, data, count, total, offset, limit } — total is the upstream match count' }
         '400': { $ref: '#/components/responses/BadRequest' }
   /providers/{npi}:
     get:
@@ -58,24 +58,6 @@ paths:
         - { name: endYear, in: query, schema: { type: integer } }
       responses:
         '200': { description: '{ npi, trends, analysis }' }
-  /providers/bulk-data:
-    post:
-      summary: Bulk provider MIPS data (API key required)
-      security: [{ apiKey: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [npis]
-              properties:
-                npis: { type: array, items: { type: string, pattern: '^\d{10}$' } }
-                performanceYear: { type: integer }
-      responses:
-        '200': { description: '{ success, data: { totalRequested, ...mips } }' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
   /quality-measures/{facilityId}:
     get:
       summary: Hospital quality measures with national comparison

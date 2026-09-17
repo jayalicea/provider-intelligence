@@ -26,3 +26,13 @@ the answers. Claims below were re-verified against the code on 2026-09-15.
   `api_usage` (key_label, endpoint pattern, method, status).
   `GET /api/v1/admin/usage?days=N` reports per-key totals and per-endpoint
   breakdowns and requires a valid key itself.
+
+## Package P0: bulk-data removal (2026-09-17)
+
+- **P0-1 closed.** `POST /api/v1/providers/bulk-data` is removed from the
+  public API surface entirely: route (`src/routes/providerRoutes.js`),
+  controller method (`bulkProviderData`), and the service methods that existed
+  only for it (`getBulkMipsPerformance`, `chunkArray` in
+  `src/services/cmsDataService.js`). Bulk data loads remain offline jobs in
+  `tools/`; `docs/openapi.yaml`, `README.md`, `docs/README.md`, and
+  `docs/FRONTEND_SPEC.md` no longer list the endpoint.

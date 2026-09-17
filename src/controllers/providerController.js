@@ -37,9 +37,24 @@ class ProviderController {
         });
       }
 
-      if (parseInt(offset) < 0) {
+      const limit = Number(maxResults);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+        return res.status(400).json({
+          error: 'maxResults must be an integer between 1 and 500'
+        });
+      }
+
+      const start = Number(offset);
+      if (!Number.isInteger(start) || start < 0) {
         return res.status(400).json({
           error: 'Offset must be a non-negative integer'
+        });
+      }
+
+      // Upstream hard limit: offset + count must not exceed 7500.
+      if (start + limit > 7500) {
+        return res.status(400).json({
+          error: 'offset + maxResults must not exceed 7500'
         });
       }
 
@@ -48,16 +63,19 @@ class ProviderController {
         state,
         city,
         taxonomy,
-        maxResults: parseInt(maxResults) || 50,
-        offset: parseInt(offset) || 0
+        maxResults: limit,
+        offset: start
       };
 
-      const providers = await this.npiService.searchProviders(criteria);
+      const { total, providers } = await this.npiService.searchProviders(criteria);
 
       res.json({
         success: true,
         data: providers,
-        count: providers.length
+        count: providers.length,
+        total,
+        offset: start,
+        limit
       });
     } catch (error) {
       logger.error('Error in searchProviders:', error);
@@ -358,56 +376,6 @@ class ProviderController {
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve quality measure data'
-      });
-    }
-  }
-
-  /**
-   * Bulk provider search and MIPS data retrieval
-   */
-  async bulkProviderData(req, res) {
-    try {
-      const { npis, performanceYear } = req.body;
-
-      if (!npis || !Array.isArray(npis)) {
-        return res.status(400).json({
-          success: false,
-          error: 'NPI array is required'
-        });
-      }
-
-      // Validate NPI formats
-      const validNpis = npis.filter(npi => this.npiService.validateNpiFormat(npi));
-
-      if (validNpis.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'No valid NPI numbers provided'
-        });
-      }
-
-      const year = performanceYear || new Date().getFullYear() - 1;
-
-      // Fetch MIPS data for all providers
-      const mipsData = await this.cmsDataService.getBulkMipsPerformance(
-        validNpis,
-        year
-      );
-
-      res.json({
-        success: true,
-        data: {
-          totalRequested: npis.length,
-          totalValid: validNpis.length,
-          performanceYear: year,
-          results: mipsData
-        }
-      });
-    } catch (error) {
-      logger.error('Error in bulkProviderData:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve bulk provider data'
       });
     }
   }

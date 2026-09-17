@@ -35,6 +35,9 @@ describe('GET /api/v1/providers/search', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.count).toBe(1);
+    expect(res.body.total).toBe(1);
+    expect(res.body.offset).toBe(0);
+    expect(res.body.limit).toBe(50);
     expect(res.body.data[0]).toMatchObject({
       npi: '1234567890',
       enumerationType: 'Individual',
@@ -63,6 +66,52 @@ describe('GET /api/v1/providers/search', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/at least one search criterion/i);
+  });
+
+  test('400 for invalid maxResults (non-numeric, zero, over 500)', async () => {
+    for (const maxResults of ['abc', '0', '501', '10.5']) {
+      const res = await request(app)
+        .get('/api/v1/providers/search')
+        .query({ terms: 'Smith', maxResults });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/maxresults/i);
+    }
+  });
+
+  test('400 for invalid offset (non-numeric, negative)', async () => {
+    for (const offset of ['abc', '-1']) {
+      const res = await request(app)
+        .get('/api/v1/providers/search')
+        .query({ terms: 'Smith', offset });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/offset/i);
+    }
+  });
+
+  test('400 when offset + maxResults exceeds the upstream 7500 cap', async () => {
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith', maxResults: 500, offset: 7100 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/7500/i);
+  });
+
+  test('echoes requested offset and limit with the upstream total', async () => {
+    mockNpiSearch('Smith', npiEnvelope([PROVIDER_ROW]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith', maxResults: 10, offset: 20 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(1);
+    expect(res.body.offset).toBe(20);
+    expect(res.body.limit).toBe(10);
+    expect(res.body.count).toBe(1);
+    expect(nock.isDone()).toBe(true);
   });
 
   test('results include hasMipsData; a scored NPI reports true', async () => {

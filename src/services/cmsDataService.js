@@ -55,42 +55,6 @@ class CmsDataService {
   }
 
   /**
-   * Get MIPS performance data for multiple providers
-   */
-  async getBulkMipsPerformance(npis, performanceYear) {
-    try {
-      const results = [];
-
-      // Process in batches to avoid rate limiting
-      const batchSize = 10;
-      const batches = this.chunkArray(npis, batchSize);
-
-      for (const batch of batches) {
-        const batchPromises = batch.map(async (npi) => {
-          try {
-            const data = await this.getMipsPerformance(npi, performanceYear);
-            if (data) {
-              results.push(data);
-            }
-          } catch (error) {
-            logger.warn(`Failed to fetch MIPS data for NPI ${npi}:`, error.message);
-          }
-        });
-
-        await Promise.all(batchPromises);
-
-        // Rate limiting delay between batches
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      return results;
-    } catch (error) {
-      logger.error('Error in bulk MIPS data fetch:', error);
-      throw new Error('Failed to retrieve bulk MIPS performance data');
-    }
-  }
-
-  /**
    * Get quality measures for a facility/provider
    */
   async getQualityMeasures(facilityId, measureType = 'all') {
@@ -459,17 +423,6 @@ class CmsDataService {
     } finally {
       client.release();
     }
-  }
-
-  /**
-   * Chunk array into smaller batches
-   */
-  chunkArray(array, size) {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
   }
 }
 

@@ -142,7 +142,7 @@ boot. `DB_PASSWORD` must be set in `.env` or compose fails fast. See
 
 Base URL: `http://localhost:3000/api/v1`. All GET endpoints are open —
 every upstream source is public government data. All non-GET endpoints
-(roster screening, bulk data) require an API key, as does the admin usage
+(roster screening) require an API key, as does the admin usage
 report on every method.
 
 Send the key on every write:
@@ -164,7 +164,7 @@ Endpoint groups:
 - **Providers** — `GET /providers/search` (terms/state/city/taxonomy,
   offset pagination), `GET /providers/{npi}`, `GET /providers/{npi}/verification`
   (dossier with per-field provenance), `GET /providers/{npi}/mips-performance`,
-  `GET /providers/{npi}/mips-trends`, `POST /providers/bulk-data` (key).
+  `GET /providers/{npi}/mips-trends`.
 - **Quality** — `GET /quality-measures/{facilityId}?type=`.
 - **Analytics** — `GET /analytics/group-performance?npis=…&year=`,
   `ranking/{npi}`, `trends/{npi}`, `benchmark/{npi}`.

@@ -35,7 +35,13 @@ export const api = {
     const { data } = await http.get('/providers/search', {
       params: { terms, state, city, taxonomy, maxResults },
     })
-    return { results: data.data ?? [], count: data.count ?? 0 }
+    return {
+      results: data.data ?? [],
+      count: data.count ?? 0,
+      total: data.total ?? null,
+      offset: data.offset ?? 0,
+      limit: data.limit ?? maxResults,
+    }
   },
 
   getProvider: async (npi) => {

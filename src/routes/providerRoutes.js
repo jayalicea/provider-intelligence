@@ -24,7 +24,4 @@ router.get('/:npi/mips-trends', bound('getMipsTrends'));
 // Quality measures
 router.get('/quality-measures/:facilityId', bound('getQualityMeasures'));
 
-// Bulk operations
-router.post('/bulk-data', bound('bulkProviderData'));
-
 module.exports = router;

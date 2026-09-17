@@ -8,9 +8,11 @@ backend on :3000 (`/api/v1/...`), per Prompt A Phase 3 step 2.
 
 ## Live API shapes verified 2026-09-12 (all return `{success, data, count?}`)
 
-- `GET /api/v1/providers/search?terms=&state=&city=&taxonomy=&maxResults=`
-  (note: `terms`, not the spec's `query`; no `page`/`limit`) → `data` is an
-  array of providers with nested `name/address/taxonomy/license` objects.
+- `GET /api/v1/providers/search?terms=&state=&city=&taxonomy=&maxResults=&offset=`
+  (note: `terms`, not the spec's `query`) → `data` is an array of providers
+  with nested `name/address/taxonomy/license` objects, plus `total`
+  (upstream match count), `offset` and `limit` since 2026-09-17. `maxResults`
+  caps at 500; `offset + maxResults` must not exceed 7500.
 - `GET /api/v1/providers/:npi` → single provider object (same nested shape)
   with `mipsPerformance` (null unless `?includeMips=true`).
 - `GET /api/v1/providers/:npi/mips-performance` → camelCase MIPS row with
@@ -58,9 +60,13 @@ backend on :3000 (`/api/v1/...`), per Prompt A Phase 3 step 2.
 
 ## Discrepancies between spec hypotheses and the live backend
 
-1. Search uses `terms`/`maxResults` and returns at most `maxResults` rows;
-   no `total`/`page`/`limit` — so server-side pagination was not built.
-   The results table reports the returned count instead of "Page X of Y".
+1. Search uses `terms`/`maxResults`/`offset` and, since 2026-09-17, returns
+   `total`/`offset`/`limit` alongside `data`/`count`. The results table shows
+   "N of M matching providers" from `total` (hidden again when the MIPS-only
+   checkbox filters client-side, since `total` then no longer matches the
+   displayed subset). Full "Page X of Y" navigation was not built: the page
+   still requests a single `maxResults=50` page and there is no offset
+   control in the UI.
 2. `mips-trends` returns parallel arrays, not records (client reshapes).
 3. Quality rows have no `facilityName` (page heading uses the facility ID)
    and no `footnote` (footnote column/tooltips not possible against live data).

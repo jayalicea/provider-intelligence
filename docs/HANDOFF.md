@@ -101,7 +101,6 @@ Public reads (no key):
 
 Key-required (`X-API-Key` header, all non-GET under /api/v1 plus all of /admin):
 - `POST /api/v1/intelligence/screen-roster` (max 1,000 rows)
-- `POST /api/v1/providers/bulk-data`
 - `GET /api/v1/admin/usage?days=N`
 
 Rate limiting: in-memory fixed window, 100 req/min per router. It is per
@@ -383,9 +382,9 @@ Built (documented in `docs/SECURITY_REVIEW_RESPONSES.md`):
 - helmet, cors, compression, request logging, generic error messages upstream.
 
 Not built, from `docs/SECURITY_REVIEW.md` P0:
-- **P0-1 partially open**: `POST /providers/bulk-data` now requires a key, but
-  the review's recommendation was to remove it from the public API surface
-  entirely in favor of offline jobs. It is still mounted.
+- **P0-1 closed (2026-09-17)**: `POST /providers/bulk-data` was removed from
+  the public API surface entirely (route, controller, service method), per the
+  review's recommendation in favor of offline jobs.
 - **P0-2 partial**: GET endpoints are deliberately open (all upstream sources
   are free public data). That is a defensible product decision, not an
   oversight, but it means no per-caller quota on reads.
@@ -456,7 +455,8 @@ cd client && npm ci && npm run dev       # Vite, proxies /api to :3000
 4. **Key management backed by `api_keys`.** Honor `revoked_at` at
    authentication time; add issue/rotate/revoke. Required before any real pilot
    customer.
-5. **Remove or relocate `POST /providers/bulk-data`** per P0-1.
+5. ~~**Remove or relocate `POST /providers/bulk-data`** per P0-1.~~ Done
+   2026-09-17: endpoint removed entirely.
 6. **`docker compose up` runtime validation.** Build is verified, runtime is not.
 7. **True multi-year MIPS data (Phase A0 in `docs/V2_ROADMAP.md`).** Requires
    hunting archived per-year QPP/Physician Compare CSVs and adding a real
