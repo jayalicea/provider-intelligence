@@ -21,6 +21,20 @@ services:
       db:
         condition: service_healthy
     restart: always
+    # Without this, `docker compose up -d --wait` can only wait for the
+    # database: the app would be reported up the moment its container starts,
+    # before Express is listening. The probe uses node itself rather than curl
+    # or wget so it depends on nothing beyond the image's own runtime.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
 
   db:
     image: postgres:15-alpine
