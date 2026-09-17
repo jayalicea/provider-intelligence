@@ -12,7 +12,8 @@ const {
   parseNuccCsv,
   parseNihEnvelope,
   describe: describeCode,
-  loadRows
+  loadRows,
+  NUCC_URLS
 } = require('../tools/taxonomy-ingest');
 
 afterEach(() => {
@@ -117,7 +118,9 @@ describe('taxonomy source priority', () => {
     const { rows, sourceLabel } = await loadRows({ source: 'auto', file: null }, fetcher);
     expect(sourceLabel).toBe('NIH_CLINICAL_TABLES');
     expect(rows[0].description).toBe('Internal Medicine');
-    expect(calls).toHaveLength(2);
+    // one attempt per NUCC candidate URL, then NIH
+    expect(calls).toHaveLength(NUCC_URLS.length + 1);
+    expect(calls[calls.length - 1]).toContain('clinicaltables');
   });
 
   it('reports both failures and the offline option when neither source answers', async () => {

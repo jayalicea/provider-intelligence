@@ -21,7 +21,12 @@
 const fs = require('fs');
 const https = require('https');
 
-const NUCC_URL = 'https://www.nucc.org/images/stories/CSV/nucc_taxonomy_260.csv';
+// NUCC publishes semi-annual versions; newest first, older as fallback.
+const NUCC_URLS = [
+  'https://www.nucc.org/images/stories/CSV/nucc_taxonomy_261.csv',
+  'https://www.nucc.org/images/stories/CSV/nucc_taxonomy_260.csv',
+  'https://www.nucc.org/images/stories/CSV/nucc_taxonomy_251.csv',
+];
 const NIH_URL = 'https://clinicaltables.nlm.nih.gov/api/taxonomy/v3/search';
 
 const DDL = `CREATE TABLE IF NOT EXISTS taxonomy_codes (
@@ -201,8 +206,8 @@ async function loadRows(args, fetcher = fetchUrl) {
   const attempts = args.source === 'nih'
     ? [['NIH_CLINICAL_TABLES', NIH_URL]]
     : args.source === 'nucc'
-      ? [['NUCC_CSV', NUCC_URL]]
-      : [['NUCC_CSV', NUCC_URL], ['NIH_CLINICAL_TABLES', NIH_URL]];
+      ? NUCC_URLS.map(url => ['NUCC_CSV', url])
+      : [...NUCC_URLS.map(url => ['NUCC_CSV', url]), ['NIH_CLINICAL_TABLES', NIH_URL]];
 
   const failures = [];
   for (const [label, url] of attempts) {
@@ -384,5 +389,5 @@ if (require.main === module) {
 
 module.exports = {
   parseLine, parseNuccCsv, parseNihEnvelope, describe, loadRows, parseArgs,
-  NUCC_URL, NIH_URL, DDL, BACKFILL
+  NUCC_URLS, NIH_URL, DDL, BACKFILL
 };
