@@ -75,6 +75,46 @@ class ApiKeyService {
     }
   }
 
+  /**
+   * Periodic hot-reload entry point. Safe to call on a schedule: any DB
+   * error is caught here and in loadFromDatabase(), so a failed reload never
+   * rejects and never replaces the currently served key set.
+   */
+  async reloadKeys() {
+    try {
+      await this.loadFromDatabase();
+    } catch (error) {
+      logger.warn(`apiKeyService: periodic reload failed (${error.message}); keeping previous key set`);
+    }
+  }
+
+  /**
+   * Start reloading the key set from the api_keys table every `intervalMs`.
+   * Defaults to API_KEY_RELOAD_SECONDS (default 60) when intervalMs is not a
+   * positive number. Calling startReloading again replaces the timer.
+   */
+  startReloading(intervalMs) {
+    this.stopReloading();
+    const envSeconds = parseInt(process.env.API_KEY_RELOAD_SECONDS, 10);
+    const seconds = Number.isFinite(envSeconds) && envSeconds > 0 ? envSeconds : 60;
+    const ms = Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : seconds * 1000;
+    this._reloadTimer = setInterval(() => {
+      this.reloadKeys().catch(error => {
+        logger.warn(`apiKeyService: periodic reload failed (${error.message}); keeping previous key set`);
+      });
+    }, ms);
+    if (typeof this._reloadTimer.unref === 'function') this._reloadTimer.unref();
+    return this._reloadTimer;
+  }
+
+  /** Stop the periodic reload timer, if running. */
+  stopReloading() {
+    if (this._reloadTimer) {
+      clearInterval(this._reloadTimer);
+      this._reloadTimer = null;
+    }
+  }
+
   configured() {
     return this.index.size > 0;
   }

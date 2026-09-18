@@ -125,6 +125,10 @@ class App {
     // Load active api_keys rows into memory; on failure the service keeps
     // serving from the API_KEYS env set.
     apiKeyService.loadFromDatabase();
+    // Hot-reload revoked/issued keys without a restart. There is no server
+    // shutdown hook in this app, so stopReloading() is exposed on the
+    // service for callers that manage the lifecycle themselves.
+    apiKeyService.startReloading();
     const server = this.app.listen(port, () => {
       logger.info(`Server started on port ${port}`);
     });

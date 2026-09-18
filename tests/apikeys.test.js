@@ -163,6 +163,75 @@ describe('database-backed keys (api_keys table)', () => {
   });
 });
 
+describe('periodic key reload', () => {
+  const digest = key => crypto.createHash('sha256').update(key).digest('hex');
+
+  afterEach(() => {
+    ApiKeyService.shared.stopReloading();
+  });
+
+  test('a key revoked between loads is rejected after reloadKeys()', async () => {
+    const row = {
+      key_hash: digest('hot-secret'), label: 'hot',
+      created_at: new Date(), revoked_at: null
+    };
+    mockDb._stores.apiKeys.set('hot', row);
+    await ApiKeyService.shared.loadFromDatabase();
+
+    const before = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .set('X-API-Key', 'hot-secret')
+      .send({ rows: [{ npi: '1366446619', lastname: 'DOE', firstname: 'JANE', state: 'CA' }] });
+    expect(before.status).toBe(200);
+
+    // Revoke in the "database", then hot-reload instead of restarting.
+    row.revoked_at = new Date();
+    await ApiKeyService.shared.reloadKeys();
+
+    const after = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .set('X-API-Key', 'hot-secret')
+      .send({ rows: [{ npi: '1366446619', lastname: 'DOE', firstname: 'JANE', state: 'CA' }] });
+    expect(after.status).toBe(401);
+  });
+
+  test('a reload that rejects keeps the previously loaded key set', async () => {
+    mockDb._stores.apiKeys.set('stable', {
+      key_hash: digest('stable-secret'), label: 'stable',
+      created_at: new Date(), revoked_at: null
+    });
+    await ApiKeyService.shared.loadFromDatabase();
+    expect(ApiKeyService.shared.source).toBe('database');
+
+    jest.spyOn(mockDb, 'query').mockRejectedValue(new Error('connection reset'));
+    await expect(ApiKeyService.shared.reloadKeys()).resolves.toBeUndefined();
+
+    expect(ApiKeyService.shared.source).toBe('database');
+    expect(ApiKeyService.shared.authenticate('stable-secret')).toBe('stable');
+
+    const res = await request(app)
+      .post('/api/v1/intelligence/screen-roster')
+      .set('X-API-Key', 'stable-secret')
+      .send({ rows: [{ npi: '1366446619', lastname: 'DOE', firstname: 'JANE', state: 'CA' }] });
+    expect(res.status).toBe(200);
+  });
+
+  test('startReloading ticks on the interval and stopReloading halts it', () => {
+    jest.useFakeTimers();
+    try {
+      const spy = jest.spyOn(ApiKeyService.shared, 'reloadKeys').mockResolvedValue();
+      ApiKeyService.shared.startReloading(1000);
+      jest.advanceTimersByTime(3000);
+      expect(spy).toHaveBeenCalledTimes(3);
+      ApiKeyService.shared.stopReloading();
+      jest.advanceTimersByTime(3000);
+      expect(spy).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe('tools/api-keys.js', () => {
   const { issueKey, listKeys, revokeKey, generateKey } = require('../tools/api-keys');
 
