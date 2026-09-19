@@ -1,6 +1,6 @@
 {
   "note": "Coverage registry rendered by client/src/pages/CoveragePage.jsx. Every figure carries the vintage it was measured at; nothing here is computed at request time.",
-  "generatedAt": "2026-09-13",
+  "generatedAt": "2026-09-18",
   "datasets": [
     {
       "id": "oig-leie",
@@ -77,6 +77,21 @@
       "notes": [
         "CMS publishes a single rolling vintage, so year-over-year movement may reflect re-based scores rather than true performance change.",
         "Each cached score carries its own access date."
+      ]
+    },
+    {
+      "id": "license-status",
+      "name": "State license status (TX, CO)",
+      "publisher": "Texas Medical Board (data.texas.gov) and Colorado DORA (data.colorado.gov)",
+      "scope": "Medical license status for Texas and Colorado, all license types",
+      "records": 2041025,
+      "recordLabel": "licenses with board-published status",
+      "asOf": "2026-09-18",
+      "cadence": "Refreshed on demand; Socrata feeds update on the states own schedules",
+      "sourceUrl": "https://data.texas.gov/dataset/DataSet-01-All-Licenses/tm3v-pfq9",
+      "provenance": "Keyless Socrata bulk APIs, loaded by tools/license-status-ingest.js with parsed=inserted=table self-verification. TX 455,287 unique licenses, CO 1,585,738.",
+      "notes": [
+        "Only Texas and Colorado publish free keyless license-status bulk; the remaining states are lookup-only per docs/research/license-source-survey.md."
       ]
     }
   ],
