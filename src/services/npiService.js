@@ -2,6 +2,7 @@ const { ApiClient } = require('../utils/apiClient');
 const apiConfig = require('../config/api-config');
 const { logger } = require('../utils/logger');
 const db = require('../config/database');
+const { requestCoalesce } = require('../utils/coalescer');
 
 // Leaf fields requested via `ef`. The API returns them as parallel arrays
 // keyed by dotted path. Verified live (2026-09-17): leaf paths under
@@ -56,9 +57,13 @@ class NpiService {
         params.q = `${params.q || ''} licenses.taxonomy.code:${criteria.taxonomy}`;
       }
 
-      const response = await this.npiClient.get(
-        apiConfig.npiRegistry.endpoints.individual,
-        params
+      // Concurrent identical searches join one in-flight upstream call.
+      const response = await requestCoalesce(
+        `npi-search:${JSON.stringify(params)}`,
+        () => this.npiClient.get(
+          apiConfig.npiRegistry.endpoints.individual,
+          params
+        )
       );
 
       // Envelope element 0 is the upstream total match count; thread it
@@ -119,9 +124,13 @@ class NpiService {
         ef: EXTRA_FIELDS
       };
 
-      const response = await this.npiClient.get(
-        apiConfig.npiRegistry.endpoints.individual,
-        params
+      // Concurrent misses for the same NPI join one in-flight upstream call.
+      const response = await requestCoalesce(
+        `npi-detail:${npiNumber}`,
+        () => this.npiClient.get(
+          apiConfig.npiRegistry.endpoints.individual,
+          params
+        )
       );
 
       const providers = this.transformNpiResponse(response);

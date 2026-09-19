@@ -220,6 +220,32 @@ describe('GET /api/v1/providers/:npi', () => {
     expect(scope.isDone()).toBe(true);
   });
 
+  test('concurrent identical detail requests produce exactly one upstream call', async () => {
+    let upstreamCalls = 0;
+    const scope = require('nock')('https://clinicaltables.nlm.nih.gov')
+      .get('/api/npi_idv/v3/search')
+      .query(q => q.terms === '1234567890')
+      .reply(200, () => {
+        upstreamCalls += 1;
+        return npiEnvelope([PROVIDER_ROW]);
+      });
+
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        request(app).get('/api/v1/providers/1234567890'))
+    );
+
+    expect(responses.every(r => r.status === 200)).toBe(true);
+    expect(upstreamCalls).toBe(1);
+    expect(scope.isDone()).toBe(true);
+    // every caller gets an equal response
+    const bodies = responses.map(r => r.body);
+    for (const body of bodies) {
+      expect(body).toEqual(bodies[0]);
+    }
+    expect(bodies[0].data.npi).toBe('1234567890');
+  });
+
   test('second request is served from cache without hitting the NPI API', async () => {
     mockNpiSearch('1234567890', npiEnvelope([PROVIDER_ROW]));
 

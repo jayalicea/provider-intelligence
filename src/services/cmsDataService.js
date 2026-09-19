@@ -2,6 +2,7 @@ const { ApiClient } = require('../utils/apiClient');
 const apiConfig = require('../config/api-config');
 const { logger } = require('../utils/logger');
 const db = require('../config/database');
+const { requestCoalesce } = require('../utils/coalescer');
 
 class CmsDataService {
   constructor() {
@@ -28,9 +29,13 @@ class CmsDataService {
         size: 10
       };
 
-      const response = await this.cmsClient.get(
-        `/dataset/${datasetId}/data`,
-        params
+      // Concurrent misses for the same NPI/year join one in-flight upstream call.
+      const response = await requestCoalesce(
+        `mips:${npi}:${performanceYear}`,
+        () => this.cmsClient.get(
+          `/dataset/${datasetId}/data`,
+          params
+        )
       );
 
       // The data API returns a bare JSON array (not an envelope)
@@ -76,9 +81,13 @@ class CmsDataService {
         limit: 500
       };
 
-      const response = await this.catalogClient.get(
-        `/datastore/query/${datasetId}/0`,
-        params
+      // Concurrent misses for the same facility/type join one in-flight call.
+      const response = await requestCoalesce(
+        `quality:${facilityId}:${type}`,
+        () => this.catalogClient.get(
+          `/datastore/query/${datasetId}/0`,
+          params
+        )
       );
 
       const rows = response && Array.isArray(response.results) ? response.results : [];

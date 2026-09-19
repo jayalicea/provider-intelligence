@@ -142,3 +142,18 @@ API and coverage should follow demand.
 - **A cache miss is slower than a passthrough**, because it pays the upstream
   latency plus an insert. Accepted: misses are the minority and the insert is
   what makes the next thousand reads cheap.
+
+## Follow-up: in-flight request coalescing (2026-09-19)
+
+The original decision left concurrent identical in-flight misses each going
+upstream. As of 2026-09-19 the upstream legs of `getProviderByNpi`,
+`searchProviders`, `getMipsPerformance` and `getQualityMeasures` are wrapped
+in `requestCoalesce` (`src/utils/coalescer.js`): concurrent misses for the
+same key (NPI, search parameters, NPI+year, or facility+measure type) join a
+single in-flight upstream call, and the entry is dropped on settlement so a
+rejection never poisons the key. Rationale: cache misses cluster (a detail
+view plus `includeMips` fan-out, or several clients on the same search), and
+coalescing halves the upstream cost without changing cache-hit behavior or
+response shapes. The cache-first design above is unchanged; this narrows only
+the "each miss goes upstream" consequence.
+
