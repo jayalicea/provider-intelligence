@@ -250,7 +250,16 @@ direct fetch 2026-09-18:
 
 ## Open questions / follow-ups
 
-- Ohio DataOhio dataset relocation URL (portal 404 today).
+- Ohio DataOhio relocation update, verified live 2026-09-18: the dataset
+  still exists at
+  `https://data.ohio.gov/wps/portal/gov/data/view/state-of-ohio-licensure`
+  (HTTP 200; the older portal URL shape 404s). The view page is a
+  JavaScript-rendered SPA and its download resource URL is not present in
+  the served HTML (only placeholder `s3.csv` tokens), so the bulk endpoint
+  could not be located by curl alone. Next step is a manual browser session
+  with devtools network inspection to capture the CSV download request,
+  after which a loader module can be added next to
+  `tools/license-status-ingest.js`.
 - Florida MQA bulk account requirement — verify by registering.
 - Scraping ToS for the top ~10 lookup-only states (CA, NY, PA, WA, IL, MI,
   NJ, GA, VA, NC) if Phase 3 proceeds.
