@@ -12,9 +12,9 @@ names now collide. Three clarifications:
   should be re-scoped accordingly rather than re-estimating it at 0.5 weekend.
 - **The shipped `/watchlist` route is an exclusion watchlist**, backed by
   `GET /api/v1/intelligence/exclusion-watchlist`: it lists cached providers
-  carrying an OIG LEIE or state Medicaid exclusion match. It is not Story 2.1's
-  user-curated MIPS watchlist, which is still unbuilt, and it holds no per-user
-  state, so it does not resolve Tension 1.
+  carrying an OIG LEIE or state Medicaid exclusion match. Story 2.1's
+  user-curated watchlist is now built separately at `/my-providers`
+  (shipped 2026-09-19), so the two no longer collide.
 - **The shipped `/providers/:npi/360`, `/cohort`, `/upload-roster` and
   `/coverage` routes** are exclusion-screening and coverage-reporting surfaces,
   unrelated to the stories below.
