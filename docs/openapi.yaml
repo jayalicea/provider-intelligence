@@ -132,6 +132,37 @@ paths:
         - { $ref: '#/components/parameters/Npi' }
         - { name: year, in: query, required: true, schema: { type: integer } }
         - { name: taxonomy, in: query, schema: { type: string } }
+  /analytics/percentile-trends/{npi}:
+    get:
+      summary: Provider percentile over time vs their taxonomy cohort (archive years)
+      description: >-
+        One row per archive performance year for the provider's primary
+        taxonomy, read from the materialized taxonomy_percentiles table
+        (built by tools/build-taxonomy-percentiles.js). The provider's
+        taxonomy resolves with the loader's coalesce order:
+        nppes_providers.primary_taxonomy_code first, providers cache as
+        fallback. Distribution columns (median/p25/p75/scored_count) come
+        from taxonomy_percentiles with PERCENTILE_CONT (linear
+        interpolation over non-null final scores, same definition as
+        group-performance/benchmark). The per-year percentile is computed
+        at read time as the exact share of scored same-taxonomy peers
+        scoring at or below the provider (100 = best, same definition as
+        ranking), because stored quartiles plus scored_count cannot
+        reproduce that exact share. Only year_source='archive' rows
+        participate; rolling-vintage rows never appear. 404 when the npi
+        has no primary taxonomy in either table.
+      parameters:
+        - { $ref: '#/components/parameters/Npi' }
+      responses:
+        '200':
+          description: >-
+            { success, data: { npi, taxonomy, years: [ { performance_year,
+            final_score, percentile, median_final_score, p25, p75,
+            scored_count, year_source, provenance: { source, as_of } } ] } }
+            final_score and percentile are null when the provider has no
+            archive score that year.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { description: No primary taxonomy on record for the npi }
   /intelligence/cohort:
     get:
       summary: Cohort intelligence (cached or national source)

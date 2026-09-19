@@ -16,5 +16,6 @@ router.get('/group-performance', bound('getGroupPerformance'));
 router.get('/ranking/:npi', bound('getRanking'));
 router.get('/trends/:npi', bound('getTrends'));
 router.get('/benchmark/:npi', bound('getBenchmark'));
+router.get('/percentile-trends/:npi', bound('getPercentileTrends'));
 
 module.exports = router;

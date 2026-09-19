@@ -25,7 +25,7 @@ any line of it.
 | H1 `num()` returns NaN | `num` is `const n = Number(v); return Number.isFinite(n) ? n : null;`. |
 | H2 unscored provider classified bottom quartile | `getBenchmark` returns an explicit `status: 'unscored'` instead of falling through the quartile chain. |
 | H3 `peer_count` counts unscored peers | `COUNT(m.final_score) AS peer_count`. |
-| H4 no index coverage | `init.sql` creates `idx_mips_npi_year` on `(npi, performance_year)` and `idx_mips_year_npi` on `(performance_year, npi)`. The precomputed rank/percentile materialization the finding also asks for is **not** built; it remains V2_ROADMAP work. |
+| H4 no index coverage | `init.sql` creates `idx_mips_npi_year` on `(npi, performance_year)` and `idx_mips_year_npi` on `(performance_year, npi)`. The per-taxonomy-per-year percentile materialization the finding also asks for is built as the `taxonomy_percentiles` table (`tools/build-taxonomy-percentiles.js`, migration `20260919_taxonomy_percentiles.sql`); per-provider percentiles are still computed at read time via the ranking definition. |
 | H5 no uniqueness on `(npi, performance_year)` | `mips_performance_scores` declares `UNIQUE(npi, performance_year)`. |
 | M2 unvalidated `npis` | `Array.isArray` plus a string-element check, an explicit empty-array rejection, both raising a 400, and a 5,000-element cap. |
 | M3 `provider_count` overstates scored population | A `scoredCount` is returned alongside the row count. |

@@ -257,6 +257,120 @@ class AnalyticsService {
   }
 
   /**
+   * Percentile-over-time for one provider against their taxonomy cohort,
+   * backed by the materialized taxonomy_percentiles table (built by
+   * tools/build-taxonomy-percentiles.js). One row per archive year for the
+   * provider's primary taxonomy.
+   *
+   * Taxonomy resolution uses the same coalesce order as the loader:
+   * nppes_providers.primary_taxonomy_code first (national coverage),
+   * providers.primary_taxonomy_code as fallback for npis missing from
+   * nppes_providers. An npi with no taxonomy in either table yields
+   * taxonomy=null and an explicit reason (controller maps this to 404).
+   *
+   * Percentile definition: share of scored same-taxonomy peers (archive
+   * rows, final_score NOT NULL) scoring at or below the provider, 100 =
+   * best; identical to getRanking. Computed at read time from
+   * mips_performance_scores rather than interpolated from the stored
+   * quartiles, because p25/p50/p75 + scored_count cannot reproduce the
+   * exact at-or-below share; the stored quartiles supply the band.
+   * Distribution columns (median/p25/p75/scored_count) come from
+   * taxonomy_percentiles, and each row carries provenance (source, as_of).
+   */
+  async getPercentileTrends(npi) {
+    try {
+      const taxRes = await db.query(`
+        SELECT COALESCE(n.primary_taxonomy_code, p.primary_taxonomy_code) AS taxonomy_code
+        FROM (SELECT $1 AS npi) s
+        LEFT JOIN nppes_providers n ON n.npi = s.npi
+        LEFT JOIN providers p ON p.npi = s.npi
+      `, [npi]);
+      const taxonomy = taxRes.rows[0] && taxRes.rows[0].taxonomy_code
+        ? String(taxRes.rows[0].taxonomy_code)
+        : null;
+
+      if (!taxonomy) {
+        return {
+          npi,
+          taxonomy: null,
+          years: [],
+          reason: 'No primary taxonomy on record for this NPI in nppes_providers or providers'
+        };
+      }
+
+      const tpRes = await db.query(`
+        SELECT performance_year, scored_count, min_final_score, max_final_score,
+               median_final_score, p25_final_score, p75_final_score, mean_final_score,
+               source, as_of
+        FROM taxonomy_percentiles
+        WHERE taxonomy_code = $1
+        ORDER BY performance_year ASC
+      `, [taxonomy]);
+
+      const years = [];
+      for (const row of tpRes.rows) {
+        const year = Number(row.performance_year);
+
+        // Exact at-or-below share within the taxonomy cohort for this year.
+        // Peers = npis whose resolved taxonomy (same coalesce order as the
+        // loader) equals the provider's taxonomy.
+        const pctRes = await db.query(`
+          SELECT t.final_score AS provider_score,
+                 COUNT(m.final_score) AS cohort_scored,
+                 COUNT(*) FILTER (WHERE m.final_score <= t.final_score) AS at_or_below
+          FROM (
+            SELECT final_score FROM mips_performance_scores
+            WHERE npi = $1 AND performance_year = $2 AND year_source = 'archive'
+          ) t
+          CROSS JOIN mips_performance_scores m
+          WHERE m.performance_year = $2
+            AND m.year_source = 'archive'
+            AND m.final_score IS NOT NULL
+            AND m.npi IN (
+              SELECT n.npi FROM nppes_providers n WHERE n.primary_taxonomy_code = $3
+              UNION
+              SELECT p.npi FROM providers p
+              WHERE p.primary_taxonomy_code = $3
+                AND NOT EXISTS (SELECT 1 FROM nppes_providers n2 WHERE n2.npi = p.npi)
+            )
+          GROUP BY t.final_score
+        `, [npi, year, taxonomy]);
+
+        const pctRow = pctRes.rows[0];
+        const finalScore = pctRow ? num(pctRow.provider_score) : null;
+        let percentile = null;
+        if (finalScore !== null && pctRow && Number(pctRow.cohort_scored) > 0) {
+          percentile = Math.round(
+            10000 * Number(pctRow.at_or_below) / Number(pctRow.cohort_scored)
+          ) / 100;
+        }
+
+        years.push({
+          performance_year: year,
+          final_score: finalScore,
+          percentile,
+          median_final_score: round2(num(row.median_final_score)),
+          p25: round2(num(row.p25_final_score)),
+          p75: round2(num(row.p75_final_score)),
+          scored_count: Number(row.scored_count),
+          year_source: 'archive',
+          provenance: {
+            source: row.source,
+            as_of: row.as_of === null || row.as_of === undefined
+              ? null
+              : (row.as_of instanceof Date ? row.as_of.toISOString().slice(0, 10) : String(row.as_of))
+          }
+        });
+      }
+
+      return { npi, taxonomy, years };
+    } catch (error) {
+      logger.error('Error in percentile trends:', error);
+      throw new Error('Failed to generate percentile trend analysis');
+    }
+  }
+
+  /**
    * Compare one provider's score to the national distribution for a year.
    * Returns null when the provider has no score that year.
    */

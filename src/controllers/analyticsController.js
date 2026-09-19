@@ -163,6 +163,39 @@ class AnalyticsController {
   }
 
   /**
+   * GET /percentile-trends/:npi
+   * 404 when the npi's taxonomy cannot be resolved (documented in
+   * docs/openapi.yaml); the service response carries an explicit reason.
+   */
+  async getPercentileTrends(req, res) {
+    try {
+      const { npi } = req.params;
+      if (!NPI_RE.test(npi)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid NPI number format'
+        });
+      }
+
+      const data = await this.analyticsService.getPercentileTrends(npi);
+      if (!data.taxonomy) {
+        return res.status(404).json({
+          success: false,
+          error: `No primary taxonomy on record for NPI ${npi}`
+        });
+      }
+
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('Error in getPercentileTrends:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate percentile trend analysis'
+      });
+    }
+  }
+
+  /**
    * GET /benchmark/:npi?year=
    */
   async getBenchmark(req, res) {

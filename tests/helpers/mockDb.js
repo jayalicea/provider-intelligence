@@ -10,6 +10,7 @@ const nppesProviders = new Map(); // npi -> row (national v2 table)
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
 const taxonomyCodes = new Map(); // taxonomy_codes rows, keyed by code
+const taxonomyPercentiles = [];  // taxonomy_percentiles materialized rows
 const stateExclusions = []; // state_exclusions rows
 const apiUsage = [];        // api_usage metering rows
 const apiKeys = new Map();  // label -> api_keys row
@@ -23,6 +24,7 @@ function reset() {
   mips.clear();
   exclusions.length = 0;
   taxonomyCodes.clear();
+  taxonomyPercentiles.length = 0;
   stateExclusions.length = 0;
   apiUsage.length = 0;
   apiKeys.clear();
@@ -411,6 +413,69 @@ async function query(text, params = []) {
     return { rows: [groupStats(rows)], rowCount: 1 };
   }
 
+  // --- percentile trends (tests/analytics.test.js) ---------------------------
+
+  // Taxonomy resolution, same coalesce order as the loader:
+  // nppes_providers first, providers as fallback.
+  if (/COALESCE\(n\.primary_taxonomy_code, p\.primary_taxonomy_code\)/.test(sql)) {
+    const npi = String(params[0]);
+    const nppes = nppesProviders.get(npi);
+    const prov = providers.get(npi);
+    const code = (nppes && nppes.primary_taxonomy_code) ||
+                 (prov && prov.primary_taxonomy_code) || null;
+    return { rows: [{ taxonomy_code: code }], rowCount: 1 };
+  }
+
+  if (/^SELECT performance_year, scored_count, min_final_score, max_final_score, median_final_score, p25_final_score, p75_final_score, mean_final_score, source, as_of FROM taxonomy_percentiles WHERE taxonomy_code = \$1 ORDER BY performance_year ASC$/.test(sql)) {
+    const rows = taxonomyPercentiles
+      .filter(r => r.taxonomy_code === params[0])
+      .sort((a, b) => Number(a.performance_year) - Number(b.performance_year))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // Exact per-year percentile within the taxonomy cohort (archive rows,
+  // scored peers only). Percentile = share of cohort scoring at or below
+  // the provider, 100 = best (matches getRanking).
+  if (/AS at_or_below/.test(sql)) {
+    const [npi, year, taxonomy] = params;
+    const target = [...mips.values()].find(r =>
+      String(r.npi) === String(npi) &&
+      Number(r.performance_year) === Number(year) &&
+      r.year_source === 'archive');
+    if (!target) return { rows: [], rowCount: 0 };
+    const resolveTaxonomy = n => {
+      const nppes = nppesProviders.get(String(n));
+      if (nppes && nppes.primary_taxonomy_code) return nppes.primary_taxonomy_code;
+      const prov = providers.get(String(n));
+      return (prov && prov.primary_taxonomy_code) || null;
+    };
+    const cohort = [...mips.values()].filter(r =>
+      Number(r.performance_year) === Number(year) &&
+      r.year_source === 'archive' &&
+      r.final_score !== null && r.final_score !== undefined &&
+      resolveTaxonomy(r.npi) === taxonomy);
+    const targetScore = Number(target.final_score);
+    if (Number.isNaN(targetScore)) {
+      return {
+        rows: [{
+          provider_score: target.final_score,
+          cohort_scored: cohort.length,
+          at_or_below: null
+        }],
+        rowCount: 1
+      };
+    }
+    return {
+      rows: [{
+        provider_score: target.final_score,
+        cohort_scored: cohort.length,
+        at_or_below: cohort.filter(r => Number(r.final_score) <= targetScore).length
+      }],
+      rowCount: 1
+    };
+  }
+
   // --- national cohort query (national_screening, materialized) --------------
 
   // The service builds the WHERE clause dynamically. Params are
@@ -749,6 +814,7 @@ module.exports = {
     mips,
     get quality() { return quality; },
     taxonomyCodes,
+    taxonomyPercentiles,
     exclusions,
     stateExclusions,
     queryLog,

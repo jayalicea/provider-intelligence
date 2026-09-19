@@ -19,9 +19,12 @@ names now collide. Three clarifications:
   `/coverage` routes** are exclusion-screening and coverage-reporting surfaces,
   unrelated to the stories below.
 
-Everything else in Phase A0 through Phase C remains open, including Phase A0
-itself, which is the prerequisite for every story that involves a year or a
-percentile. CSV export (Story 3.1) shipped 2026-09-19: `format=csv` on
+Everything else in Phase A through Phase C remains open. Phase A0 itself
+shipped 2026-09-19: real per-year archive rows (PY 2018-2020, 2022-2024)
+plus the `taxonomy_percentiles` materialization job and the
+`/analytics/percentile-trends/:npi` read endpoint (details in the Phase A0
+section below), which every story that involves a year or a percentile
+builds on. CSV export (Story 3.1) shipped 2026-09-19: `format=csv` on
 `/providers/search` and `/providers/:npi/mips-performance` (see Story 3.1
 below); the only other CSV handling in the client is roster upload, which is
 an input path, not an export.
@@ -142,13 +145,16 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
 - **Story 5.2**: As a Practice Manager, I want to compare two or three of my providers side by side across years so that I can see who is improving and who is slipping.
   - Value: Direct internal comparison for incentive and remediation decisions.
   - Effort: 1 weekend. Cost drivers: multi-series trend chart, provider picker limited to small N.
+  - **Status: shipped 2026-09-19, client-only.** Route `/compare` (nav label "Compare", after "My Providers"), localStorage key `providerlens.compare` (plain NPI array, cap 3, storage separate from the watchlist). Per NPI the page fetches `GET /api/v1/providers/:npi` and `GET /api/v1/analytics/trends/:npi` via `Promise.allSettled`; an NPI that fails both renders an explicit "Could not be loaded" row. One recharts line chart (final score by performance year, one series per provider, palette-token colors) plus a per-year comparison table with gray "Not reported" cells for missing years. The analytics trends `warning` field (rolling-vintage rows present) is surfaced as a note under the chart naming the affected NPIs. A "Compare" button next to the watchlist toggle on the provider detail page adds the NPI and navigates to `/compare`.
 
 ---
 
 ## Phases
 
-### Phase A0: Real Multi-Year Data (prerequisite, 2 weekends)
+### Phase A0: Real Multi-Year Data (prerequisite, 2 weekends) — SHIPPED 2026-09-19
 Archived QPP CSV acquisition, `performance_year` backfill, per-vintage ingestion pipeline, plus the per-taxonomy-per-year percentile materialization job. Nothing user facing, but everything below that involves years or percentiles depends on it.
+
+Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_percentiles.sql`) holds per-taxonomy-per-year aggregates over archive MIPS rows, built by `tools/build-taxonomy-percentiles.js` (TRUNCATE + rebuild, self-verifying accounting, `--dry-run` supported). The read path `GET /api/v1/analytics/percentile-trends/:npi` reads it. Percentile definitions: stored quartiles/median use PERCENTILE_CONT over non-null final scores (same as group-performance/benchmark); the per-provider percentile uses the ranking definition (share of scored same-taxonomy peers at or below the provider), computed at read time. This unblocks Story 5.1 (percentile-over-time chart) and Story 4.1 (taxonomy benchmarking report); both remain open.
 
 ### Phase A: Lowest Effort, Highest Value, No Auth (3.5 weekends total)
 1. Story 3.1: CSV export (0.5)
@@ -180,7 +186,7 @@ Archived QPP CSV acquisition, `performance_year` backfill, per-vintage ingestion
 | 3.2 Printable summary (print to PDF) | A | 0.5 | none |
 | 2.1 localStorage watchlist | A | 1 | none |
 | 2.2 Shareable watchlist URL | A | 0.5 | 2.1 |
-| 5.2 Side-by-side provider comparison | A | 1 | existing trends endpoint; A0 for full value |
+| 5.2 Side-by-side provider comparison (shipped 2026-09-19) | A | 1 | existing trends endpoint; A0 for full value |
 | 1.1 Client side score drop alerts | B | 1.5 | 2.1, A0 |
 | 1.2 Shareable alert config link | B | 0.5 | 2.2, 1.1 |
 | 5.1 Percentile-over-time vs cohort band | B | 1 | A0 materialization |
