@@ -155,8 +155,9 @@ shared `pg` pool.
 
 | Script | Command | Description |
 |---|---|---|
-| dev | `npm run dev` | Start the server with hot reload |
-| start | `npm start` | Start the production server |
+| start | `npm start` | Start the full stack: API on :3000 plus the Vite client on :5173 |
+| start:api | `npm run start:api` | API only (`node src/app.js`; what the Docker image runs) |
+| dev | `npm run dev` | Full stack with nodemon hot reload on the API |
 | test | `npm test` | Run the test suite |
 | lint | `npm run lint` | Run ESLint |
 

@@ -120,18 +120,16 @@ PostgreSQL is required):
 npm test
 ```
 
-Start the backend on port 3000:
+Start the full stack (API on :3000 and the Vite client on :5173, which
+proxies `/api` to the API):
 
 ```bash
-npm start          # node src/app.js
-npm run dev        # nodemon, same entrypoint
+npm start          # API + client together
+npm run dev        # same, with nodemon on the API
+npm run start:api  # API only (node src/app.js; what the Docker image runs)
 ```
 
-Start the client dev server, which proxies `/api` to port 3000:
-
-```bash
-cd client && npm install && npm run dev   # Vite on :5173
-```
+The client needs its own install once: `cd client && npm install`.
 
 Docker is an alternative to the local Postgres steps: `docker compose up`
 builds the app image and starts PostgreSQL 15 with `init.sql` applied on first
