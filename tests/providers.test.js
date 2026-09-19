@@ -132,6 +132,75 @@ describe('GET /api/v1/providers/search', () => {
     expect(byNpi['1234567890'].hasMipsData).toBe(true);
     expect(byNpi['9876543210'].hasMipsData).toBe(false);
   });
+
+  test('format=csv returns text/csv with attachment header and header row', async () => {
+    mockNpiSearch('Smith', npiEnvelope([PROVIDER_ROW]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith', format: 'csv' });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
+    expect(res.headers['content-disposition']).toBe(
+      'attachment; filename="provider-search.csv"'
+    );
+    const lines = res.text.trimEnd().split('\r\n');
+    expect(lines[0]).toBe(
+      'npi,name,credential,taxonomy_code,taxonomy_description,city,state,zip,phone'
+    );
+    expect(lines[1]).toBe(
+      '1234567890,"DOE, JOHN A, MD",MD,207R00000X,Physician/Internal Medicine,BALTIMORE,MD,21201,(410) 555-1212'
+    );
+    expect(nock.isDone()).toBe(true);
+  });
+
+  test('format=csv escapes a malicious comma/quote field', async () => {
+    const evil = {
+      ...PROVIDER_ROW,
+      npi: '2222222222',
+      'name.full': 'EVIL, MAL "DOCTOR"',
+      'addr_practice.city': 'SPRINGFIELD, "MIDWEST"'
+    };
+    mockNpiSearch('Smith', npiEnvelope([evil]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith', format: 'csv' });
+
+    expect(res.status).toBe(200);
+    const lines = res.text.trimEnd().split('\r\n');
+    expect(lines[1]).toBe(
+      '2222222222,"EVIL, MAL ""DOCTOR""",MD,207R00000X,Physician/Internal Medicine,"SPRINGFIELD, ""MIDWEST""",MD,21201,(410) 555-1212'
+    );
+  });
+
+  test('format=csv emits the header row even when there are no results', async () => {
+    mockNpiSearch('Smith', npiEnvelope([]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith', format: 'csv' });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toBe(
+      'npi,name,credential,taxonomy_code,taxonomy_description,city,state,zip,phone\r\n'
+    );
+    expect(nock.isDone()).toBe(true);
+  });
+
+  test('JSON format is unaffected when format is absent', async () => {
+    mockNpiSearch('Smith', npiEnvelope([PROVIDER_ROW]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith' });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/json/);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data[0].npi).toBe('1234567890');
+  });
 });
 
 describe('GET /api/v1/providers/:npi', () => {

@@ -3,6 +3,7 @@ const CmsDataService = require('../services/cmsDataService');
 const ExclusionService = require('../services/exclusionService');
 const { formatAsOf } = require('../services/exclusionService');
 const { logger } = require('../utils/logger');
+const { toCsv, sendCsv } = require('../utils/csv');
 
 const TERMS = 'This report states what public sources published as of the ' +
   "dates shown. It does not certify any provider's status.";
@@ -69,6 +70,26 @@ class ProviderController {
       };
 
       const { total, providers } = await this.npiService.searchProviders(criteria);
+
+      // CSV export reuses the same search; only the serialization differs.
+      if (req.query.format === 'csv') {
+        const headers = [
+          'npi', 'name', 'credential', 'taxonomy_code', 'taxonomy_description',
+          'city', 'state', 'zip', 'phone'
+        ];
+        const csv = toCsv(headers, providers.map(p => [
+          p.npi,
+          p.name && p.name.full,
+          p.name && p.name.credential,
+          p.taxonomy && p.taxonomy.code,
+          p.taxonomy && p.taxonomy.description,
+          p.address && p.address.city,
+          p.address && p.address.state,
+          p.address && p.address.zipcode,
+          p.address && p.address.phone
+        ]));
+        return sendCsv(res, 'provider-search.csv', csv);
+      }
 
       res.json({
         success: true,
@@ -331,6 +352,36 @@ class ProviderController {
           success: false,
           error: 'Invalid NPI number format'
         });
+      }
+
+      // CSV export: one row per cached year in the requested range, sourced
+      // from the cache so archived per-year vintages and request-labeled
+      // rolling rows are both represented.
+      if (req.query.format === 'csv') {
+        const startYear = parseInt(req.query.startYear) || 2018;
+        const endYear = parseInt(req.query.endYear) || new Date().getFullYear() - 1;
+        const rows = await this.cmsDataService.getMipsPerformanceHistory(
+          npi,
+          startYear,
+          endYear
+        );
+        const headers = [
+          'performance_year', 'final_score', 'quality_score',
+          'improvement_activities_score', 'promoting_interoperability_score',
+          'cost_score', 'performance_status', 'data_source', 'year_source'
+        ];
+        const csv = toCsv(headers, rows.map(r => [
+          r.performanceYear,
+          r.finalScore,
+          r.qualityScore,
+          r.improvementActivitiesScore,
+          r.promotingInteroperabilityScore,
+          r.costScore,
+          r.performanceStatus,
+          r.dataSource,
+          r.yearSource
+        ]));
+        return sendCsv(res, `mips-performance-${npi}.csv`, csv);
       }
 
       const mipsData = await this.cmsDataService.getMipsPerformance(npi, year);

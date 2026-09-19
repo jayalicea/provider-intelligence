@@ -84,6 +84,107 @@ describe('GET /api/v1/providers/:npi/mips-performance', () => {
 
     expect(res.status).toBe(400);
   });
+
+  test('format=csv returns one row per cached year with provenance columns', async () => {
+    mockDb._stores.mips.set('1111111111:2022', {
+      npi: '1111111111',
+      performance_year: 2022,
+      final_score: 82.1,
+      quality_score: 78,
+      improvement_activities_score: 40,
+      promoting_interoperability_score: 90,
+      cost_score: 55,
+      performance_status: 'Individual',
+      reporting_entity_type: 'Traditional MIPS',
+      data_source: 'CMS_OPEN_DATA',
+      year_source: 'archive',
+      sync_timestamp: new Date()
+    });
+    mockDb._stores.mips.set('1111111111:2023', {
+      npi: '1111111111',
+      performance_year: 2023,
+      final_score: 87.5,
+      quality_score: 80,
+      improvement_activities_score: 40,
+      promoting_interoperability_score: 95,
+      cost_score: 60,
+      performance_status: 'Individual',
+      reporting_entity_type: 'Traditional MIPS',
+      data_source: 'CMS_OPEN_DATA',
+      year_source: 'rolling',
+      sync_timestamp: new Date()
+    });
+
+    const res = await request(app)
+      .get('/api/v1/providers/1111111111/mips-performance')
+      .query({ format: 'csv', startYear: 2018, endYear: 2025 });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
+    expect(res.headers['content-disposition']).toBe(
+      'attachment; filename="mips-performance-1111111111.csv"'
+    );
+    const lines = res.text.trimEnd().split('\r\n');
+    expect(lines[0]).toBe(
+      'performance_year,final_score,quality_score,improvement_activities_score,' +
+      'promoting_interoperability_score,cost_score,performance_status,data_source,year_source'
+    );
+    expect(lines[1]).toBe(
+      '2022,82.1,78,40,90,55,Individual,CMS_OPEN_DATA,archive'
+    );
+    expect(lines[2]).toBe(
+      '2023,87.5,80,40,95,60,Individual,CMS_OPEN_DATA,rolling'
+    );
+  });
+
+  test('format=csv emits the header row when no cached years exist', async () => {
+    const res = await request(app)
+      .get('/api/v1/providers/1111111111/mips-performance')
+      .query({ format: 'csv', startYear: 2018, endYear: 2025 });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toBe(
+      'performance_year,final_score,quality_score,improvement_activities_score,' +
+      'promoting_interoperability_score,cost_score,performance_status,data_source,year_source\r\n'
+    );
+  });
+
+  test('format=csv escapes commas and quotes in string columns', async () => {
+    mockDb._stores.mips.set('1111111111:2023', {
+      npi: '1111111111',
+      performance_year: 2023,
+      final_score: 87.5,
+      quality_score: 80,
+      improvement_activities_score: 40,
+      promoting_interoperability_score: 95,
+      cost_score: 60,
+      performance_status: 'Group, "Traditional"',
+      reporting_entity_type: 'Traditional MIPS',
+      data_source: 'CMS_OPEN_DATA',
+      year_source: 'rolling',
+      sync_timestamp: new Date()
+    });
+
+    const res = await request(app)
+      .get('/api/v1/providers/1111111111/mips-performance')
+      .query({ format: 'csv' });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"Group, ""Traditional"""');
+  });
+
+  test('JSON format is unaffected when format is absent', async () => {
+    const scope = mockMipsData('1111111111', [MIPS_ROW]);
+
+    const res = await request(app)
+      .get('/api/v1/providers/1111111111/mips-performance')
+      .query({ year: 2023 });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/json/);
+    expect(res.body.data.finalScore).toBe(87.5);
+    expect(scope.isDone()).toBe(true);
+  });
 });
 
 describe('GET /api/v1/providers/:npi/mips-trends', () => {

@@ -117,6 +117,45 @@ class CmsDataService {
   }
 
   /**
+   * Per-year cached MIPS rows for a provider across a year range, including
+   * the provenance columns (data_source, year_source) so exports can
+   * distinguish archived per-year vintages from request-labeled rolling rows.
+   * Cache-only: never fans out to the CMS API.
+   */
+  async getMipsPerformanceHistory(npi, startYear, endYear) {
+    try {
+      const query = `
+        SELECT performance_year, final_score, quality_score,
+               improvement_activities_score, promoting_interoperability_score,
+               cost_score, performance_status, data_source, year_source
+        FROM mips_performance_scores
+        WHERE npi = $1 AND performance_year BETWEEN $2 AND $3
+        ORDER BY performance_year ASC
+      `;
+
+      const result = await db.query(query, [npi, startYear, endYear]);
+      return result.rows.map(row => ({
+        performanceYear: Number(row.performance_year),
+        finalScore: row.final_score === null ? null : Number(row.final_score),
+        qualityScore: row.quality_score === null ? null : Number(row.quality_score),
+        improvementActivitiesScore: row.improvement_activities_score === null
+          ? null
+          : Number(row.improvement_activities_score),
+        promotingInteroperabilityScore: row.promoting_interoperability_score === null
+          ? null
+          : Number(row.promoting_interoperability_score),
+        costScore: row.cost_score === null ? null : Number(row.cost_score),
+        performanceStatus: row.performance_status,
+        dataSource: row.data_source,
+        yearSource: row.year_source
+      }));
+    } catch (error) {
+      logger.error(`Error fetching MIPS history for NPI ${npi}:`, error);
+      throw new Error('Failed to retrieve MIPS performance history');
+    }
+  }
+
+  /**
    * Transform MIPS API response to standard format.
    * Column names are those of the live "Quality Payment Program Experience"
    * dataset (lowercase with spaces); several doc-era fields have no

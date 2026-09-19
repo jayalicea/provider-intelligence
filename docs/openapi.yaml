@@ -21,6 +21,14 @@ paths:
         - { name: taxonomy, in: query, schema: { type: string } }
         - { name: maxResults, in: query, schema: { type: integer, default: 50, minimum: 1, maximum: 500 } }
         - { name: offset, in: query, schema: { type: integer, default: 0, minimum: 0 }, description: offset + maxResults must not exceed 7500 (upstream limit) }
+        - name: format
+          in: query
+          schema: { type: string, enum: [csv] }
+          description: >-
+            When 'csv', returns text/csv (attachment filename provider-search.csv)
+            instead of JSON. Header row: npi, name, credential, taxonomy_code,
+            taxonomy_description, city, state, zip, phone (snake_case; always
+            emitted, even for empty results)
       responses:
         '200': { description: '{ success, data, count, total, offset, limit } — total is the upstream match count' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -59,6 +67,20 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/Npi' }
         - { name: year, in: query, schema: { type: integer } }
+        - name: format
+          in: query
+          schema: { type: string, enum: [csv] }
+          description: >-
+            When 'csv', ignores `year` and returns one row per cached year in
+            the startYear..endYear range as text/csv (attachment filename
+            mips-performance-{npi}.csv). Header row: performance_year,
+            final_score, quality_score, improvement_activities_score,
+            promoting_interoperability_score, cost_score, performance_status,
+            data_source, year_source (archive vs rolling, so request-labeled
+            rolling rows are distinguishable from archived per-year vintages;
+            header always emitted, even with no rows)
+        - { name: startYear, in: query, schema: { type: integer, default: 2018 }, description: CSV export only }
+        - { name: endYear, in: query, schema: { type: integer }, description: CSV export only; defaults to the previous calendar year }
       responses:
         '200': { description: MIPS score object or null data when unscored }
   /providers/{npi}/mips-trends:

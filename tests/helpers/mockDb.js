@@ -312,6 +312,18 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
+  // MIPS CSV export history: per-year rows with provenance columns
+  if (/^SELECT performance_year, final_score, quality_score, improvement_activities_score, promoting_interoperability_score, cost_score, performance_status, data_source, year_source FROM mips_performance_scores WHERE npi = \$1 AND performance_year BETWEEN \$2 AND \$3 ORDER BY performance_year ASC$/.test(sql)) {
+    const rows = [...mips.values()]
+      .filter(r =>
+        String(r.npi) === String(params[0]) &&
+        Number(r.performance_year) >= Number(params[1]) &&
+        Number(r.performance_year) <= Number(params[2]))
+      .sort((a, b) => Number(a.performance_year) - Number(b.performance_year))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   // Ranking: window-function style, overall or within a taxonomy peer group.
   // Only scored peers enter the partition (matches the service's
   // final_score IS NOT NULL filter); an unscored target still returns a row
