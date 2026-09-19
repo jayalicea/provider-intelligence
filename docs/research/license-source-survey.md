@@ -211,6 +211,29 @@ by this session's searches plus the platform's existing API reference:
   Same Socrata protocol as data.texas.gov patterns already known; join on
   (license number, state). Expected coverage: high, since these two states
   are among the largest physician populations.
+
+**Phase 1 status: BUILT 2026-09-18.** `license_status` table
+(`src/config/migrations/20260918_license_status.sql`), loader
+`tools/license-status-ingest.js` (Socrata `$limit`/`$offset` pagination,
+TRUNCATE + reload per state, parsed vs inserted vs table count
+self-verification, `--dry-run` and `--source tx|co`), and the verification
+dossier now attaches a `verified` block per matched license
+(`src/controllers/providerController.js`). Column names re-verified by
+direct fetch 2026-09-18:
+
+- TX `tm3v-pfq9`: `license_type`, `first_name`, `last_name`,
+  `year_of_birth`, `license_number`, `license_issue_date`,
+  `license_expiration_date`, `registration_status`,
+  `registration_status_date`, `disciplinary_status`, `license_status`,
+  `degree`, `practice_address`/`practice_city`/`practice_state`/
+  `practice_zip`, `currently_licensed`. Note: TX `license_number` arrives
+  as a plain string; leading zeros matter, load as TEXT.
+- CO `7s5z-vewr`: `lastname`, `firstname`, `middlename`, `city`, `state`,
+  `mailzipcode`, `licensetype`, `licensenumber`,
+  `licensefirstissuedate`, `licenselastreneweddate`,
+  `licenseexpirationdate`, `licensestatusdescription`,
+  `linktoverifylicense`, `linktoviewhealthcareprofile`. No separate status
+  date is published; `licenselastreneweddate` is used as `status_date`.
 - **Phase 2 (bulk, free w/ account):** FL MQA portal (register free account,
   verify download flow), then re-locate and ingest the Ohio DataOhio
   licensure CSV once its relocated URL is confirmed.

@@ -369,6 +369,31 @@ class NpiService {
   }
 
   /**
+   * Verified board status for one (state, license number) pair from the
+   * license_status table ingested by tools/license-status-ingest.js. Multiple
+   * license types can share a number; the most recently status-dated row wins.
+   * Returns null when no board row exists (coverage is state by state).
+   */
+  async getCachedLicenseStatus(issuingState, licenseNumber) {
+    try {
+      const result = await db.query(
+        `SELECT license_number, issuing_state, license_type, status,
+                status_date, expiration_date, disciplinary_status,
+                source, as_of
+           FROM license_status
+          WHERE issuing_state = $1 AND license_number = $2
+          ORDER BY status_date DESC NULLS LAST
+          LIMIT 1`,
+        [issuingState, licenseNumber]
+      );
+      return result.rows && result.rows.length ? result.rows[0] : null;
+    } catch (error) {
+      logger.error('Error fetching cached license status:', error);
+      return null;
+    }
+  }
+
+  /**
    * Map a providers table row back to the API response shape so cache hits
    * return the same structure as fresh API transforms.
    */

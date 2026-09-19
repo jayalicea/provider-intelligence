@@ -45,7 +45,14 @@ paths:
             terms }'. The licenses block lists every license the provider
             self-reported to NPPES; each value carries source and as-of
             provenance. Licenses are self-reported data, not verified board
-            statuses, and the block carries a note saying so.
+            statuses, and the block carries a note saying so. When an
+            ingested state board row matches (issuing state, license number),
+            the license also carries a 'verified' block:
+            '{ status, expirationDate, disciplinaryStatus, source, asOf }',
+            where the first three are provenance-wrapped values from the
+            board feed (Texas Medical Board or Colorado DORA) and source/asOf
+            cite the board dataset and its load date. Licenses without a
+            board match have no 'verified' key.
   /providers/{npi}/mips-performance:
     get:
       summary: MIPS performance for one NPI and year

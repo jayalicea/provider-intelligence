@@ -251,6 +251,19 @@ export default function Provider360Page() {
                       ? `, ${lic.taxonomySpecialization.value || lic.taxonomyClassification.value}`
                       : ''}
                     <Provenance source={lic.number.source} asOf={lic.number.asOf} />
+                    {lic.verified && (
+                      <span className="muted">
+                        {' '}
+                        board status: {lic.verified.status.value ?? 'unknown'}
+                        {lic.verified.expirationDate.value
+                          ? `, expires ${lic.verified.expirationDate.value}`
+                          : ''}
+                        {lic.verified.disciplinaryStatus.value
+                          ? `, discipline: ${lic.verified.disciplinaryStatus.value}`
+                          : ''}
+                        <Provenance source={lic.verified.source} asOf={lic.verified.asOf} />
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

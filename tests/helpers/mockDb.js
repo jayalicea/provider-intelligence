@@ -5,6 +5,7 @@
 
 const providers = new Map(); // npi -> row
 const providerLicenses = []; // provider_licenses rows
+const licenseStatus = [];    // license_status rows (ingested board statuses)
 const nppesProviders = new Map(); // npi -> row (national v2 table)
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
@@ -17,6 +18,7 @@ let quality = [];            // quality_measures rows
 function reset() {
   providers.clear();
   providerLicenses.length = 0;
+  licenseStatus.length = 0;
   nppesProviders.clear();
   mips.clear();
   exclusions.length = 0;
@@ -276,6 +278,23 @@ async function query(text, params = []) {
       as_of: new Date()
     });
     return { rows: [], rowCount: 1 };
+  }
+
+  // --- license_status (verified board statuses) ------------------------------
+
+  if (/^SELECT license_number, issuing_state, license_type, status, status_date, expiration_date, disciplinary_status, source, as_of FROM license_status WHERE issuing_state = \$1 AND license_number = \$2 ORDER BY status_date DESC NULLS LAST LIMIT 1$/.test(sql)) {
+    const rows = licenseStatus
+      .filter(r =>
+        String(r.issuing_state) === String(params[0]) &&
+        String(r.license_number) === String(params[1]))
+      .sort((a, b) => {
+        const ad = a.status_date ? new Date(a.status_date).getTime() : -Infinity;
+        const bd = b.status_date ? new Date(b.status_date).getTime() : -Infinity;
+        return bd - ad;
+      })
+      .slice(0, 1)
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
   }
 
   // --- analytics queries (tests/analytics.test.js) -------------------------
@@ -712,6 +731,7 @@ module.exports = {
   _stores: {
     providers,
     providerLicenses,
+    licenseStatus,
     nppesProviders,
     mips,
     get quality() { return quality; },

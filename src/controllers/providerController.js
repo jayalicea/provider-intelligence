@@ -215,11 +215,11 @@ class ProviderController {
       }
       const licenses = {
         note: 'Licenses are self-reported NPPES data, not verified board statuses.',
-        values: licenseRows.map(row => {
+        values: (await Promise.all(licenseRows.map(async row => {
           const lSource = row.source || 'NPI Registry';
           const lAsOf = formatAsOf(row.as_of);
           const wrapL = value => ({ value, source: lSource, asOf: lAsOf });
-          return {
+          const entry = {
             number: wrapL(row.license_number),
             state: wrapL(row.issuing_state),
             isPrimaryTaxonomy: wrapL(row.is_primary_taxonomy === true),
@@ -227,7 +227,30 @@ class ProviderController {
             taxonomyClassification: wrapL(row.taxonomy_classification),
             taxonomySpecialization: wrapL(row.taxonomy_specialization)
           };
-        })
+          // Board-published status when an ingested state board row matches
+          // this (state, license number); otherwise the license stays
+          // baseline-only. No status is ever invented.
+          try {
+            const statusRow = await this.npiService.getCachedLicenseStatus(
+              row.issuing_state, row.license_number
+            );
+            if (statusRow) {
+              const vSource = statusRow.source;
+              const vAsOf = formatAsOf(statusRow.as_of);
+              const wrapV = value => ({ value, source: vSource, asOf: vAsOf });
+              entry.verified = {
+                status: wrapV(statusRow.status),
+                expirationDate: wrapV(formatAsOf(statusRow.expiration_date)),
+                disciplinaryStatus: wrapV(statusRow.disciplinary_status),
+                source: vSource,
+                asOf: vAsOf
+              };
+            }
+          } catch (statusError) {
+            logger.warn('Failed to load license status for verification dossier:', statusError.message);
+          }
+          return entry;
+        })))
       };
 
       // The cache carries no DOB, so name-fallback checks from this endpoint

@@ -81,6 +81,12 @@ field (`number`, `state`, `isPrimaryTaxonomy`, `taxonomyCode`,
 `taxonomyClassification`, `taxonomySpecialization`) is wrapped with
 `{ value, source, asOf }` provenance, same as the identity block. The values
 are self-reported NPPES data, not verified board statuses, and the `note`
-field says exactly that. `Provider360Page` renders the list with the note
-under a "Licenses" section; providers with no cached license rows show
-"No licenses reported."
+field says exactly that. Since 2026-09-18 a license may also carry a
+`verified` block (`{ status, expirationDate, disciplinaryStatus, source,
+asOf }`, first three provenance-wrapped) when an ingested state board row
+(Texas Medical Board or Colorado DORA via `tools/license-status-ingest.js`)
+matches its (state, license number); licenses without a match have no
+`verified` key. `Provider360Page` renders the list with the note under a
+"Licenses" section and appends the board status (status, expiration,
+discipline) with its own provenance when present; providers with no cached
+license rows show "No licenses reported."
