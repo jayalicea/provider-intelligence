@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import api from '../api/client.js'
+import api, { exportUrls } from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
 import CategoryBarChart from '../components/CategoryBarChart.jsx'
 import ScoreTrendChart from '../components/ScoreTrendChart.jsx'
@@ -22,6 +22,15 @@ export default function MipsDashboardPage() {
       </p>
       <h1 className="page-title">MIPS performance</h1>
       <p className="muted">NPI {npi}</p>
+      <p>
+        <a
+          className="btn export-csv"
+          href={exportUrls.mipsPerformance(npi, 2018, END_YEAR)}
+          download
+        >
+          Export CSV
+        </a>
+      </p>
 
       <div className="stack-top">
         <CategoryBarChart

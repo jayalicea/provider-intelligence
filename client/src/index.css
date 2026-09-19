@@ -252,6 +252,29 @@ textarea:focus-visible,
   margin-top: var(--space-4);
 }
 
+.stack-bottom {
+  margin-bottom: var(--space-4);
+}
+
+/* Inline notice for share merges and watchlist-cap messages: tinted wash,
+   hairline border, status role carries the meaning. */
+.notice-banner {
+  background: var(--primary-wash);
+  border: 1px solid rgba(15, 107, 92, 0.28);
+  border-radius: var(--radius);
+  color: var(--primary);
+  font-size: 13px;
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.watchlist-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 .muted {
   color: var(--text-muted);
 }

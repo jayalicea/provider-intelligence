@@ -120,4 +120,23 @@ export const api = {
   },
 }
 
+// CSV exports are plain browser downloads (anchor href), not axios calls, so
+// the helpers return URLs rather than fetching. `format=csv` on the search
+// endpoint and on mips-performance; both set Content-Disposition attachment.
+function buildUrl(path, params) {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value)
+  }
+  const qs = search.toString()
+  return `${http.defaults.baseURL}${path}${qs ? `?${qs}` : ''}`
+}
+
+export const exportUrls = {
+  providerSearch: ({ terms, state, city, taxonomy, maxResults = 50 }) =>
+    buildUrl('/providers/search', { terms, state, city, taxonomy, maxResults, format: 'csv' }),
+  mipsPerformance: (npi, startYear, endYear) =>
+    buildUrl(`/providers/${npi}/mips-performance`, { startYear, endYear, format: 'csv' }),
+}
+
 export default api

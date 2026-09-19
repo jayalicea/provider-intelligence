@@ -21,8 +21,10 @@ names now collide. Three clarifications:
 
 Everything else in Phase A0 through Phase C remains open, including Phase A0
 itself, which is the prerequisite for every story that involves a year or a
-percentile. CSV export (Story 3.1) is not built: the only CSV handling in the
-client is roster upload, which is an input path, not an export.
+percentile. CSV export (Story 3.1) shipped 2026-09-19: `format=csv` on
+`/providers/search` and `/providers/:npi/mips-performance` (see Story 3.1
+below); the only other CSV handling in the client is roster upload, which is
+an input path, not an export.
 
 ## Personas
 
@@ -84,9 +86,11 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
 - **Story 2.1**: As a Credentialing Staff member, I want to save a list of NPIs to a watchlist in my browser so that I can re-check the same providers each cycle without re-searching.
   - Value: Removes repetitive search work for recurring reviews.
   - Effort: 1 weekend. Cost drivers: localStorage store, watchlist UI (add/remove/reorder), integration with search and detail pages.
+  - **Status: shipped 2026-09-19, client-only.** Route `/my-providers` (nav label "My Providers"), localStorage key `providerlens.watchlist`, cap 200 NPIs, add/remove toggle on the provider detail page. No-auth path per the Tension 1 decision; server persistence remains Story 2.3.
 - **Story 2.2**: As a Consultant, I want to share my watchlist as a URL so that clients open the exact same provider set.
   - Value: Shareability without accounts.
   - Effort: 0.5 weekend (base64/compressed token of NPI list in the URL, decode on load).
+  - **Status: shipped 2026-09-19, client-only.** `/my-providers?list=<token>` where the token is unpadded base64url of the UTF-8 JSON array of NPI strings; decoded on load, merged into the local list (dedupe, inline notice of how many were added), and the query param is removed.
 - **Story 2.3**: As a Practice Manager, I want my watchlist to survive browser changes and be visible to my staff so that the whole office works from one list.
   - Value: Team visibility.
   - Effort: 2 weekends on top of auth. Cost drivers: server persistence, per-user and per-org list scoping.
@@ -97,6 +101,20 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
 - **Story 3.1**: As a Healthcare Analyst, I want to export search results and a provider's MIPS scores to CSV so that I can do my own analysis in Excel.
   - Value: Analysts live in spreadsheets; CSV unblocks them immediately.
   - Effort: 0.5 weekend. Cost drivers: CSV serializer, streaming for large result sets, filename/column conventions.
+  - **Status: shipped 2026-09-19.** `format=csv` on `GET /api/v1/providers/search`
+    (Content-Disposition attachment `provider-search.csv`; header row `npi,
+    name, credential, taxonomy_code, taxonomy_description, city, state, zip,
+    phone`, snake_case, always emitted even for empty results) and on `GET
+    /api/v1/providers/:npi/mips-performance` (attachment
+    `mips-performance-{npi}.csv`; one row per cached year in the optional
+    `startYear..endYear` range; header row `performance_year, final_score,
+    quality_score, improvement_activities_score,
+    promoting_interoperability_score, cost_score, performance_status,
+    data_source, year_source`, where `year_source` distinguishes archived
+    per-year vintages from request-labeled rolling rows). RFC 4180-ish
+    escaping lives in `src/utils/csv.js` (no new dependencies); JSON
+    responses are unchanged. Client: "Export CSV" anchors on the provider
+    search page (carries current filters) and the MIPS dashboard page.
 - **Story 3.2**: As a Credentialing Staff member, I want a printable provider summary page so that I can attach it to a credentialing file as a PDF.
   - Value: Audit ready artifact with zero backend work.
   - Effort: 0.5 weekend (print stylesheet + browser print to PDF).
@@ -158,7 +176,7 @@ Archived QPP CSV acquisition, `performance_year` backfill, per-vintage ingestion
 | Story | Phase | Effort (weekends) | Depends On |
 |---|---|---|---|
 | A0: multi-year data acquisition + materialization | A0 | 2 | none |
-| 3.1 CSV export | A | 0.5 | none |
+| 3.1 CSV export (shipped 2026-09-19) | A | 0.5 | none |
 | 3.2 Printable summary (print to PDF) | A | 0.5 | none |
 | 2.1 localStorage watchlist | A | 1 | none |
 | 2.2 Shareable watchlist URL | A | 0.5 | 2.1 |

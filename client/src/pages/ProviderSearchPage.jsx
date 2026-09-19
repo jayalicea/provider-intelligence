@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
-import api from '../api/client.js'
+import api, { exportUrls } from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
 import SearchBar from '../components/SearchBar.jsx'
 import FilterPanel from '../components/FilterPanel.jsx'
@@ -78,6 +78,20 @@ export default function ProviderSearchPage() {
             vintage rather than per-year data, and as-of dates are shown per
             value. Absence here does not mean a provider has no MIPS history.
           </p>
+        )}
+        {hasCriteria && (
+          <a
+            className="btn export-csv"
+            href={exportUrls.providerSearch({
+              terms: terms || undefined,
+              state: state || undefined,
+              city: city || undefined,
+              taxonomy: taxonomy || undefined,
+            })}
+            download
+          >
+            Export CSV
+          </a>
         )}
       </div>
 

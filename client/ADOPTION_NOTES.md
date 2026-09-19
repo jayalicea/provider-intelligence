@@ -90,3 +90,54 @@ matches its (state, license number); licenses without a match have no
 "Licenses" section and appends the board status (status, expiration,
 discipline) with its own provenance when present; providers with no cached
 license rows show "No licenses reported."
+
+## Update 2026-09-19: CSV export (Story 3.1)
+
+Both exports are `format=csv` query params on existing GET endpoints, served
+as `text/csv` attachments; JSON shapes are unchanged.
+
+- `GET /api/v1/providers/search?...&format=csv` → `provider-search.csv`,
+  header row `npi, name, credential, taxonomy_code, taxonomy_description,
+  city, state, zip, phone` (snake_case, always emitted, empty results
+  included). `ProviderSearchPage` renders an "Export CSV" anchor (`.btn`)
+  inside the filter card when criteria are present, carrying the current
+  URL-param filters; the MIPS-only checkbox is client-side only and does not
+  affect the export.
+- `GET /api/v1/providers/:npi/mips-performance?format=csv&startYear=&endYear=`
+  → `mips-performance-{npi}.csv`, one row per cached year in the range
+  (defaults 2018..previous year). Header row `performance_year, final_score,
+  quality_score, improvement_activities_score,
+  promoting_interoperability_score, cost_score, performance_status,
+  data_source, year_source`; `year_source` (`archive` vs `rolling`) keeps
+  archived per-year vintages distinguishable from request-labeled rolling
+  rows. `MipsDashboardPage` renders an "Export CSV" anchor for the same
+  2018..END_YEAR range the trends chart uses.
+- `client/src/api/client.js` gains an `exportUrls` helper (URL builders, not
+  axios calls) since exports are plain browser downloads.
+
+## Update 2026-09-19: user-curated provider watchlist (V2 Stories 2.1 and 2.2)
+
+Built client-only, no new dependencies, no backend changes.
+
+- **Route**: `/my-providers` (nav label "My Providers", listed after the
+  exclusion "Watchlist"). Page: `src/pages/MyProvidersPage.jsx`.
+- **Storage**: localStorage key `providerlens.watchlist`, shape
+  `{ version: 1, npis: string[], addedAt: { [npi]: ISO date } }`, capped at
+  200 NPIs (rejected adds surface a visible message). NPIs validated as
+  10-digit strings on load; malformed entries are dropped. Pure logic in
+  `src/lib/watchlist.js`, React wrapper in `src/hooks/useWatchlist.js`.
+- **Detail-page integration**: `src/components/WatchlistToggle.jsx`
+  ("Add to watchlist" / "Watching") rendered on `ProviderDetailPage`. Search
+  results rows were left untouched as the less invasive choice.
+- **Summaries**: the page fetches `GET /api/v1/providers/:npi` per watched
+  NPI (the cap of 200 makes per-NPI fetches acceptable; no batch endpoint
+  exists). Rows show name, NPI, state, taxonomy, added date, and Remove.
+  Providers missing from the cache stay listed with a "Not available" row.
+- **Share token**: the NPI array serialized as JSON, UTF-8 encoded, unpadded
+  base64url (`+` → `-`, `/` → `_`, no `=`). Example: `["1234567890"]` becomes
+  `WyIxMjM0NTY3ODkwIl0`. Encoders/decoders exported from `src/lib/watchlist.js`;
+  `/my-providers?list=<token>` merges into the local list (dedupe, inline
+  notice of how many were added) and removes the query param.
+- Story statuses recorded in `docs/V2_ROADMAP.md` (Feature 2, Stories 2.1 and
+  2.2): shipped 2026-09-19, client-only, no-auth path per the Tension 1
+  decision. Server persistence remains Story 2.3 (blocked on auth).
