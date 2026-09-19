@@ -76,9 +76,11 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
   - Value: Early warning before a bad MIPS year becomes a payment penalty.
   - Effort: 1.5 weekends. Cost drivers: alert rule model, client side evaluation logic, snapshot storage.
   - Depends on: Story 2.1 (watchlists), Phase A0 data.
+  - **Status: shipped 2026-09-19, client-only, per the Tension 1 no-auth decision.** Alert config `{ enabled, dropThreshold }` lives on the watchlist storage (v2 shape, key `providerlens.watchlist`). On each page load of `/my-providers`, when enabled, the page fetches `GET /api/v1/analytics/trends/:npi` for every watched NPI and compares consecutive archive years (`year_source = 'archive'`, the endpoint's rolling-vintage warning field is the proxy since per-row year_source is not exposed). A provider whose final score dropped by at least the threshold between two consecutive archive years gets a row badge and a page banner ("dropped X points from PY YYYY to PY YYYY"). Providers with fewer than two scored archive years get no alert, not an all-clear. Evaluation runs only while the page is open; there is no scheduling. Server-side snapshot storage and scheduling remain Story 1.3 (Phase C).
 - **Story 1.2**: As a Consultant, I want to share an alert configuration as a link so that my client sees the same flagged drops without creating an account.
   - Value: Consultants work across platforms; links are the deliverable.
   - Effort: 0.5 weekend (extends the watchlist URL token).
+  - **Status: shipped 2026-09-19, client-only.** The share token gained a v2 payload `{ npis, alert }` (still unpadded base64url of UTF-8 JSON). `decodeShareToken` stays backward compatible with the old bare-array format, wrapping it as `{ npis, alert: null }`. "Copy share link" on `/my-providers` emits the v2 token only when alerts are enabled; a legacy-format token otherwise, so old links keep working. Loading `?list=` with a v2 token merges the NPIs and applies the shared alert config in one commit, and the inline notice says the settings came along. See `client/ADOPTION_NOTES.md` (2026-09-19 section).
 - **Story 1.3**: As a Practice Manager, I want to receive an email when a watched provider's score drops after a data refresh so that I do not have to remember to check.
   - Value: True push alerting.
   - Effort: 3 weekends. Cost drivers: auth, scheduled job, email provider integration, unsubscribe/compliance.
@@ -188,8 +190,8 @@ Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_perce
 | 2.1 localStorage watchlist | A | 1 | none |
 | 2.2 Shareable watchlist URL | A | 0.5 | 2.1 |
 | 5.2 Side-by-side provider comparison (shipped 2026-09-19) | A | 1 | existing trends endpoint; A0 for full value |
-| 1.1 Client side score drop alerts | B | 1.5 | 2.1, A0 |
-| 1.2 Shareable alert config link | B | 0.5 | 2.2, 1.1 |
+| 1.1 Client side score drop alerts (shipped 2026-09-19) | B | 1.5 | 2.1, A0 |
+| 1.2 Shareable alert config link (shipped 2026-09-19) | B | 0.5 | 2.2, 1.1 |
 | 5.1 Percentile-over-time vs cohort band (shipped 2026-09-19) | B | 1 | A0 materialization |
 | 4.1 Taxonomy benchmarking report | B | 2 | A0 materialization |
 | Auth foundation | C | 2.5 | none (can start anytime) |

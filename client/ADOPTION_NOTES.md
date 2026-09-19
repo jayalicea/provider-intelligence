@@ -1,5 +1,11 @@
 # ADOPTION_NOTES.md — Phase 3 frontend inventory and adoption decisions
 
+## 2026-09-19: Watchlist token v2 + score drop alerts (Stories 1.1, 1.2)
+
+- Watchlist storage shape is now `{ version: 2, npis, addedAt, alert: { enabled, dropThreshold } }` under the same key `providerlens.watchlist`. `loadWatchlist` migrates v1 on load (alert defaults to `{ enabled: false, dropThreshold: 10 }`); the 200-NPI cap logic is unchanged. Malformed alert configs fall back to the default rather than poisoning the load.
+- Share token format v2: base64url JSON object `{ npis, alert }` instead of the bare NPI array. `decodeShareToken` accepts both formats and always returns `{ npis, alert }` (`alert: null` for legacy tokens), so old `?list=` links keep working. `encodeShareToken(npis, alert)` emits v2 only when the alert is enabled; otherwise it emits the legacy bare array so links shared with older deployments still decode. Verified by a node round-trip one-liner against the real module (v1, v2, legacy decode, v1 storage migration, malformed alert, garbage token).
+- `/my-providers` gained a settings block (enable checkbox, 1-100 threshold input) and client-side alert evaluation per Story 1.1: on page load only, each watched NPI's trends (`GET /api/v1/analytics/trends/:npi`) are compared across consecutive archive years. Deviation to note: the endpoint does not expose per-row `year_source`, so the client treats a response as all-archive only when the endpoint's rolling-vintage `warning` field is null; a response carrying the warning is skipped rather than compared, and providers with fewer than two scored archive years are never flagged. No new dependencies; `npm run lint` and `npm run build` pass.
+
 Inventory of the uncommitted frontend work recovered from the prior session
 (WIP commit `2b06aa8`), decided file by file. Design authority:
 `docs/DESIGN.md` (tokens, copy, empty/loading/error states, disclaimer panel);

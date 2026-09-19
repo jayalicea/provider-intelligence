@@ -6,6 +6,8 @@ import {
   mergeNpis,
   removeNpi,
   saveWatchlist,
+  setAlertConfig,
+  isValidAlert,
 } from '../lib/watchlist.js'
 
 /**
@@ -59,6 +61,13 @@ export function useWatchlist() {
     [state, add, remove]
   )
 
+  const setAlert = useCallback(
+    (alert) => {
+      commit(setAlertConfig(state, alert))
+    },
+    [state, commit]
+  )
+
   const merge = useCallback(
     (npis) => {
       const result = mergeNpis(state, npis)
@@ -68,20 +77,41 @@ export function useWatchlist() {
     [state, commit]
   )
 
+  // Share-link load: merge NPIs and apply the shared alert config (when the
+  // token carries one) in a single commit so neither update clobbers the
+  // other. Returns { added, skipped, alertApplied }.
+  const mergeShared = useCallback(
+    (npis, alert) => {
+      const result = mergeNpis(state, npis)
+      let next = result.state
+      let alertApplied = false
+      if (isValidAlert(alert)) {
+        next = setAlertConfig(next, alert)
+        alertApplied = true
+      }
+      if (result.added > 0 || alertApplied) commit(next)
+      return { ...result, alertApplied }
+    },
+    [state, commit]
+  )
+
   return useMemo(
     () => ({
       npis: state.npis,
       addedAt: state.addedAt,
+      alert: state.alert,
       count: state.npis.length,
       max: WATCHLIST_MAX,
       has,
       add,
       remove,
       toggle,
+      setAlert,
       merge,
+      mergeShared,
       capMessage,
       clearCapMessage: () => setCapMessage(null),
     }),
-    [state, has, add, remove, toggle, merge, capMessage]
+    [state, has, add, remove, toggle, setAlert, merge, mergeShared, capMessage]
   )
 }

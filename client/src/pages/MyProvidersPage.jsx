@@ -5,6 +5,10 @@ import { useWatchlist } from '../hooks/useWatchlist.js'
 import { WATCHLIST_MAX, decodeShareToken, encodeShareToken } from '../lib/watchlist.js'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
+import { findLargestDrop } from '../lib/scoreDrop.js'
+
+// Widest sensible window for archive-year comparisons: MIPS began in 2017.
+const TRENDS_START_YEAR = 2017
 
 function providerName(p) {
   return (
@@ -48,16 +52,21 @@ export default function MyProvidersPage() {
       if (cancelled) return
       const decoded = decodeShareToken(token)
       if (decoded) {
-        const { added, skipped } = watchlist.merge(decoded)
-        if (added > 0) {
-          setShareNotice(
-            `Added ${added} provider${added === 1 ? '' : 's'} from the shared link` +
+        const { added, skipped, alertApplied } = watchlist.mergeShared(
+          decoded.npis,
+          decoded.alert
+        )
+        const base =
+          added > 0
+            ? `Added ${added} provider${added === 1 ? '' : 's'} from the shared link` +
               (skipped > 0 ? `; ${skipped} already on your list or invalid` : '') +
               '.'
-          )
-        } else {
-          setShareNotice('All providers from the link were already on your list.')
-        }
+            : 'All providers from the link were already on your list.'
+        setShareNotice(
+          alertApplied
+            ? `${base} The shared alert settings were applied too (warn when a final score drops by ${decoded.alert.dropThreshold} point${decoded.alert.dropThreshold === 1 ? '' : 's'} or more between two archive years).`
+            : base
+        )
       } else {
         setShareNotice('That share link could not be read. It may be truncated or malformed.')
       }
@@ -108,6 +117,60 @@ export default function MyProvidersPage() {
     }
   }, [npisKey])
 
+  // Score drop alerts (Story 1.1): on page load, when alerts are enabled,
+  // fetch each watched provider's multi-year trend and compare consecutive
+  // archive years. Runs only while the page is open; there is no scheduling.
+  // Providers with fewer than two scored archive years get no alert.
+  const [alerts, setAlerts] = useState({})
+  const alertEnabled = watchlist.alert.enabled
+  const dropThreshold = watchlist.alert.dropThreshold
+  useEffect(() => {
+    let cancelled = false
+    if (!alertEnabled) {
+      Promise.resolve().then(() => {
+        if (!cancelled) setAlerts({})
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+    const npis = npisKey ? npisKey.split(',') : []
+    if (npis.length === 0) {
+      Promise.resolve().then(() => {
+        if (!cancelled) setAlerts({})
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+    const endYear = new Date().getFullYear()
+    Promise.allSettled(
+      npis.map((npi) => api.getAnalyticsTrends(npi, TRENDS_START_YEAR, endYear))
+    ).then((results) => {
+      if (cancelled) return
+      const next = {}
+      results.forEach((r, i) => {
+        if (r.status !== 'fulfilled' || !r.value) return
+        // The trends endpoint flags rolling-vintage (request-labeled) rows
+        // with a warning. Archive years are real per-year MIPS data; only a
+        // warning-free response is safe to compare year over year. The API
+        // does not expose per-row year_source, so a mixed response is
+        // skipped rather than guessed at.
+        if (r.value.warning) return
+        const archiveYears = (r.value.years || [])
+          .filter((y) => y.finalScore !== null)
+          .sort((a, b) => a.year - b.year)
+        if (archiveYears.length < 2) return
+        const worst = findLargestDrop(archiveYears)
+        if (worst && worst.drop >= dropThreshold) next[npis[i]] = worst
+      })
+      setAlerts(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [npisKey, alertEnabled, dropThreshold])
+
   const ordered = useMemo(
     () =>
       watchlist.npis.map((npi) => ({
@@ -119,9 +182,12 @@ export default function MyProvidersPage() {
 
   const shareLink = useMemo(() => {
     if (watchlist.npis.length === 0) return null
-    const token = encodeShareToken(watchlist.npis)
+    const token = encodeShareToken(
+      watchlist.npis,
+      watchlist.alert.enabled ? watchlist.alert : null
+    )
     return `${window.location.origin}/my-providers?list=${token}`
-  }, [watchlist.npis])
+  }, [watchlist.npis, watchlist.alert])
 
   const copyShareLink = async () => {
     if (!shareLink) return
@@ -174,11 +240,76 @@ export default function MyProvidersPage() {
               {copied && (
                 <span className="provenance">
                   Anyone opening the link gets this provider set merged into
-                  their own list.
+                  their own list
+                  {watchlist.alert.enabled
+                    ? ', along with these alert settings.'
+                    : '.'}
                 </span>
               )}
             </div>
           </div>
+
+          <div className="card">
+            <div className="watchlist-actions">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={watchlist.alert.enabled}
+                  onChange={(e) =>
+                    watchlist.setAlert({
+                      ...watchlist.alert,
+                      enabled: e.target.checked,
+                    })
+                  }
+                />{' '}
+                Warn me about score drops on this page
+              </label>
+              <label>
+                Drop threshold{' '}
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={watchlist.alert.dropThreshold}
+                  disabled={!watchlist.alert.enabled}
+                  onChange={(e) => {
+                    const value = Number.parseInt(e.target.value, 10)
+                    if (Number.isNaN(value)) return
+                    const clamped = Math.min(100, Math.max(1, value))
+                    watchlist.setAlert({
+                      ...watchlist.alert,
+                      dropThreshold: clamped,
+                    })
+                  }}
+                  style={{ width: '5em' }}
+                />{' '}
+                points
+              </label>
+            </div>
+            <p className="provenance">
+              When this is on, each visit to this page compares the final MIPS
+              scores from one archive year to the next for every provider on
+              your list, and flags any drop of {watchlist.alert.dropThreshold}{' '}
+              point{watchlist.alert.dropThreshold === 1 ? '' : 's'} or more.
+              Providers with less than two archive years are not compared.
+            </p>
+          </div>
+
+          {alertEnabled &&
+            (() => {
+              const flagged = ordered.filter(({ npi }) => alerts[npi])
+              if (flagged.length === 0) return null
+              return (
+                <p className="notice-banner" role="alert">
+                  {flagged.length === 1
+                    ? '1 watched provider'
+                    : `${flagged.length} watched providers`}{' '}
+                  dropped by {dropThreshold} point
+                  {dropThreshold === 1 ? '' : 's'} or more between two archive
+                  MIPS years. See the flagged rows below.
+                </p>
+              )
+            })()}
 
           {fetchError && <ErrorBanner message={fetchError.message} />}
 
@@ -210,6 +341,13 @@ export default function MyProvidersPage() {
                         {provider === null && !loading && (
                           <div className="provenance">
                             Not found in the current cached data
+                          </div>
+                        )}
+                        {alerts[npi] && (
+                          <div className="notice-banner" role="alert">
+                            MIPS final score dropped {alerts[npi].drop} points
+                            from PY {alerts[npi].fromYear} to PY{' '}
+                            {alerts[npi].toYear} (archive years)
                           </div>
                         )}
                       </td>
