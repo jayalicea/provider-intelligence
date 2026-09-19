@@ -134,6 +134,7 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
   - Value: Extends the existing ranking service into a complete, navigable report.
   - Effort: 2 weekends. Cost drivers: materialized per-taxonomy-per-year aggregates for 1M+ row scale, report UI with recharts.
   - Depends on: Percentile materialization job (shared with Feature 5).
+  - **Status: shipped 2026-09-19.** Backend endpoint `GET /api/v1/analytics/taxonomy-benchmark?taxonomy=<code>&year=<py>` (both params required, archive years 2018-2020/2022-2024 only, 404 when the taxonomy-year is not materialized, 400 when the stored cohort exceeds the 250k live-decile guard). Summary stats (mean/min/max/quartiles) read from `taxonomy_percentiles`; the d10-d90 decile ladder and the per-state breakdown are computed at read time with `PERCENTILE_CONT` over scored archive MIPS rows joined via the materializer's coalesce (`COALESCE(nppes_providers.primary_taxonomy_code, providers.primary_taxonomy_code)`). Live check: largest cohort (207Q00000X, 2018, 54,086 scored rows) computes the full endpoint, deciles plus state breakdown, in ~2.2s with existing indexes (one GROUPING SETS scan serves both), so no new index migration was added. Client route `/benchmark` (linked from the MIPS dashboard percentile section, prefilled with the provider's taxonomy when known): taxonomy input with datalist suggestions, archive-year selector, summary stat band, recharts bar chart of the decile ladder (cut-point thresholds, explicitly not a histogram), decile band table, and a top-10 state breakdown table with medians. State breakdown: included (the story asked for it and it is one grouped aggregate over the same cohort scan). "Top/bottom deciles" from the story sketch map to the d10/d90 ends of the ladder.
 - **Story 4.2**: As a Consultant, I want the benchmark report exportable as PDF so that it becomes my client deliverable.
   - Value: The report is the product a consultant sells.
   - Effort: included in 3.3.
@@ -157,7 +158,7 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
 ### Phase A0: Real Multi-Year Data (prerequisite, 2 weekends) — SHIPPED 2026-09-19
 Archived QPP CSV acquisition, `performance_year` backfill, per-vintage ingestion pipeline, plus the per-taxonomy-per-year percentile materialization job. Nothing user facing, but everything below that involves years or percentiles depends on it.
 
-Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_percentiles.sql`) holds per-taxonomy-per-year aggregates over archive MIPS rows, built by `tools/build-taxonomy-percentiles.js` (TRUNCATE + rebuild, self-verifying accounting, `--dry-run` supported). The read path `GET /api/v1/analytics/percentile-trends/:npi` reads it. Percentile definitions: stored quartiles/median use PERCENTILE_CONT over non-null final scores (same as group-performance/benchmark); the per-provider percentile uses the ranking definition (share of scored same-taxonomy peers at or below the provider), computed at read time. This unblocks Story 5.1 (percentile-over-time chart, now shipped) and Story 4.1 (taxonomy benchmarking report, still open).
+Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_percentiles.sql`) holds per-taxonomy-per-year aggregates over archive MIPS rows, built by `tools/build-taxonomy-percentiles.js` (TRUNCATE + rebuild, self-verifying accounting, `--dry-run` supported). The read path `GET /api/v1/analytics/percentile-trends/:npi` reads it. Percentile definitions: stored quartiles/median use PERCENTILE_CONT over non-null final scores (same as group-performance/benchmark); the per-provider percentile uses the ranking definition (share of scored same-taxonomy peers at or below the provider), computed at read time. This unblocks Story 5.1 (percentile-over-time chart, shipped 2026-09-19) and Story 4.1 (taxonomy benchmarking report, shipped 2026-09-19).
 
 ### Phase A: Lowest Effort, Highest Value, No Auth (3.5 weekends total)
 1. Story 3.1: CSV export (0.5)
@@ -193,7 +194,7 @@ Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_perce
 | 1.1 Client side score drop alerts (shipped 2026-09-19) | B | 1.5 | 2.1, A0 |
 | 1.2 Shareable alert config link (shipped 2026-09-19) | B | 0.5 | 2.2, 1.1 |
 | 5.1 Percentile-over-time vs cohort band (shipped 2026-09-19) | B | 1 | A0 materialization |
-| 4.1 Taxonomy benchmarking report | B | 2 | A0 materialization |
+| 4.1 Taxonomy benchmarking report (shipped 2026-09-19) | B | 2 | A0 materialization |
 | Auth foundation | C | 2.5 | none (can start anytime) |
 | 2.3 Server persisted watchlists | C | 2 | auth |
 | 1.3 Email score drop alerts | C | 1.5 | auth, 1.1, A0 |

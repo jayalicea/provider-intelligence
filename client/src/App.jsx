@@ -10,6 +10,7 @@ import ComparePage from './pages/ComparePage.jsx'
 import UploadRosterPage from './pages/UploadRosterPage.jsx'
 import CoveragePage from './pages/CoveragePage.jsx'
 import MipsDashboardPage from './pages/MipsDashboardPage.jsx'
+import BenchmarkPage from './pages/BenchmarkPage.jsx'
 import HospitalQualityPage from './pages/HospitalQualityPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import coverage from './data/coverage.json'
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="/upload-roster" element={<UploadRosterPage />} />
             <Route path="/coverage" element={<CoveragePage />} />
             <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
+            <Route path="/benchmark" element={<BenchmarkPage />} />
             <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

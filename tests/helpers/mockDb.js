@@ -90,6 +90,24 @@ function groupStats(rows) {
 
 const queryLog = [];
 
+// --- taxonomy benchmark (Story 4.1) -----------------------------------------
+// Cohort rows for one taxonomy-year: scored archive mips rows whose resolved
+// taxonomy (nppes_providers first, providers fallback, same coalesce order
+// as the materializer) matches.
+function taxonomyCohort(year, taxonomy) {
+  const resolveTaxonomy = n => {
+    const nppes = nppesProviders.get(String(n));
+    if (nppes && nppes.primary_taxonomy_code) return nppes.primary_taxonomy_code;
+    const prov = providers.get(String(n));
+    return (prov && prov.primary_taxonomy_code) || null;
+  };
+  return [...mips.values()].filter(r =>
+    Number(r.performance_year) === Number(year) &&
+    r.year_source === 'archive' &&
+    r.final_score !== null && r.final_score !== undefined &&
+    resolveTaxonomy(r.npi) === taxonomy);
+}
+
 async function query(text, params = []) {
   const sql = norm(text);
   queryLog.push(sql);
@@ -417,7 +435,7 @@ async function query(text, params = []) {
 
   // Taxonomy resolution, same coalesce order as the loader:
   // nppes_providers first, providers as fallback.
-  if (/COALESCE\(n\.primary_taxonomy_code, p\.primary_taxonomy_code\)/.test(sql)) {
+  if (/COALESCE\(n\.primary_taxonomy_code, p\.primary_taxonomy_code\) AS taxonomy_code FROM \(SELECT \$1 AS npi\) s/.test(sql)) {
     const npi = String(params[0]);
     const nppes = nppesProviders.get(npi);
     const prov = providers.get(npi);
@@ -474,6 +492,50 @@ async function query(text, params = []) {
       }],
       rowCount: 1
     };
+  }
+
+  // --- taxonomy benchmark (tests/taxonomy-benchmark.test.js) -----------------
+
+  // Materialized row lookup for one taxonomy-year; empty result = 404.
+  if (/^SELECT scored_count, min_final_score, max_final_score, median_final_score, p25_final_score, p75_final_score, mean_final_score, source, as_of FROM taxonomy_percentiles WHERE taxonomy_code = \$1 AND performance_year = \$2$/.test(sql)) {
+    const row = taxonomyPercentiles.find(r =>
+      r.taxonomy_code === params[0] && Number(r.performance_year) === Number(params[1]));
+    return { rows: row ? [{ ...row }] : [], rowCount: row ? 1 : 0 };
+  }
+
+  // Single GROUPING SETS pass: one row with overall=1 carries the cohort
+  // decile ladder; rows with overall=0 carry the per-state breakdown.
+  if (/GROUP BY GROUPING SETS/.test(sql) && sql.includes('COALESCE(n.primary_taxonomy_code')) {
+    const [year, taxonomy] = params;
+    const cohort = taxonomyCohort(year, taxonomy);
+    const byState = new Map();
+    for (const r of cohort) {
+      const nppes = nppesProviders.get(String(r.npi));
+      const prov = providers.get(String(r.npi));
+      const state = (nppes && nppes.practice_state) || (prov && prov.practice_state) || null;
+      if (!byState.has(state)) byState.set(state, []);
+      byState.get(state).push(Number(r.final_score));
+    }
+    const rows = [];
+    const overall = { overall: 1, state: null, scored_count: cohort.length };
+    const sortedAll = cohort.map(r => Number(r.final_score)).sort((a, b) => a - b);
+    for (let i = 1; i <= 9; i++) {
+      overall[`d${i * 10}`] = percentileCont(sortedAll, i / 10);
+    }
+    overall.median_final_score = percentileCont(sortedAll, 0.5);
+    rows.push(overall);
+    for (const [state, scores] of byState) {
+      const sorted = scores.sort((a, b) => a - b);
+      const row = {
+        overall: 0,
+        state,
+        scored_count: sorted.length,
+        median_final_score: percentileCont(sorted, 0.5)
+      };
+      for (let i = 1; i <= 9; i++) row[`d${i * 10}`] = null;
+      rows.push(row);
+    }
+    return { rows, rowCount: rows.length };
   }
 
   // --- national cohort query (national_screening, materialized) --------------

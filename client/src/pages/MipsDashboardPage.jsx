@@ -70,6 +70,21 @@ export default function MipsDashboardPage() {
           error={percentileTrends.error}
           onRetry={percentileTrends.refetch}
         />
+        <p className="muted">
+          Peer benchmark:{' '}
+          {percentileTrends.data?.taxonomy ? (
+            <Link
+              to={`/benchmark?taxonomy=${encodeURIComponent(percentileTrends.data.taxonomy)}`}
+            >
+              full distribution report for taxonomy{' '}
+              {percentileTrends.data.taxonomy}
+            </Link>
+          ) : (
+            <Link to="/benchmark">
+              full score distribution for any taxonomy and year
+            </Link>
+          )}
+        </p>
       </div>
     </section>
   )

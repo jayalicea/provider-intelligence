@@ -132,6 +132,34 @@ paths:
         - { $ref: '#/components/parameters/Npi' }
         - { name: year, in: query, required: true, schema: { type: integer } }
         - { name: taxonomy, in: query, schema: { type: string } }
+  /analytics/taxonomy-benchmark:
+    get:
+      summary: Per-taxonomy peer benchmark report for one archive year
+      description: >-
+        Story 4.1. Distribution summary (scored_count, mean, min/max, and
+        p25/p50/p75 quartiles) is read from the materialized
+        taxonomy_percentiles table for the requested taxonomy-year; the
+        decile ladder (d10..d90) and the per-state breakdown are computed
+        at read time with PERCENTILE_CONT (linear interpolation) over
+        scored archive MIPS rows (year_source='archive') whose resolved
+        taxonomy matches, using the materializer's coalesce order:
+        nppes_providers.primary_taxonomy_code first, providers cache as
+        fallback. Both params are required; year must be an archive
+        performance year (2018-2020, 2022-2024). 404 when the
+        taxonomy-year pair is not materialized; 400 when the stored
+        cohort exceeds the live-decile guard (250,000 scored rows).
+      parameters:
+        - { name: taxonomy, in: query, required: true, schema: { type: string, pattern: '^[0-9A-Z]{3,10}$' }, description: NPPES taxonomy code, e.g. 207Q00000X }
+        - { name: year, in: query, required: true, schema: { type: integer, enum: [2018, 2019, 2020, 2022, 2023, 2024] } }
+      responses:
+        '200':
+          description: >-
+            { success, data: { taxonomy, performance_year, scoredCount,
+            mean, deciles: { d10..d90 }, quartiles: { p25, p50, p75 },
+            min, max, states: [ { state, scoredCount, median } ],
+            provenance: { source, as_of } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { description: Taxonomy-year pair not materialized }
   /analytics/percentile-trends/{npi}:
     get:
       summary: Provider percentile over time vs their taxonomy cohort (archive years)

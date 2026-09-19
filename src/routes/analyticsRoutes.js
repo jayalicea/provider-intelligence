@@ -12,6 +12,7 @@ const bound = (method) => controller[method].bind(controller);
 router.use(rateLimiter({ windowMs: 60 * 1000, max: 100 })); // 100 requests per minute
 
 // Analytics endpoints
+router.get('/taxonomy-benchmark', bound('getTaxonomyBenchmark'));
 router.get('/group-performance', bound('getGroupPerformance'));
 router.get('/ranking/:npi', bound('getRanking'));
 router.get('/trends/:npi', bound('getTrends'));

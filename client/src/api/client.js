@@ -99,6 +99,13 @@ export const api = {
     return data.data
   },
 
+  getTaxonomyBenchmark: async (taxonomy, year) => {
+    const { data } = await http.get('/analytics/taxonomy-benchmark', {
+      params: { taxonomy, year },
+    })
+    return data.data
+  },
+
   getVerification: async (npi) => {
     const { data } = await http.get(`/providers/${npi}/verification`)
     return data.data

@@ -11,6 +11,39 @@ const num = v => {
 };
 const round2 = v => (v === null || v === undefined ? null : Math.round(v * 100) / 100);
 
+// Decile ladder computed at read time with PERCENTILE_CONT (linear
+// interpolation), the same definition the materializer stores for the
+// quartiles. The runtime path issues this as SQL; computeDeciles is the
+// pure reference form, kept in sync and unit tested, mirroring the
+// computeAggregates pattern in tools/build-taxonomy-percentiles.js.
+const DECILE_POINTS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+
+function percentileContSorted(sorted, p) {
+  if (!sorted.length) return null;
+  const idx = p * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function computeDeciles(sortedScores) {
+  const deciles = {};
+  DECILE_POINTS.forEach((p, i) => {
+    deciles[`d${(i + 1) * 10}`] = percentileContSorted(sortedScores, p);
+  });
+  return deciles;
+}
+
+// Read-time deciles are computed over the full cohort row set, not the
+// stored aggregates. Per-taxonomy-year cohorts are tens of thousands of
+// rows (largest measured: 54,086 in ~2s), but refuse pathological groups
+// rather than let the ordered-set aggregate grind.
+const MAX_LIVE_COHORT = 250000;
+
+const DECILE_SELECT = DECILE_POINTS
+  .map(p => `PERCENTILE_CONT(${p}) WITHIN GROUP (ORDER BY m.final_score) AS d${p * 100}`)
+  .join(',\n               ');
+
 class AnalyticsService {
 
   /**
@@ -371,6 +404,104 @@ class AnalyticsService {
   }
 
   /**
+   * Per-taxonomy benchmark report for one archive performance year
+   * (Story 4.1). Distribution summary (min/max/mean/quartiles) comes from
+   * the materialized taxonomy_percentiles row; the decile ladder and the
+   * per-state breakdown are computed at read time with PERCENTILE_CONT
+   * over scored archive mips rows whose resolved taxonomy
+   * (COALESCE(nppes_providers.primary_taxonomy_code,
+   * providers.primary_taxonomy_code), the same order the materializer
+   * uses) matches. Returns null when the taxonomy-year is not
+   * materialized (controller maps to 404); throws a 400 when the stored
+   * cohort is too large for a live decile computation.
+   */
+  async getTaxonomyBenchmark(taxonomy, year) {
+    try {
+      const tpRes = await db.query(`
+        SELECT scored_count, min_final_score, max_final_score,
+               median_final_score, p25_final_score, p75_final_score,
+               mean_final_score, source, as_of
+        FROM taxonomy_percentiles
+        WHERE taxonomy_code = $1 AND performance_year = $2
+      `, [taxonomy, year]);
+      const tpRow = tpRes.rows[0];
+      if (!tpRow) return null;
+
+      const scoredCount = Number(tpRow.scored_count);
+      if (scoredCount > MAX_LIVE_COHORT) {
+        throw Object.assign(
+          new Error(
+            `Cohort of ${scoredCount} scored providers is too large for a live ` +
+            'decile computation; request a smaller taxonomy group'
+          ),
+          { statusCode: 400 }
+        );
+      }
+
+      // One pass with GROUPING SETS: the empty set yields the cohort-wide
+      // decile ladder, the state set yields the per-state breakdown, so
+      // the cohort scan happens once instead of twice.
+      const res = await db.query(`
+        SELECT GROUPING(COALESCE(n.practice_state, p.practice_state)) AS overall,
+               COALESCE(n.practice_state, p.practice_state) AS state,
+               COUNT(m.final_score) AS scored_count,
+               ${DECILE_SELECT},
+               PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.final_score) AS median_final_score
+        FROM mips_performance_scores m
+        LEFT JOIN nppes_providers n ON n.npi = m.npi
+        LEFT JOIN providers p ON p.npi = m.npi
+        WHERE m.year_source = 'archive'
+          AND m.final_score IS NOT NULL
+          AND m.performance_year = $1
+          AND COALESCE(n.primary_taxonomy_code, p.primary_taxonomy_code) = $2
+        GROUP BY GROUPING SETS (
+          (),
+          (COALESCE(n.practice_state, p.practice_state))
+        )
+      `, [year, taxonomy]);
+
+      const overallRow = res.rows.find(r => Number(r.overall) === 1) || {};
+      const deciles = {};
+      for (let i = 1; i <= 9; i++) {
+        deciles[`d${i * 10}`] = round2(num(overallRow[`d${i * 10}`]));
+      }
+
+      return {
+        taxonomy,
+        performance_year: year,
+        scoredCount,
+        mean: round2(num(tpRow.mean_final_score)),
+        deciles,
+        quartiles: {
+          p25: round2(num(tpRow.p25_final_score)),
+          p50: round2(num(tpRow.median_final_score)),
+          p75: round2(num(tpRow.p75_final_score))
+        },
+        min: num(tpRow.min_final_score),
+        max: num(tpRow.max_final_score),
+        states: res.rows
+          .filter(r => Number(r.overall) === 0 && r.state !== null && r.state !== undefined)
+          .sort((a, b) => Number(b.scored_count) - Number(a.scored_count))
+          .map(r => ({
+            state: String(r.state),
+            scoredCount: Number(r.scored_count),
+            median: round2(num(r.median_final_score))
+          })),
+        provenance: {
+          source: tpRow.source,
+          as_of: tpRow.as_of === null || tpRow.as_of === undefined
+            ? null
+            : (tpRow.as_of instanceof Date ? tpRow.as_of.toISOString().slice(0, 10) : String(tpRow.as_of))
+        }
+      };
+    } catch (error) {
+      if (error.statusCode) throw error;
+      logger.error('Error in taxonomy benchmark:', error);
+      throw new Error('Failed to generate taxonomy benchmark report');
+    }
+  }
+
+  /**
    * Compare one provider's score to the national distribution for a year.
    * Returns null when the provider has no score that year.
    */
@@ -448,3 +579,5 @@ class AnalyticsService {
 }
 
 module.exports = AnalyticsService;
+module.exports.computeDeciles = computeDeciles;
+module.exports.DECILE_POINTS = DECILE_POINTS;

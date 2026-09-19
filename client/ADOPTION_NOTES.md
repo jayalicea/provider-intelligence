@@ -215,3 +215,43 @@ Built client-only, no new dependencies, no backend changes.
   banner. Provenance line (source and as-of) renders under the chart.
 - Story status recorded in `docs/V2_ROADMAP.md` (Feature 5, Story 5.1):
   shipped 2026-09-19, client-only.
+
+## Update 2026-09-19: taxonomy peer benchmark report (V2 Story 4.1)
+
+Full-stack: new backend endpoint plus a new client route. No new
+dependencies.
+
+- **Route**: `/benchmark` (`src/pages/BenchmarkPage.jsx`), registered in
+  `src/App.jsx`. Linked from the MIPS dashboard percentile section
+  (`src/pages/MipsDashboardPage.jsx`): when the provider's taxonomy resolves,
+  the link is prefilled (`/benchmark?taxonomy=<code>`); otherwise it is a
+  plain link. Deliberately not added to the top nav: the report is an
+  analyst tool reached in context from a provider, not a primary browse
+  surface.
+- **Data**: `GET /api/v1/analytics/taxonomy-benchmark?taxonomy=<code>&year=<py>`
+  via `api.getTaxonomyBenchmark(taxonomy, year)` in `src/api/client.js`. Both
+  params required; archive years 2018-2020 and 2022-2024 only. Response:
+  summary stats (`scoredCount`, `mean`, `quartiles.p25/p50/p75`, `min`,
+  `max`), live-computed `deciles.d10..d90`, a per-state breakdown
+  (`states: [{ state, scoredCount, median }]`, sorted by count), and
+  `provenance { source, as_of }`. 404 means the taxonomy-year pair is not
+  materialized; the page renders an explicit empty state saying so, not an
+  error banner.
+- **Form**: taxonomy code input with a `datalist` of the four largest
+  cohorts (207Q00000X, 207R00000X, 363A00000X, 363LF0000X); free text
+  always allowed, client-side format check (3-10 letters/digits). Year is a
+  `<select>` of the six archive years, so invalid years are unrepresentable.
+  URL `?taxonomy=` prefill seeds the input.
+- **Charts**: recharts `BarChart` of the decile ladder: one bar per decile
+  threshold (d10..d90) with a dashed mean `ReferenceLine`. Honest
+  representation choice: the data is nine PERCENTILE_CONT cut points plus
+  min/max, not a binned sample, so the chart is a ladder of thresholds
+  (labeled as such) rather than a histogram that would imply counts. A
+  companion table lists each decile value and the band it closes above the
+  previous threshold. A top-10 state table (scored count, median) follows.
+  Summary stat band reuses the `.stat-band` idiom.
+- **Provenance**: a note under the report names the source and as-of and
+  states which figures are materialized aggregates vs computed at read time.
+- Story status recorded in `docs/V2_ROADMAP.md` (Feature 4, Story 4.1):
+  shipped 2026-09-19. State breakdown included (the story listed it); the
+  story's "top/bottom deciles" map to the d10/d90 ends of the ladder.
