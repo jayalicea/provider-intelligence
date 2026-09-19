@@ -3,6 +3,7 @@ import api, { exportUrls } from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
 import CategoryBarChart from '../components/CategoryBarChart.jsx'
 import ScoreTrendChart from '../components/ScoreTrendChart.jsx'
+import PercentileTrendChart from '../components/PercentileTrendChart.jsx'
 
 const END_YEAR = new Date().getFullYear() - 1
 
@@ -12,6 +13,10 @@ export default function MipsDashboardPage() {
   const performance = useFetch(() => api.getMipsPerformance(npi), [npi])
   const trends = useFetch(
     () => api.getMipsTrends(npi, 2018, END_YEAR),
+    [npi]
+  )
+  const percentileTrends = useFetch(
+    () => api.getPercentileTrends(npi),
     [npi]
   )
 
@@ -52,6 +57,18 @@ export default function MipsDashboardPage() {
           loading={trends.loading}
           error={trends.error}
           onRetry={trends.refetch}
+        />
+      </div>
+      <div className="stack-top">
+        {/* Story 5.1: percentile rank over time vs taxonomy cohort.
+            Least invasive fit for this page: a headed section directly
+            below the raw-score trend chart it contextualizes, no new
+            route or tabs. */}
+        <PercentileTrendChart
+          result={percentileTrends.data}
+          loading={percentileTrends.loading}
+          error={percentileTrends.error}
+          onRetry={percentileTrends.refetch}
         />
       </div>
     </section>

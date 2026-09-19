@@ -142,6 +142,7 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
   - Value: Raw score trends mislead when cutoffs and cohort medians shift; percentile over time does not.
   - Effort: 1 weekend (new chart component + percentile-over-time endpoint reading materialized aggregates).
   - Depends on: Phase A0 data, materialization job.
+  - **Status: shipped 2026-09-19, client-only.** Section on the MIPS dashboard page (`/providers/:npi/mips`) directly below the raw-score trend chart, no new route. New `PercentileTrendChart` component reading `GET /api/v1/analytics/percentile-trends/:npi`; archive years only. Deviation: the endpoint's cohort median/p25/p75 are final-score values (PERCENTILE_CONT over cohort scores), not percentile ranks, so the chart uses a dual-axis recharts composition (percentile rank left, cohort score right) rather than one shared percentile axis. A 404 (no resolvable taxonomy) renders an explicit "percentile context unavailable" note, never an empty box; a null provider percentile leaves a line gap, never an interpolation.
 - **Story 5.2**: As a Practice Manager, I want to compare two or three of my providers side by side across years so that I can see who is improving and who is slipping.
   - Value: Direct internal comparison for incentive and remediation decisions.
   - Effort: 1 weekend. Cost drivers: multi-series trend chart, provider picker limited to small N.
@@ -154,7 +155,7 @@ This requires the Phase A0 data prerequisite and the per-year percentile materia
 ### Phase A0: Real Multi-Year Data (prerequisite, 2 weekends) — SHIPPED 2026-09-19
 Archived QPP CSV acquisition, `performance_year` backfill, per-vintage ingestion pipeline, plus the per-taxonomy-per-year percentile materialization job. Nothing user facing, but everything below that involves years or percentiles depends on it.
 
-Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_percentiles.sql`) holds per-taxonomy-per-year aggregates over archive MIPS rows, built by `tools/build-taxonomy-percentiles.js` (TRUNCATE + rebuild, self-verifying accounting, `--dry-run` supported). The read path `GET /api/v1/analytics/percentile-trends/:npi` reads it. Percentile definitions: stored quartiles/median use PERCENTILE_CONT over non-null final scores (same as group-performance/benchmark); the per-provider percentile uses the ranking definition (share of scored same-taxonomy peers at or below the provider), computed at read time. This unblocks Story 5.1 (percentile-over-time chart) and Story 4.1 (taxonomy benchmarking report); both remain open.
+Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_percentiles.sql`) holds per-taxonomy-per-year aggregates over archive MIPS rows, built by `tools/build-taxonomy-percentiles.js` (TRUNCATE + rebuild, self-verifying accounting, `--dry-run` supported). The read path `GET /api/v1/analytics/percentile-trends/:npi` reads it. Percentile definitions: stored quartiles/median use PERCENTILE_CONT over non-null final scores (same as group-performance/benchmark); the per-provider percentile uses the ranking definition (share of scored same-taxonomy peers at or below the provider), computed at read time. This unblocks Story 5.1 (percentile-over-time chart, now shipped) and Story 4.1 (taxonomy benchmarking report, still open).
 
 ### Phase A: Lowest Effort, Highest Value, No Auth (3.5 weekends total)
 1. Story 3.1: CSV export (0.5)
@@ -189,7 +190,7 @@ Materialization note: `taxonomy_percentiles` (migration `20260919_taxonomy_perce
 | 5.2 Side-by-side provider comparison (shipped 2026-09-19) | A | 1 | existing trends endpoint; A0 for full value |
 | 1.1 Client side score drop alerts | B | 1.5 | 2.1, A0 |
 | 1.2 Shareable alert config link | B | 0.5 | 2.2, 1.1 |
-| 5.1 Percentile-over-time vs cohort band | B | 1 | A0 materialization |
+| 5.1 Percentile-over-time vs cohort band (shipped 2026-09-19) | B | 1 | A0 materialization |
 | 4.1 Taxonomy benchmarking report | B | 2 | A0 materialization |
 | Auth foundation | C | 2.5 | none (can start anytime) |
 | 2.3 Server persisted watchlists | C | 2 | auth |

@@ -179,3 +179,33 @@ Built client-only, no new dependencies, no backend changes.
   storage first, then navigates to `/compare`.
 - Story status recorded in `docs/V2_ROADMAP.md` (Feature 5, Story 5.2):
   shipped 2026-09-19, client-only.
+
+## Update 2026-09-19: percentile rank over time vs taxonomy cohort (V2 Story 5.1)
+
+Built client-only, no new dependencies, no backend changes.
+
+- **Integration choice**: a new headed section on the existing MIPS dashboard
+  page (`src/pages/MipsDashboardPage.jsx`), directly below the raw-score
+  `ScoreTrendChart` it contextualizes. The page is short (two charts), so a
+  new route or tabs would add navigation weight for no gain.
+- **Data**: `GET /api/v1/analytics/percentile-trends/:npi` via a new
+  `api.getPercentileTrends(npi)` helper in `src/api/client.js`. Archive years
+  only; each row carries the provider percentile (0-100, null when not scored
+  that year), cohort score-space quartiles, and provenance.
+- **Chart**: `src/components/PercentileTrendChart.jsx`, recharts, DESIGN
+  token palette (`#0F6B5C` / `#4C8055` / `#52606D`), same card/spinner/banner
+  idiom as `ScoreTrendChart`. Deliberate deviation from the story sketch: the
+  endpoint's cohort median/p25/p75 are final-score values (PERCENTILE_CONT
+  over cohort scores), not percentile ranks, so one shared 0-100 percentile
+  axis would mix units. The chart therefore uses two y axes: provider
+  percentile rank on the left (line, domain 0-100), cohort final score on
+  the right (dashed median line plus a p25-to-p75 band via two stacked
+  `Area` series, fill opacity 0.2). Legend and axis labels name each unit in
+  plain language.
+- **Data honesty**: a null percentile renders as a line gap (no
+  `connectNulls`); years with no provider row are absent from the axis; a 404
+  (no resolvable primary taxonomy) renders an explicit note that percentile
+  context is unavailable for this provider, not an empty box or error
+  banner. Provenance line (source and as-of) renders under the chart.
+- Story status recorded in `docs/V2_ROADMAP.md` (Feature 5, Story 5.1):
+  shipped 2026-09-19, client-only.

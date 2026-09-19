@@ -88,6 +88,17 @@ export const api = {
     return data.data
   },
 
+  // Percentile rank over time vs the provider's taxonomy cohort. Archive
+  // years only; each row carries the provider percentile (0-100, null when
+  // not scored that year), cohort score-space quartiles (p25/median/p75),
+  // and provenance. The endpoint 404s when the npi has no resolvable
+  // primary taxonomy; the error carries status 404 for the chart to render
+  // an explicit "no cohort context" note instead of an error banner.
+  getPercentileTrends: async (npi) => {
+    const { data } = await http.get(`/analytics/percentile-trends/${npi}`)
+    return data.data
+  },
+
   getVerification: async (npi) => {
     const { data } = await http.get(`/providers/${npi}/verification`)
     return data.data
