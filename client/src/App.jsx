@@ -6,6 +6,7 @@ import Provider360Page from './pages/Provider360Page.jsx'
 import CohortExplorerPage from './pages/CohortExplorerPage.jsx'
 import WatchlistPage from './pages/WatchlistPage.jsx'
 import MyProvidersPage from './pages/MyProvidersPage.jsx'
+import ComparePage from './pages/ComparePage.jsx'
 import UploadRosterPage from './pages/UploadRosterPage.jsx'
 import CoveragePage from './pages/CoveragePage.jsx'
 import MipsDashboardPage from './pages/MipsDashboardPage.jsx'
@@ -25,6 +26,7 @@ const NAV = [
   { to: '/cohort', label: 'Cohort' },
   { to: '/watchlist', label: 'Watchlist' },
   { to: '/my-providers', label: 'My Providers' },
+  { to: '/compare', label: 'Compare' },
   { to: '/upload-roster', label: 'Upload Roster' },
   { to: '/coverage', label: 'Coverage' },
 ]
@@ -84,6 +86,7 @@ export default function App() {
             <Route path="/cohort" element={<CohortExplorerPage />} />
             <Route path="/watchlist" element={<WatchlistPage />} />
             <Route path="/my-providers" element={<MyProvidersPage />} />
+            <Route path="/compare" element={<ComparePage />} />
             <Route path="/upload-roster" element={<UploadRosterPage />} />
             <Route path="/coverage" element={<CoveragePage />} />
             <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />

@@ -77,6 +77,17 @@ export const api = {
     return records
   },
 
+  // Multi-year trend analysis from the analytics service. Unlike
+  // getMipsTrends (parallel arrays), data here is already per-year records
+  // under `years`, plus a `warning` string when any row is a request label
+  // on CMS's rolling vintage (null when all years are archived vintages).
+  getAnalyticsTrends: async (npi, startYear, endYear) => {
+    const { data } = await http.get(`/analytics/trends/${npi}`, {
+      params: { startYear, endYear },
+    })
+    return data.data
+  },
+
   getVerification: async (npi) => {
     const { data } = await http.get(`/providers/${npi}/verification`)
     return data.data

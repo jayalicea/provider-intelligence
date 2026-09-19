@@ -141,3 +141,41 @@ Built client-only, no new dependencies, no backend changes.
 - Story statuses recorded in `docs/V2_ROADMAP.md` (Feature 2, Stories 2.1 and
   2.2): shipped 2026-09-19, client-only, no-auth path per the Tension 1
   decision. Server persistence remains Story 2.3 (blocked on auth).
+
+## Update 2026-09-19: side-by-side provider comparison (V2 Story 5.2)
+
+Built client-only, no new dependencies, no backend changes.
+
+- **Route**: `/compare` (nav label "Compare", listed after "My Providers").
+  Page: `src/pages/ComparePage.jsx`.
+- **Storage**: localStorage key `providerlens.compare`, a plain JSON array of
+  NPI strings (deliberately not the watchlist's object envelope), capped at 3.
+  Storage is separate from the watchlist; validation reuses `isValidNpi` from
+  `src/lib/watchlist.js`. Pure logic in `src/lib/compare.js`, React wrapper in
+  `src/hooks/useCompare.js`. Rejected adds (invalid, duplicate, or full)
+  surface an inline `notice-banner`.
+- **Data**: per NPI, `GET /api/v1/providers/:npi` (summary) and
+  `GET /api/v1/analytics/trends/:npi` (per-year records, not the parallel
+  arrays of `mips-trends`) are fetched with nested `Promise.allSettled`. An
+  NPI where both settle rejected renders an explicit "Could not be loaded"
+  row with a remove action, never a blank row.
+- **Chart**: `src/components/CompareTrendChart.jsx`, one recharts `Line` per
+  provider keyed by NPI, x = `year`, y = final score, colors
+  `#0F6B5C` / `#4C8055` / `#B7791F` (DESIGN tokens, same idiom as
+  `ScoreTrendChart`). Missing years stay `undefined` so the line breaks
+  rather than implying continuity (deliberate deviation from
+  `ScoreTrendChart`'s `connectNulls`, to avoid implying values that were
+  never reported).
+- **Table**: one column per year across the union of reported years; missing
+  (year, provider) pairs render the established gray `score-null` "Not
+  reported" cell. No value is estimated.
+- **Rolling-vintage note**: the analytics trends response carries `warning`
+  when any row is a request label on the rolling CMS vintage (null when all
+  rows are `year_source = 'archive'`). When any charted series has a
+  warning, a small provenance line under the chart names the affected NPIs
+  and repeats the warning's meaning in plain language.
+- **Detail-page integration**: `src/components/CompareButton.jsx` next to
+  `WatchlistToggle` on `ProviderDetailPage`; it writes the NPI to local
+  storage first, then navigates to `/compare`.
+- Story status recorded in `docs/V2_ROADMAP.md` (Feature 5, Story 5.2):
+  shipped 2026-09-19, client-only.

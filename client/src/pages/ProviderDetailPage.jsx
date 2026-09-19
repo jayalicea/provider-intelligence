@@ -4,6 +4,7 @@ import { useFetch } from '../hooks/useFetch.js'
 import ProviderProfileCard from '../components/ProviderProfileCard.jsx'
 import MipsSummaryCard from '../components/MipsSummaryCard.jsx'
 import WatchlistToggle from '../components/WatchlistToggle.jsx'
+import CompareButton from '../components/CompareButton.jsx'
 
 export default function ProviderDetailPage() {
   const { npi } = useParams()
@@ -15,7 +16,8 @@ export default function ProviderDetailPage() {
     <section>
       <h1 className="page-title">Provider Detail</h1>
       <p className="stack-bottom">
-        <WatchlistToggle npi={npi} />
+        <WatchlistToggle npi={npi} />{' '}
+        <CompareButton npi={npi} />
       </p>
       <ProviderProfileCard
         provider={provider.data}
