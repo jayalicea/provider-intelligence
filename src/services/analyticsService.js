@@ -175,13 +175,16 @@ class AnalyticsService {
   /**
    * Per-year MIPS scores for a provider across a year range, plus trend
    * analysis (direction, total change, year-over-year deltas, best/worst).
+   * The rolling-vintage warning applies only when a rolling (request-labeled)
+   * row is involved; years bulk-loaded from archived per-year CMS vintages
+   * (year_source = 'archive') are true measurements and carry no warning.
    */
   async getTrends(npi, startYear, endYear) {
     try {
       const query = `
         SELECT performance_year, final_score, quality_score,
                improvement_activities_score, promoting_interoperability_score,
-               cost_score
+               cost_score, year_source
         FROM mips_performance_scores
         WHERE npi = $1 AND performance_year BETWEEN $2 AND $3
         ORDER BY performance_year ASC
@@ -197,15 +200,21 @@ class AnalyticsService {
         costScore: num(row.cost_score)
       }));
 
+      const hasRollingVintage = result.rows.some(
+        row => row.year_source !== 'archive'
+      );
+
       return {
         npi,
         startYear,
         endYear,
         years,
         analysis: this.analyzeTrend(years),
-        warning: 'performance_year values are request labels on a rolling CMS ' +
-          'vintage, not distinct measurement years; year-over-year trends may ' +
-          'reflect re-based scores rather than true performance change.'
+        warning: hasRollingVintage
+          ? 'performance_year values are request labels on a rolling CMS ' +
+            'vintage, not distinct measurement years; year-over-year trends may ' +
+            'reflect re-based scores rather than true performance change.'
+          : null
       };
     } catch (error) {
       logger.error('Error in trend analysis:', error);

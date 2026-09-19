@@ -65,18 +65,19 @@
     },
     {
       "id": "cms-qpp-mips",
-      "name": "CMS QPP MIPS",
+      "name": "CMS QPP MIPS (per-year archive + rolling vintage)",
       "publisher": "CMS Quality Payment Program",
-      "scope": "MIPS performance scores, cached per provider on demand",
-      "records": 8400,
-      "recordLabel": "providers cached",
-      "asOf": "per value",
-      "cadence": "One rolling vintage; CMS re-bases the dataset in place",
-      "sourceUrl": "https://data.cms.gov/provider-data/topics/physician-office-visit-costs",
-      "provenance": "Fetched per NPI from the CMS QPP Experience dataset and cached.",
+      "scope": "MIPS performance scores: true per-year rows for PY 2018-2020 and 2022-2024 (bulk archive), plus a small rolling-vintage cache for the current period",
+      "records": 3572329,
+      "recordLabel": "per-year score rows (unique NPI, performance_year)",
+      "asOf": "2026-09-18",
+      "cadence": "Yearly archive files (Wayback-captured vintages); rolling dataset re-bases in place",
+      "sourceUrl": "https://data.cms.gov/provider-data/dataset/a174-a962",
+      "provenance": "tools/mips-yearly-ingest.js bulk-loads each archived yearly CSV into mips_performance_scores with performance_year taken from the dataset vintage (year_source=archive). Rolling-vintage cache rows remain labeled year_source=rolling.",
       "notes": [
-        "CMS publishes a single rolling vintage, so year-over-year movement may reflect re-based scores rather than true performance change.",
-        "Each cached score carries its own access date."
+        "PY 2018: 666,265 NPIs; PY 2019: 719,245; PY 2020: 704,332; PY 2022: 534,992; PY 2023: 479,307; PY 2024: 461,358 (measured 2026-09-18).",
+        "PY 2021 has no retrievable archive file (no Wayback capture; live URL gone) and PY 2017 predates the catalog; marked insufficient materials in docs/research/mips-yearly-sources.md.",
+        "Trends built only on archive-sourced years no longer carry the rolling-vintage warning; any rolling-vintage year keeps it."
       ]
     },
     {

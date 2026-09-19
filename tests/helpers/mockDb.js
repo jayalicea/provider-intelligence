@@ -168,6 +168,7 @@ async function query(text, params = []) {
       reporting_entity_type: entityType,
       group_size_category: groupSize,
       data_source: 'CMS_OPEN_DATA',
+      year_source: 'rolling',
       sync_timestamp: new Date()
     });
     return { rows: [], rowCount: 1 };
@@ -300,7 +301,7 @@ async function query(text, params = []) {
   // --- analytics queries (tests/analytics.test.js) -------------------------
 
   // Trends: per-year rows across a year range
-  if (/^SELECT performance_year, final_score, quality_score, improvement_activities_score, promoting_interoperability_score, cost_score FROM mips_performance_scores WHERE npi = \$1 AND performance_year BETWEEN \$2 AND \$3 ORDER BY performance_year ASC$/.test(sql)) {
+  if (/^SELECT performance_year, final_score, quality_score, improvement_activities_score, promoting_interoperability_score, cost_score, year_source FROM mips_performance_scores WHERE npi = \$1 AND performance_year BETWEEN \$2 AND \$3 ORDER BY performance_year ASC$/.test(sql)) {
     const rows = [...mips.values()]
       .filter(r =>
         String(r.npi) === String(params[0]) &&

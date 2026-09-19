@@ -25,6 +25,7 @@ function seedMips(npi, year, finalScore, overrides = {}) {
     performance_status: 'MIPS',
     reporting_entity_type: 'Individual',
     group_size_category: null,
+    year_source: overrides.yearSource ?? 'rolling',
     data_source: 'CMS_OPEN_DATA',
     sync_timestamp: new Date()
   });
@@ -357,6 +358,31 @@ describe('Phase 2B analytics hardening', () => {
 
   test('trends response carries the rolling-vintage warning', async () => {
     seedMips('1000000001', 2022, 80);
+    seedMips('1000000001', 2023, 90);
+
+    const res = await request(app)
+      .get('/api/v1/analytics/trends/1000000001')
+      .query({ startYear: '2022', endYear: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.warning).toMatch(/rolling cms vintage/i);
+  });
+
+  test('trends warning drops when every year is archive-sourced', async () => {
+    seedMips('1000000001', 2022, 80, { yearSource: 'archive' });
+    seedMips('1000000001', 2023, 90, { yearSource: 'archive' });
+
+    const res = await request(app)
+      .get('/api/v1/analytics/trends/1000000001')
+      .query({ startYear: '2022', endYear: '2023' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.warning).toBeNull();
+    expect(res.body.data.years.map(y => y.year)).toEqual([2022, 2023]);
+  });
+
+  test('trends warning stays when one archive year mixes with a rolling year', async () => {
+    seedMips('1000000001', 2022, 80, { yearSource: 'archive' });
     seedMips('1000000001', 2023, 90);
 
     const res = await request(app)

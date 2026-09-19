@@ -442,30 +442,38 @@ cd client && npm ci && npm run dev       # Vite, proxies /api to :3000
 
 ## 11. Open work, ranked
 
-1. **Rotate and de-hardcode the password in `tools/update-local-db.ps1`.**
-   Smallest effort, only item with a real exposure.
-2. **License status ingest.** The single biggest product gap. The verification
-   dossier promises identity + exclusion + license, and license is missing.
-   It needs a per-state source survey (cheapest reliable path per state) before
-   any build. Until it lands, Package B v1 sells identity plus exclusions only.
-3. **NUCC taxonomy description backfill.** `nppes_providers.primary_taxonomy_
-   description` is null on all 9.7M rows. Source the crosswalk from NUCC/WPC.
-   Without it the national cohort can filter by taxonomy code but cannot
-   display a human-readable specialty.
-4. **Key management backed by `api_keys`.** Honor `revoked_at` at
-   authentication time; add issue/rotate/revoke. Required before any real pilot
-   customer.
+1. ~~**Rotate and de-hardcode the password in `tools/update-local-db.ps1`.~~
+   Done 2026-09-15.
+2. **License status ingest.** Partly done 2026-09-18: 51-state source survey
+   (`docs/research/license-source-survey.md`), self-reported baseline from the
+   NPI API `licenses` object (`provider_licenses` table, dossier block), and
+   board-verified status for TX + CO (2.04M rows in `license_status`,
+   `tools/license-status-ingest.js`). Remaining: FL MQA bulk (needs a free
+   account registration), Ohio (SPA-gated endpoint needs a devtools capture),
+   per-provider lookup augmentation for the remaining ~46 states (ToS review
+   first), discipline datasets.
+3. ~~**NUCC taxonomy description backfill.~~ Done 2026-09-17: 883 codes from
+   the live NUCC 261 CSV, 9,374,952 of 9,726,865 NPPES rows backfilled.
+4. ~~**Key management backed by `api_keys`.~~ Done 2026-09-17/18: keys load
+   from `api_keys` at startup (env fallback), `revoked_at` honored, 60s
+   hot-reload, `tools/api-keys.js` issue/list/revoke CLI.
 5. ~~**Remove or relocate `POST /providers/bulk-data`** per P0-1.~~ Done
    2026-09-17: endpoint removed entirely.
-6. **`docker compose up` runtime validation.** Build is verified, runtime is not.
-7. **True multi-year MIPS data (Phase A0 in `docs/V2_ROADMAP.md`).** Requires
-   hunting archived per-year QPP/Physician Compare CSVs and adding a real
-   `performance_year` sourced from each file's vintage. Everything multi-year is
-   built on sand until this lands. Judgment call: MIPS is sunsetting after 2028,
-   so weigh this against item 2, which does not decay.
-8. **Server-side pagination on search.** The backend has no `total`/`page`/
-   `limit`; results are capped by `maxResults` and the table reports a count
-   rather than "Page X of Y".
+6. ~~**`docker compose up` runtime validation.**~~ Done 2026-09-17: stack
+   built, health-checked (`/health` 200, live search 200), torn down cleanly;
+   recorded in `docs/docker-runtime-validation.md`.
+7. ~~**True multi-year MIPS data (Phase A0 in `docs/V2_ROADMAP.md`).~~ Done
+   2026-09-18: no sibling per-year datasets exist (CMS re-bases `a174-a962`
+   in place); PY 2018-2020 and 2022-2024 vintages recovered from Wayback
+   captures and bulk-loaded as real `performance_year` rows (~3.57M rows,
+   `year_source=archive`) by `tools/mips-yearly-ingest.js`. PY 2021 has no
+   retrievable file; PY 2017 predates the catalog. Trends warnings now drop
+   when all years are archive-sourced. See
+   `docs/research/mips-yearly-sources.md`.
+8. ~~**Server-side pagination on search.**~~ Done 2026-09-17: search returns
+   `total`/`offset`/`limit` from the upstream envelope total, with 400s for
+   invalid params and the 7500 upstream cap; client shows "N of M matching
+   providers".
 9. **TLS, audit logging, authorization model** if the platform is ever hosted
    for a customer rather than demoed.
 
