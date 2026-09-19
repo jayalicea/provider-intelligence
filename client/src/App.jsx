@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
+import HomePage from './pages/HomePage.jsx'
 import ProviderSearchPage from './pages/ProviderSearchPage.jsx'
 import ProviderDetailPage from './pages/ProviderDetailPage.jsx'
 import Provider360Page from './pages/Provider360Page.jsx'
@@ -23,6 +24,7 @@ This tool is not medical advice, is not a credentialing decision, and certifies 
 Values may be stale or incorrect at the source; always verify against the source directly.`
 
 const NAV = [
+  { to: '/', label: 'Home' },
   { to: '/providers', label: 'Search' },
   { to: '/cohort', label: 'Cohort' },
   { to: '/watchlist', label: 'Watchlist' },
@@ -80,7 +82,7 @@ export default function App() {
 
         <main className="app-main">
           <Routes>
-            <Route path="/" element={<Navigate to="/providers" replace />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/providers" element={<ProviderSearchPage />} />
             <Route path="/providers/:npi" element={<ProviderDetailPage />} />
             <Route path="/providers/:npi/360" element={<Provider360Page />} />

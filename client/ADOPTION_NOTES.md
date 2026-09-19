@@ -1,5 +1,14 @@
 # ADOPTION_NOTES.md — Phase 3 frontend inventory and adoption decisions
 
+## 2026-09-19: Home page front door + verification passport link (Provider detail)
+
+- `/` no longer redirects to `/providers`; it renders the new `HomePage` (`client/src/pages/HomePage.jsx`), composed of the existing `StatBand` + `StatBandCaption` (moved off the search page), a plain-language lede stating the platform's positioning (identity and integrity screening over public US government data, as-of dates per value), and a grid of eight link cards (Provider Search, Cohort Explorer, Screen a Roster, My Providers, Compare, Benchmark, Coverage, Watchlist), each a title plus one-sentence description.
+- `StatBand` and `StatBandCaption` were removed from `ProviderSearchPage.jsx`; the search page keeps filters, results, and the MIPS-only note. The band's own comment about the "landing page" is now accurate again.
+- New CSS in `client/src/index.css`: `.link-card-grid`, `.link-card`, `.link-card-title`, built on the existing `.card` style and tokens (`--surface`, `--border`, `--primary`, `--text`, `--space-*`). Cards are whole-surface `Link`s, auto-fill grid with 230px minimum columns.
+- `App.jsx`: "Home" is the first nav entry; the `Navigate` import went away with the old redirect.
+- `ProviderDetailPage.jsx`: added a `btn`-style link "Open verification passport" to `/providers/:npi/360` with an adjacent muted line, "Includes license status where board data is available." No license summary line was added: `GET /providers/:npi` returns normalized identity only (single `license` object), and license rows with board-verified status live on the verification dossier (360) endpoint, which the new link points to. No new fetch was introduced.
+- No new dependencies; no backend changes. `npm run lint` and `npm run build` pass.
+
 ## 2026-09-19: Watchlist token v2 + score drop alerts (Stories 1.1, 1.2)
 
 - Watchlist storage shape is now `{ version: 2, npis, addedAt, alert: { enabled, dropThreshold } }` under the same key `providerlens.watchlist`. `loadWatchlist` migrates v1 on load (alert defaults to `{ enabled: false, dropThreshold: 10 }`); the 200-NPI cap logic is unchanged. Malformed alert configs fall back to the default rather than poisoning the load.

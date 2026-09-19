@@ -38,6 +38,14 @@ export default function ProviderDetailPage() {
           </Link>
         </p>
       )}
+      <p className="stack-top">
+        <Link className="btn" to={`/providers/${npi}/360`}>
+          Open verification passport
+        </Link>{' '}
+        <span className="muted">
+          Includes license status where board data is available.
+        </span>
+      </p>
     </section>
   )
 }

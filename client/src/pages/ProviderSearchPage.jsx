@@ -5,7 +5,6 @@ import { useFetch } from '../hooks/useFetch.js'
 import SearchBar from '../components/SearchBar.jsx'
 import FilterPanel from '../components/FilterPanel.jsx'
 import ProviderResultsTable from '../components/ProviderResultsTable.jsx'
-import StatBand, { StatBandCaption } from '../components/StatBand.jsx'
 
 export default function ProviderSearchPage() {
   // Search state is mirrored into URL search params so results are shareable.
@@ -48,9 +47,6 @@ export default function ProviderSearchPage() {
       <p className="page-lede muted">
         Search the NPI Registry, MIPS quality scores, and hospital quality measures.
       </p>
-
-      <StatBand />
-      <StatBandCaption />
 
       <div className="card">
         <SearchBar

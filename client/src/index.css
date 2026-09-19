@@ -219,6 +219,31 @@ textarea:focus-visible,
   margin-top: var(--space-6);
 }
 
+/* Home page link cards: a reusable card styled as a whole-click link. */
+.link-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-4);
+}
+
+.link-card {
+  display: block;
+  margin-bottom: 0;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.link-card:hover {
+  border-color: var(--primary);
+}
+
+.link-card-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
 .section-heading {
   font-size: 17px;
   font-weight: 600;
