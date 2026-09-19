@@ -72,3 +72,15 @@ backend on :3000 (`/api/v1/...`), per Prompt A Phase 3 step 2.
    and no `footnote` (footnote column/tooltips not possible against live data).
 4. `mips-performance` has no `paymentAdjustmentPct`.
 5. Quality measures live at `/api/v1/providers/quality-measures/:facilityId`.
+
+## Update 2026-09-18: licenses block on the verification dossier
+
+The verification dossier (`GET /api/v1/providers/:npi/verification`) now
+includes a `licenses` block: `{ note, values: [...] }`, where each license
+field (`number`, `state`, `isPrimaryTaxonomy`, `taxonomyCode`,
+`taxonomyClassification`, `taxonomySpecialization`) is wrapped with
+`{ value, source, asOf }` provenance, same as the identity block. The values
+are self-reported NPPES data, not verified board statuses, and the `note`
+field says exactly that. `Provider360Page` renders the list with the note
+under a "Licenses" section; providers with no cached license rows show
+"No licenses reported."

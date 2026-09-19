@@ -4,6 +4,7 @@
 // logic under test behaves as it does against Postgres.
 
 const providers = new Map(); // npi -> row
+const providerLicenses = []; // provider_licenses rows
 const nppesProviders = new Map(); // npi -> row (national v2 table)
 const mips = new Map();      // `${npi}:${year}` -> row
 const exclusions = [];       // oig_exclusions rows
@@ -15,6 +16,7 @@ let quality = [];            // quality_measures rows
 
 function reset() {
   providers.clear();
+  providerLicenses.length = 0;
   nppesProviders.clear();
   mips.clear();
   exclusions.length = 0;
@@ -230,6 +232,50 @@ async function query(text, params = []) {
       .filter(r => wanted.has(String(r.npi)))
       .map(r => ({ npi: r.npi }));
     return { rows, rowCount: rows.length };
+  }
+
+  // --- provider_licenses (license baseline) ----------------------------------
+
+  if (/^SELECT license_number, issuing_state, is_primary_taxonomy, taxonomy_code, taxonomy_classification, taxonomy_specialization, source, as_of FROM provider_licenses WHERE npi = \$1 ORDER BY is_primary_taxonomy DESC, license_number ASC, issuing_state ASC$/.test(sql)) {
+    const rows = providerLicenses
+      .filter(r => String(r.npi) === String(params[0]))
+      .sort((a, b) =>
+        Number(b.is_primary_taxonomy === true) - Number(a.is_primary_taxonomy === true) ||
+        String(a.license_number).localeCompare(String(b.license_number)) ||
+        String(a.issuing_state).localeCompare(String(b.issuing_state)))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
+  if (/^DELETE FROM provider_licenses WHERE npi = \$1$/.test(sql)) {
+    const before = providerLicenses.length;
+    for (let i = providerLicenses.length - 1; i >= 0; i--) {
+      if (String(providerLicenses[i].npi) === String(params[0])) {
+        providerLicenses.splice(i, 1);
+      }
+    }
+    return { rows: [], rowCount: before - providerLicenses.length };
+  }
+
+  if (/^INSERT INTO provider_licenses /.test(sql)) {
+    const [
+      npi, licenseNumber, issuingState, isPrimaryTaxonomy,
+      taxonomyCode, taxonomyClassification, taxonomySpecialization
+    ] = params;
+    // Source and as_of are literals in the statement (CURRENT_DATE), so
+    // they are not bound params; mirror that here.
+    providerLicenses.push({
+      npi: String(npi),
+      license_number: licenseNumber,
+      issuing_state: issuingState,
+      is_primary_taxonomy: isPrimaryTaxonomy,
+      taxonomy_code: taxonomyCode,
+      taxonomy_classification: taxonomyClassification,
+      taxonomy_specialization: taxonomySpecialization,
+      source: 'NPI Registry',
+      as_of: new Date()
+    });
+    return { rows: [], rowCount: 1 };
   }
 
   // --- analytics queries (tests/analytics.test.js) -------------------------
@@ -665,6 +711,7 @@ module.exports = {
   pool: {},
   _stores: {
     providers,
+    providerLicenses,
     nppesProviders,
     mips,
     get quality() { return quality; },

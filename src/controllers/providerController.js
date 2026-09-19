@@ -1,6 +1,7 @@
 const NpiService = require('../services/npiService');
 const CmsDataService = require('../services/cmsDataService');
 const ExclusionService = require('../services/exclusionService');
+const { formatAsOf } = require('../services/exclusionService');
 const { logger } = require('../utils/logger');
 
 const TERMS = 'This report states what public sources published as of the ' +
@@ -140,8 +141,9 @@ class ProviderController {
   }
 
   /**
-   * Verification dossier: cached identity plus LEIE exclusion resolution,
-   * every field carrying source and as-of provenance.
+   * Verification dossier: cached identity plus self-reported license
+   * baseline plus LEIE exclusion resolution, every field carrying source
+   * and as-of provenance.
    */
   async getVerification(req, res) {
     try {
@@ -202,6 +204,32 @@ class ProviderController {
         }
       };
 
+      // License block: every license the provider self-reported to NPPES,
+      // each value carrying its own source and as-of. These are self-reported
+      // values, never a verified board status, so the note says exactly that.
+      let licenseRows = [];
+      try {
+        licenseRows = await this.npiService.getCachedProviderLicenses(npi);
+      } catch (licenseError) {
+        logger.warn('Failed to load cached licenses for verification dossier:', licenseError.message);
+      }
+      const licenses = {
+        note: 'Licenses are self-reported NPPES data, not verified board statuses.',
+        values: licenseRows.map(row => {
+          const lSource = row.source || 'NPI Registry';
+          const lAsOf = formatAsOf(row.as_of);
+          const wrapL = value => ({ value, source: lSource, asOf: lAsOf });
+          return {
+            number: wrapL(row.license_number),
+            state: wrapL(row.issuing_state),
+            isPrimaryTaxonomy: wrapL(row.is_primary_taxonomy === true),
+            taxonomyCode: wrapL(row.taxonomy_code),
+            taxonomyClassification: wrapL(row.taxonomy_classification),
+            taxonomySpecialization: wrapL(row.taxonomy_specialization)
+          };
+        })
+      };
+
       // The cache carries no DOB, so name-fallback checks from this endpoint
       // can never confirm a DOB; surface the status explicitly (null on the
       // NPI path) so consumers can rely on the field always being present.
@@ -251,6 +279,7 @@ class ProviderController {
         data: {
           npi,
           identity,
+          licenses,
           exclusion,
           performance,
           flagsSummary,

@@ -9,7 +9,7 @@ jest.mock('../src/config/database', () => require('./helpers/mockDb'));
 const mockDb = require('./helpers/mockDb');
 const {
   isolateNet, resetNet,
-  npiEnvelope, PROVIDER_ROW,
+  npiEnvelope, PROVIDER_ROW, LICENSES_PARSED,
   mockNpiSearch
 } = require('./helpers/apiMocks');
 
@@ -201,5 +201,44 @@ describe('GET /api/v1/providers/:npi', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/invalid npi/i);
+  });
+
+  test('parses the JSON-stringified licenses array from ef=licenses', async () => {
+    mockNpiSearch('1234567890', npiEnvelope([PROVIDER_ROW]));
+
+    const res = await request(app).get('/api/v1/providers/1234567890');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.licenses).toEqual(LICENSES_PARSED);
+  });
+
+  test('malformed or missing licenses values transform to an empty array', async () => {
+    for (const licenses of ['not json', '', null]) {
+      resetNet();
+      mockNpiSearch('1234567890', npiEnvelope([{ ...PROVIDER_ROW, licenses }]));
+
+      const res = await request(app).get('/api/v1/providers/1234567890');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.licenses).toEqual([]);
+    }
+  });
+
+  test('cache write stores the license baseline in provider_licenses', async () => {
+    mockNpiSearch('1234567890', npiEnvelope([PROVIDER_ROW]));
+
+    await request(app).get('/api/v1/providers/1234567890');
+
+    const rows = mockDb._stores.providerLicenses
+      .filter(r => r.npi === '1234567890');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      license_number: 'MD12345',
+      issuing_state: 'MD',
+      is_primary_taxonomy: true,
+      taxonomy_code: '207R00000X',
+      source: 'NPI Registry'
+    });
+    expect(rows.every(r => r.as_of instanceof Date)).toBe(true);
   });
 });

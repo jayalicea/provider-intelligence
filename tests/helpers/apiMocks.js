@@ -53,7 +53,8 @@ function npiEnvelope(rows) {
     'addr_practice.line1', 'addr_practice.line2', 'addr_practice.city',
     'addr_practice.state', 'addr_practice.zip', 'addr_practice.phone',
     'licenses.taxonomy.code', 'licenses.taxonomy.grouping',
-    'licenses.lic_number', 'licenses.issuing_state'
+    'licenses.lic_number', 'licenses.issuing_state',
+    'licenses'
   ];
   const extra = {};
   extraKeys.forEach(k => { extra[k] = rows.map(r => (k in r ? r[k] : null)); });
@@ -83,8 +84,57 @@ const PROVIDER_ROW = {
   'licenses.taxonomy.code': '207R00000X',
   'licenses.taxonomy.grouping': 'Allopathic & Osteopathic Physicians',
   'licenses.lic_number': 'MD12345',
-  'licenses.issuing_state': 'MD'
+  'licenses.issuing_state': 'MD',
+  // Non-leaf `ef=licenses` value: JSON-stringified per-license array, as
+  // returned live by the API (verified 2026-09-17).
+  licenses: JSON.stringify([
+    {
+      taxonomy: {
+        code: '207R00000X',
+        grouping: 'Allopathic & Osteopathic Physicians',
+        classification: 'Internal Medicine',
+        specialization: '',
+        path: 'Allopathic & Osteopathic Physicians\\Internal Medicine'
+      },
+      lic_number: 'MD12345',
+      lic_state: 'MD',
+      is_primary_taxonomy: 'Y',
+      medicare: []
+    },
+    {
+      taxonomy: {
+        code: '207R00000X',
+        grouping: 'Allopathic & Osteopathic Physicians',
+        classification: 'Internal Medicine',
+        specialization: '',
+        path: 'Allopathic & Osteopathic Physicians\\Internal Medicine'
+      },
+      lic_number: 'DC67890',
+      lic_state: 'DC',
+      is_primary_taxonomy: 'N',
+      medicare: []
+    }
+  ])
 };
+
+const LICENSES_PARSED = [
+  {
+    number: 'MD12345',
+    state: 'MD',
+    isPrimaryTaxonomy: true,
+    taxonomyCode: '207R00000X',
+    taxonomyClassification: 'Internal Medicine',
+    taxonomySpecialization: ''
+  },
+  {
+    number: 'DC67890',
+    state: 'DC',
+    isPrimaryTaxonomy: false,
+    taxonomyCode: '207R00000X',
+    taxonomyClassification: 'Internal Medicine',
+    taxonomySpecialization: ''
+  }
+];
 
 const MIPS_ROW = {
   npi: '1111111111',
@@ -154,6 +204,7 @@ module.exports = {
   resetNet,
   npiEnvelope,
   PROVIDER_ROW,
+  LICENSES_PARSED,
   MIPS_ROW,
   QM_ROWS,
   mockNpiSearch,

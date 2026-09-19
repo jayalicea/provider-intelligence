@@ -4,14 +4,19 @@ const { logger } = require('../utils/logger');
 const db = require('../config/database');
 
 // Leaf fields requested via `ef`. The API returns them as parallel arrays
-// keyed by dotted path; non-leaf objects (e.g. `licenses`) come back as
-// JSON strings and are not usable, so we request leaf paths instead.
+// keyed by dotted path. Verified live (2026-09-17): leaf paths under
+// `licenses` (e.g. `licenses.lic_number`) come back null; the non-leaf
+// `licenses` object returns a JSON-stringified array per provider, which is
+// the only way to get the full per-license baseline. Both are requested:
+// the leaf fields keep the existing primary-license transform working, and
+// `licenses` feeds the full license list.
 const EXTRA_FIELDS = [
   'name.full', 'name.first', 'name.middle', 'name.last', 'name.credential',
   'addr_practice.line1', 'addr_practice.line2', 'addr_practice.city',
   'addr_practice.state', 'addr_practice.zip', 'addr_practice.phone',
   'licenses.taxonomy.code', 'licenses.taxonomy.grouping',
-  'licenses.lic_number', 'licenses.issuing_state'
+  'licenses.lic_number', 'licenses.issuing_state',
+  'licenses'
 ].join(',');
 
 class NpiService {
@@ -192,8 +197,37 @@ class NpiService {
       license: {
         number: fieldAt('licenses.lic_number', i) || '',
         state: fieldAt('licenses.issuing_state', i) || ''
-      }
+      },
+      licenses: this.parseLicenses(fieldAt('licenses', i))
     }));
+  }
+
+  /**
+   * The non-leaf `ef=licenses` value is a JSON-stringified array of
+   * per-license objects: {taxonomy: {...}, lic_number, lic_state,
+   * is_primary_taxonomy, medicare: [...]}. Parse defensively: missing,
+   * null, or malformed values yield an empty array.
+   */
+  parseLicenses(raw) {
+    if (typeof raw !== 'string' || raw.trim() === '') return [];
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(entry => entry && typeof entry === 'object')
+      .map(entry => ({
+        number: entry.lic_number || '',
+        state: entry.lic_state || entry.issuing_state || '',
+        isPrimaryTaxonomy: entry.is_primary_taxonomy === 'Y' ||
+          entry.is_primary_taxonomy === true,
+        taxonomyCode: (entry.taxonomy && entry.taxonomy.code) || '',
+        taxonomyClassification: (entry.taxonomy && entry.taxonomy.classification) || '',
+        taxonomySpecialization: (entry.taxonomy && entry.taxonomy.specialization) || ''
+      }));
   }
 
   /**
@@ -256,6 +290,29 @@ class NpiService {
         new Date(),
         new Date()
       ]);
+
+      // Replace the license baseline for this NPI: delete + insert keeps the
+      // provider_licenses rows exactly in sync with the latest fetch. Every
+      // row is stamped as self-reported NPI Registry data as of the fetch.
+      await db.query('DELETE FROM provider_licenses WHERE npi = $1', [npi]);
+      for (const lic of providerData.licenses || []) {
+        await db.query(
+          `INSERT INTO provider_licenses (
+             npi, license_number, issuing_state, is_primary_taxonomy,
+             taxonomy_code, taxonomy_classification, taxonomy_specialization,
+             source, as_of
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'NPI Registry', CURRENT_DATE)`,
+          [
+            npi,
+            lic.number,
+            lic.state,
+            lic.isPrimaryTaxonomy,
+            lic.taxonomyCode,
+            lic.taxonomyClassification,
+            lic.taxonomySpecialization
+          ]
+        );
+      }
     } catch (error) {
       logger.error('Error caching provider data:', error);
     }
@@ -279,7 +336,9 @@ class NpiService {
         [npi]
       );
 
-      return this.normalizeProviderRow(result.rows[0]);
+      const licenseRows = await this.getCachedProviderLicenses(npi);
+
+      return this.normalizeProviderRow(result.rows[0], licenseRows);
     } catch (error) {
       logger.error('Error fetching cached provider:', error);
       return null;
@@ -287,10 +346,33 @@ class NpiService {
   }
 
   /**
+   * License baseline rows for one NPI, in a stable order. Row-level source
+   * and as_of are kept here (not on the normalized provider) so the
+   * verification dossier can cite per-value provenance.
+   */
+  async getCachedProviderLicenses(npi) {
+    try {
+      const result = await db.query(
+        `SELECT license_number, issuing_state, is_primary_taxonomy,
+                taxonomy_code, taxonomy_classification, taxonomy_specialization,
+                source, as_of
+           FROM provider_licenses
+          WHERE npi = $1
+          ORDER BY is_primary_taxonomy DESC, license_number ASC, issuing_state ASC`,
+        [npi]
+      );
+      return result.rows || [];
+    } catch (error) {
+      logger.error('Error fetching cached provider licenses:', error);
+      return [];
+    }
+  }
+
+  /**
    * Map a providers table row back to the API response shape so cache hits
    * return the same structure as fresh API transforms.
    */
-  normalizeProviderRow(row) {
+  normalizeProviderRow(row, licenseRows = []) {
     if (!row) return null;
     const normalized = {
       npi: row.npi,
@@ -320,7 +402,15 @@ class NpiService {
       license: {
         number: row.license_number || '',
         state: row.license_issuing_state || ''
-      }
+      },
+      licenses: licenseRows.map(r => ({
+        number: r.license_number || '',
+        state: r.issuing_state || '',
+        isPrimaryTaxonomy: r.is_primary_taxonomy === true,
+        taxonomyCode: r.taxonomy_code || '',
+        taxonomyClassification: r.taxonomy_classification || '',
+        taxonomySpecialization: r.taxonomy_specialization || ''
+      }))
     };
     // Carry sync_timestamp for isCacheExpiry checks without exposing it in
     // JSON responses.

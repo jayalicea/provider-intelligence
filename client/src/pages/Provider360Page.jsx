@@ -86,7 +86,7 @@ export default function Provider360Page() {
     )
   }
 
-  const { identity, exclusion, performance, terms, flagsSummary } = data
+  const { identity, licenses, exclusion, performance, terms, flagsSummary } = data
   const dob = exclusion.dobStatus ? DOB_STATUS_COPY[exclusion.dobStatus] : null
   const categories = performance
     ? [
@@ -233,6 +233,31 @@ export default function Provider360Page() {
                 <li key={note}>{note}</li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section className="passport-section">
+          <h3 className="card-title">Licenses</h3>
+          {licenses?.values?.length ? (
+            <>
+              <ul className="detail-list">
+                {licenses.values.map((lic) => (
+                  <li key={`${lic.number.value}-${lic.state.value}`}>
+                    <span className="mono">{lic.number.value}</span>
+                    {' '}
+                    {lic.state.value}
+                    {lic.isPrimaryTaxonomy.value ? ' (primary taxonomy)' : ''}
+                    {lic.taxonomySpecialization.value || lic.taxonomyClassification.value
+                      ? `, ${lic.taxonomySpecialization.value || lic.taxonomyClassification.value}`
+                      : ''}
+                    <Provenance source={lic.number.source} asOf={lic.number.asOf} />
+                  </li>
+                ))}
+              </ul>
+              <p className="muted">{licenses.note}</p>
+            </>
+          ) : (
+            <p className="muted">No licenses reported.</p>
           )}
         </section>
 

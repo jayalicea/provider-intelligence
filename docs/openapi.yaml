@@ -40,7 +40,12 @@ paths:
         - { $ref: '#/components/parameters/Npi' }
       responses:
         '200':
-          description: '{ npi, identity, exclusion, performance, flagsSummary, terms }'
+          description: >-
+            '{ npi, identity, licenses, exclusion, performance, flagsSummary,
+            terms }'. The licenses block lists every license the provider
+            self-reported to NPPES; each value carries source and as-of
+            provenance. Licenses are self-reported data, not verified board
+            statuses, and the block carries a note saying so.
   /providers/{npi}/mips-performance:
     get:
       summary: MIPS performance for one NPI and year

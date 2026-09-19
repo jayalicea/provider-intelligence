@@ -241,6 +241,48 @@ describe('GET /api/v1/providers/:npi/verification', () => {
     );
   });
 
+  test('licenses block carries per-value provenance and the self-reported note', async () => {
+    seedProvider('1366446619');
+    mockDb._stores.providerLicenses.push({
+      npi: '1366446619',
+      license_number: 'D0057847',
+      issuing_state: 'MD',
+      is_primary_taxonomy: true,
+      taxonomy_code: '2084N0400X',
+      taxonomy_classification: 'Psychiatry & Neurology',
+      taxonomy_specialization: 'Neurology',
+      source: 'NPI Registry',
+      as_of: new Date('2026-09-12T00:00:00Z')
+    });
+
+    const res = await request(app).get('/api/v1/providers/1366446619/verification');
+
+    expect(res.status).toBe(200);
+    const { licenses } = res.body.data;
+    expect(licenses.note).toBe(
+      'Licenses are self-reported NPPES data, not verified board statuses.'
+    );
+    expect(licenses.values).toHaveLength(1);
+    expect(licenses.values[0].number).toEqual({
+      value: 'D0057847',
+      source: 'NPI Registry',
+      asOf: '2026-09-12'
+    });
+    expect(licenses.values[0].state.value).toBe('MD');
+    expect(licenses.values[0].isPrimaryTaxonomy.value).toBe(true);
+    expect(licenses.values[0].taxonomySpecialization.value).toBe('Neurology');
+  });
+
+  test('licenses block is empty when no license rows are cached', async () => {
+    seedProvider('1366446619');
+
+    const res = await request(app).get('/api/v1/providers/1366446619/verification');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.licenses.values).toEqual([]);
+    expect(res.body.data.licenses.note).toMatch(/self-reported/i);
+  });
+
   test('404 when the provider is not cached', async () => {
     const res = await request(app).get('/api/v1/providers/9999999999/verification');
     expect(res.status).toBe(404);
