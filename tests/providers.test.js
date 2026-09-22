@@ -133,6 +133,56 @@ describe('GET /api/v1/providers/search', () => {
     expect(byNpi['9876543210'].hasMipsData).toBe(false);
   });
 
+  test('results include cannabisCertified; a certified NPI reports true', async () => {
+    // 1234567890 matches via its cached provider_licenses baseline
+    // (MD12345/MD); 5555555555 matches via the providers row (ME126815/FL);
+    // 9876543210 has no cached license and matches nothing.
+    mockDb._stores.providerLicenses.push({
+      npi: '1234567890',
+      license_number: 'MD12345',
+      issuing_state: 'MD'
+    });
+    mockDb._stores.providers.set('5555555555', {
+      npi: '5555555555',
+      license_number: 'ME126815',
+      license_issuing_state: 'FL'
+    });
+    mockDb._stores.cannabis.set('MD:MD12345', { state: 'MD', license_number: 'MD12345' });
+    mockDb._stores.cannabis.set('FL:ME126815', { state: 'FL', license_number: 'ME126815' });
+    const certifiedViaProvidersRow = { ...PROVIDER_ROW, npi: '5555555555' };
+    const uncertifiedRow = { ...PROVIDER_ROW, npi: '9876543210' };
+    mockNpiSearch('Smith', npiEnvelope([PROVIDER_ROW, certifiedViaProvidersRow, uncertifiedRow]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith' });
+
+    expect(res.status).toBe(200);
+    const byNpi = Object.fromEntries(res.body.data.map(p => [p.npi, p]));
+    expect(byNpi['1234567890'].cannabisCertified).toBe(true);
+    expect(byNpi['5555555555'].cannabisCertified).toBe(true);
+    expect(byNpi['9876543210'].cannabisCertified).toBe(false);
+  });
+
+  test('results include cannabisCertified true for an NPI enriched directly on cannabis_certifications', async () => {
+    // No cached license for this NPI; it flags purely because the row was
+    // NPI-enriched (third UNION arm).
+    mockDb._stores.cannabis.set('FL:ME900000', {
+      state: 'FL',
+      license_number: 'ME900000',
+      npi: '9876543210'
+    });
+    const enrichedRow = { ...PROVIDER_ROW, npi: '9876543210' };
+    mockNpiSearch('Smith', npiEnvelope([enrichedRow]));
+
+    const res = await request(app)
+      .get('/api/v1/providers/search')
+      .query({ terms: 'Smith' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].cannabisCertified).toBe(true);
+  });
+
   test('format=csv returns text/csv with attachment header and header row', async () => {
     mockNpiSearch('Smith', npiEnvelope([PROVIDER_ROW]));
 
@@ -218,6 +268,40 @@ describe('GET /api/v1/providers/:npi', () => {
     expect(cached).toBeDefined();
     expect(cached.name_last).toBe('DOE');
     expect(scope.isDone()).toBe(true);
+  });
+
+  test('detail includes cannabisCertification when the NPI is on a cannabis row', async () => {
+    mockDb._stores.cannabis.set('FL:ME900000', {
+      state: 'FL',
+      license_number: 'ME900000',
+      npi: '1234567890',
+      program_name: 'Florida Medical Marijuana Program',
+      as_of: '2026-09-11',
+      source_name: 'FL OMMU Qualified Physician List',
+      source_url: 'https://knowthefactsmmj.com/physicians/list/',
+      certification_status: 'qualified'
+    });
+    mockNpiSearch('1234567890', npiEnvelope([PROVIDER_ROW]));
+
+    const res = await request(app).get('/api/v1/providers/1234567890');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.cannabisCertification).toMatchObject({
+      certified: true,
+      programName: 'Florida Medical Marijuana Program',
+      state: 'FL',
+      asOf: '2026-09-11',
+      certificationStatus: 'qualified'
+    });
+  });
+
+  test('detail reports cannabisCertification null when not certified', async () => {
+    mockNpiSearch('1234567890', npiEnvelope([PROVIDER_ROW]));
+
+    const res = await request(app).get('/api/v1/providers/1234567890');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.cannabisCertification).toBeNull();
   });
 
   test('concurrent identical detail requests produce exactly one upstream call', async () => {
@@ -335,5 +419,76 @@ describe('GET /api/v1/providers/:npi', () => {
       source: 'NPI Registry'
     });
     expect(rows.every(r => r.as_of instanceof Date)).toBe(true);
+  });
+});
+
+
+describe('GET /api/v1/cannabis/summary', () => {
+  test('reports listed and matched counts per state', async () => {
+    // FL: two listed rows — one NPI-enriched directly, one matched through a
+    // cached provider_licenses row. WV: one listed row, no matches.
+    mockDb._stores.cannabis.set('FL:ME100001', {
+      state: 'FL',
+      license_number: 'ME100001',
+      npi: '1111111111',
+      program_name: 'Florida Medical Marijuana Program',
+      as_of: '2026-09-11',
+      source_name: 'FL OMMU Qualified Physician List',
+      source_url: 'https://knowthefactsmmj.com/physicians/list/',
+      certification_status: 'qualified'
+    });
+    mockDb._stores.cannabis.set('FL:ME100002', {
+      state: 'FL',
+      license_number: 'ME100002',
+      program_name: 'Florida Medical Marijuana Program',
+      as_of: '2026-09-11',
+      source_name: 'FL OMMU Qualified Physician List',
+      source_url: 'https://knowthefactsmmj.com/physicians/list/',
+      certification_status: 'qualified'
+    });
+    mockDb._stores.providerLicenses.push({
+      npi: '2222222222',
+      license_number: 'ME100002',
+      issuing_state: 'FL'
+    });
+    mockDb._stores.cannabis.set('WV:PHY000001', {
+      state: 'WV',
+      license_number: 'PHY000001',
+      program_name: 'West Virginia Medical Cannabis Program',
+      as_of: '2026-09-20',
+      source_name: 'WV OMC Physicians List',
+      source_url: 'https://omc.wv.gov/patients/schedule-an-appointment/Documents/PHYSICIANS%20LIST%20-%20UPDATED.pdf',
+      certification_status: 'registered'
+    });
+
+    const res = await request(app).get('/api/v1/cannabis/summary');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.count).toBe(2);
+    const byState = Object.fromEntries(res.body.data.map(r => [r.state, r]));
+    expect(byState.FL).toMatchObject({
+      state: 'FL',
+      programName: 'Florida Medical Marijuana Program',
+      sourceName: 'FL OMMU Qualified Physician List',
+      sourceUrl: 'https://knowthefactsmmj.com/physicians/list/',
+      asOf: '2026-09-11',
+      listedCount: 2,
+      matchedCount: 2
+    });
+    expect(byState.WV).toMatchObject({
+      state: 'WV',
+      programName: 'West Virginia Medical Cannabis Program',
+      listedCount: 1,
+      matchedCount: 0
+    });
+  });
+
+  test('returns an empty list when no certifications are loaded', async () => {
+    const res = await request(app).get('/api/v1/cannabis/summary');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.count).toBe(0);
   });
 });

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import HomePage from './pages/HomePage.jsx'
 import ProviderSearchPage from './pages/ProviderSearchPage.jsx'
+import CannabisPage from './pages/CannabisPage.jsx'
 import ProviderDetailPage from './pages/ProviderDetailPage.jsx'
 import Provider360Page from './pages/Provider360Page.jsx'
 import CohortExplorerPage from './pages/CohortExplorerPage.jsx'
@@ -84,6 +85,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/providers" element={<ProviderSearchPage />} />
+            <Route path="/cannabis" element={<CannabisPage />} />
             <Route path="/providers/:npi" element={<ProviderDetailPage />} />
             <Route path="/providers/:npi/360" element={<Provider360Page />} />
             <Route path="/cohort" element={<CohortExplorerPage />} />

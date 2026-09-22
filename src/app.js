@@ -11,6 +11,7 @@ const providerRoutes = require('./routes/providerRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const intelligenceRoutes = require('./routes/intelligenceRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const cannabisRoutes = require('./routes/cannabisRoutes');
 
 class App {
   constructor() {
@@ -90,13 +91,17 @@ class App {
           '/analytics/ranking/:npi': 'Provider rank/percentile vs peers, optionally by taxonomy',
           '/analytics/trends/:npi': 'Multi-year MIPS scores with trend analysis',
           '/analytics/benchmark/:npi': 'Provider score vs national average and quartiles',
-          '/intelligence/cohort': 'Joined providers, latest MIPS, and LEIE verdicts for a state'
+          '/intelligence/cohort': 'Joined providers, latest MIPS, and LEIE verdicts for a state',
+          '/cannabis/summary': 'Per-state cannabis-certification counts (listed vs linked to provider profiles)'
         }
       });
     });
 
     // Provider routes
     this.app.use('/api/v1/providers', providerRoutes);
+
+    // Cannabis hub routes
+    this.app.use('/api/v1/cannabis', cannabisRoutes);
 
     // Analytics routes
     this.app.use('/api/v1/analytics', analyticsRoutes);

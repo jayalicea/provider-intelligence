@@ -7,6 +7,7 @@
 //
 // Usage: node tools/license-backfill.js [--limit N] [--offset N] [--dry-run]
 //        [--delay-ms N]   (default 100ms, well under the ~25 req/s soft limit)
+//        [--state FL]     (only providers practicing in / licensed by that state)
 
 const fs = require('fs');
 const https = require('https');
@@ -25,13 +26,14 @@ function readEnvFile() {
 }
 
 function parseArgs(argv) {
-  const args = { limit: null, offset: 0, dryRun: false, delayMs: 100 };
+  const args = { limit: null, offset: 0, dryRun: false, delayMs: 100, state: null };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--limit') args.limit = parseInt(argv[++i], 10);
     else if (a === '--offset') args.offset = parseInt(argv[++i], 10);
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--delay-ms') args.delayMs = parseInt(argv[++i], 10);
+    else if (a === '--state') args.state = String(argv[++i]).slice(0, 2).toUpperCase();
     else { console.error(`Unknown argument: ${a}`); process.exit(1); }
   }
   return args;
@@ -93,9 +95,11 @@ async function main() {
     const missing = await c.query(`
       SELECT p.npi FROM providers p
       WHERE NOT EXISTS (SELECT 1 FROM provider_licenses pl WHERE pl.npi = p.npi)
+      ${args.state ? 'AND (p.practice_state = $1 OR p.license_issuing_state = $1)' : ''}
       ORDER BY p.npi
       LIMIT ${args.limit ? parseInt(args.limit, 10) : 'ALL'}
-      OFFSET ${parseInt(args.offset, 10) || 0}`);
+      OFFSET ${parseInt(args.offset, 10) || 0}`,
+      args.state ? [args.state] : []);
     const npis = missing.rows.map(r => r.npi);
     console.log(`backfill candidates: ${npis.length}`);
 

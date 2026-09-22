@@ -60,6 +60,18 @@ export default function ProviderProfileCard({ provider, loading, error }) {
           <dt>Phone</dt>
           <dd className="numeric">{addr.phone || 'Not available'}</dd>
         </div>
+        {provider.cannabisCertification ? (
+          <div>
+            <dt>Cannabis certification</dt>
+            <dd>
+              <span className="badge badge-accent">Cannabis-certified</span>{' '}
+              <span className="muted">
+                {provider.cannabisCertification.programName} (list as of{' '}
+                {String(provider.cannabisCertification.asOf).slice(0, 10)})
+              </span>
+            </dd>
+          </div>
+        ) : null}
       </dl>
       <p className="provenance">
         NIH NPI Registry, accessed {new Date().toISOString().slice(0, 10)}

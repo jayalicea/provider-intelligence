@@ -111,3 +111,68 @@ no `paymentAdjustmentPct`; quality measures mounted under `/providers`).
    uncommitted — not part of this deliverable.
 6. Docker: image build verified, but `docker compose up` runtime validation
    (app + database containers) has not been run.
+
+---
+
+# SUMMARY — cannabis-certification feature (2026-09-19/20)
+
+Date: 2026-09-20. Follow-up batch: FL OMMU "Qualified Physician List"
+ingest, search filter + badge, NPI enrichment, provider-detail surfacing,
+weekly refresh pipeline.
+
+## What was built
+
+- **Schema** (`src/config/migrations/20260919_cannabis_certifications.sql`):
+  `cannabis_certifications` — 2,009 FL OMMU qualified physicians keyed by
+  `UNIQUE(state, license_number)`, indexed on `(license_number, state)`;
+  source/provenance columns per the survey CSV shape. First/last stored split
+  (the source publishes separate columns; its "Last/First" labels are swapped
+  relative to their content — stored as actual first/last).
+- **Ingest** (`tools/cannabis-ingest.js`): parses the fixed-width PDF text
+  (61 pages, per-page column offsets; 662/2,009 rows split by the extractor
+  and rejoined in list order; glued license tokens split on the ME/OS/ACN
+  prefix set). Re-ingests are lossless: `npi` is never in the ON CONFLICT
+  update list and existing `NPI matched/quarantined` provenance segments are
+  carried forward.
+- **Search annotation** (`npiService.annotateCannabisCertification`): one
+  UNION query per search over cached license joins (`provider_licenses`,
+  `providers`) plus directly-enriched NPIs; degrades to false on error.
+  Frontend: `cannabisOnly` checkbox composing with `mipsOnly`
+  (`ProviderSearchPage.jsx`) and a `badge badge-accent` in the results table.
+- **NPI enrichment** (`tools/cannabis-npi-enrich.js`): one lookup per distinct
+  name against the NPI Registry (FL practice addresses), audit-gated.
+  Auto-accepts only a unique name+city match: **383 rows enriched; 1,626
+  quarantined** (1,267 no-candidates, 265 unique-name-no-city, 87
+  name-matches-no-city-confirmation, 7 multiple-city-matches) with reasons in
+  `provenance_note` and a review CSV under `data/cannabis/`. UNION match
+  count went 15 → **394**.
+- **Provider detail** (`npiService.getCannabisCertification` +
+  `providerController.getProvider`): response now carries
+  `cannabisCertification` (`{certified, programName, state, asOf, sourceName,
+  sourceUrl, certificationStatus}`, null when absent); profile card renders a
+  badge row with program name and list as-of date.
+- **Weekly refresh** (`tools/cannabis-refresh.ps1`, modeled on
+  `monthly-leie-refresh.ps1`): resolves the current `QP_List/MMDDYY.pdf` from
+  the list page, `pdftotext -layout`, lossless re-ingest, drops licenses
+  absent from the new list, re-enriches new rows, logs a summary line to
+  `logs/cannabis-refresh.log`. Verified end-to-end twice with `-Force`:
+  2,009 upserts, 0 dropped, 0 new enrichments, all 383 NPIs and match notes
+  intact.
+
+## Test results
+
+- Backend: `npm test` — **29 suites, 387 tests, all green** (new: search
+  cannabisCertified true/false + enriched-NPI cases, provider-detail
+  certified/null cases). `npx eslint` clean on touched files.
+- Client: `npm run lint` clean, `npm run build` succeeds.
+
+## Known gaps and limitations
+
+1. 1,626 rows remain NPI-less pending human review (`data/cannabis/
+   npi-match-review-2026-09-20.csv`); the 265 `unique-name-no-city` rows are
+   the strongest candidates.
+2. The annotation is only as good as the local license cache: uncached
+   providers never light up via license joins (by design); enriched NPIs
+   bypass this.
+3. Nothing is committed to git per batch instructions; the review CSV is
+   intentionally untracked.

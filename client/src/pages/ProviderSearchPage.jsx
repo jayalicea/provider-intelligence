@@ -14,6 +14,8 @@ export default function ProviderSearchPage() {
   const city = searchParams.get('city') || ''
   const taxonomy = searchParams.get('taxonomy') || ''
   const [mipsOnly, setMipsOnly] = useState(false)
+  // Cannabis filter is URL-driven so the homepage link can deep-link it.
+  const cannabisOnly = searchParams.get('cannabis') === 'true'
 
   const hasCriteria = Boolean(terms || state || city)
 
@@ -28,9 +30,9 @@ export default function ProviderSearchPage() {
     [terms, state, city, taxonomy]
   )
 
-  const results = mipsOnly
-    ? (data?.results ?? []).filter((p) => p.hasMipsData)
-    : data?.results
+  const results = (data?.results ?? []).filter(
+    (p) => (!mipsOnly || p.hasMipsData) && (!cannabisOnly || p.cannabisCertified)
+  )
 
   const updateParams = (patch) => {
     const next = new URLSearchParams(searchParams)
@@ -68,6 +70,14 @@ export default function ProviderSearchPage() {
           />
           Only show providers with MIPS scores
         </label>
+        <label className="mips-filter">
+          <input
+            type="checkbox"
+            checked={cannabisOnly}
+            onChange={(e) => updateParams({ cannabis: e.target.checked ? 'true' : '' })}
+          />
+          Only show cannabis-certified providers
+        </label>
         {mipsOnly && (
           <p className="muted mips-filter-note">
             MIPS coverage reflects cached CMS data. CMS publishes one rolling
@@ -99,7 +109,7 @@ export default function ProviderSearchPage() {
       ) : (
         <ProviderResultsTable
           results={results}
-          total={mipsOnly ? undefined : data?.total}
+          total={mipsOnly || cannabisOnly ? undefined : data?.total}
           loading={loading}
           error={error}
           onRetry={refetch}

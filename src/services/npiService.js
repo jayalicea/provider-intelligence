@@ -74,6 +74,7 @@ class NpiService {
 
       const providers = this.transformNpiResponse(response);
       await this.annotateMipsAvailability(providers);
+      await this.annotateCannabisCertification(providers);
       return { total, providers };
     } catch (error) {
       logger.error('Error searching NPI registry:', error);
@@ -102,6 +103,146 @@ class NpiService {
       }
     } catch (error) {
       logger.error('Error annotating MIPS availability:', error);
+    }
+  }
+
+  /**
+   * Flag each search result with whether it holds a medical-cannabis
+   * certification in cannabis_certifications (state program registries).
+   * NPIs come from three arms: cached license joins (provider_licenses or
+   * the providers row) — a result lights up only when the license it
+   * self-reported to NPPES is also in our cache, so providers whose licenses
+   * aren't cached can never match that way — plus NPIs enriched directly onto
+   * cannabis_certifications rows by tools/cannabis-npi-enrich.js. One query
+   * per search; failures degrade to cannabisCertified false rather than
+   * failing the search.
+   */
+  async annotateCannabisCertification(providers) {
+    for (const p of providers) p.cannabisCertified = false;
+    if (providers.length === 0) return;
+
+    try {
+      const result = await db.query(
+        `SELECT DISTINCT pl.npi
+           FROM provider_licenses pl
+           JOIN cannabis_certifications cc
+             ON cc.license_number = pl.license_number
+            AND cc.state = pl.issuing_state
+         UNION
+         SELECT p.npi
+           FROM providers p
+           JOIN cannabis_certifications cc
+             ON cc.license_number = p.license_number
+            AND cc.state = p.license_issuing_state
+         UNION
+         SELECT npi
+           FROM cannabis_certifications
+          WHERE npi IS NOT NULL`
+      );
+      const certified = new Set(result.rows.map(r => String(r.npi)));
+      for (const p of providers) {
+        p.cannabisCertified = certified.has(String(p.npi));
+      }
+    } catch (error) {
+      logger.error('Error annotating cannabis certification:', error);
+    }
+  }
+
+  /**
+   * Medical-cannabis certification for one NPI: same match semantics as
+   * annotateCannabisCertification (cached license joins OR an NPI enriched
+   * directly onto cannabis_certifications). Returns a display-ready object or
+   * null when the provider is not certified; failures degrade to null.
+   */
+  async getCannabisCertification(npiNumber) {
+    try {
+      const result = await db.query(
+        `SELECT cc.program_name, cc.state, cc.as_of, cc.source_name, cc.source_url,
+                cc.certification_status
+           FROM cannabis_certifications cc
+          WHERE cc.npi = $1
+             OR EXISTS (
+                  SELECT 1 FROM provider_licenses pl
+                   WHERE pl.npi = $1
+                     AND pl.license_number = cc.license_number
+                     AND pl.issuing_state = cc.state
+                )
+             OR EXISTS (
+                  SELECT 1 FROM providers p
+                   WHERE p.npi = $1
+                     AND p.license_number = cc.license_number
+                     AND p.license_issuing_state = cc.state
+                )
+          LIMIT 1`,
+        [npiNumber]
+      );
+      if (!result.rows || result.rows.length === 0) return null;
+      const r = result.rows[0];
+      return {
+        certified: true,
+        programName: r.program_name,
+        state: r.state,
+        asOf: r.as_of,
+        sourceName: r.source_name,
+        sourceUrl: r.source_url,
+        certificationStatus: r.certification_status
+      };
+    } catch (error) {
+      logger.error('Error fetching cannabis certification:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Per-state summary of cannabis_certifications for the hub page: listed
+   * counts grouped by (state, program, source) plus, per state, the count of
+   * distinct NPIs matching under the same three-arm semantics as
+   * annotateCannabisCertification (license joins plus directly enriched
+   * NPIs). Failures degrade to an empty list.
+   */
+  async getCannabisSummary() {
+    try {
+      const result = await db.query(
+        `SELECT s.state, s.program_name, s.source_name, s.source_url,
+                s.as_of, s.listed_count, COUNT(m.npi) AS matched_count
+           FROM (
+                  SELECT state, program_name, source_name, source_url,
+                         MAX(as_of) AS as_of, COUNT(*) AS listed_count
+                    FROM cannabis_certifications
+                   GROUP BY state, program_name, source_name, source_url
+                ) s
+           LEFT JOIN (
+                  SELECT DISTINCT cc.state, pl.npi
+                    FROM provider_licenses pl
+                    JOIN cannabis_certifications cc
+                      ON cc.license_number = pl.license_number
+                     AND cc.state = pl.issuing_state
+                  UNION
+                  SELECT DISTINCT cc.state, p.npi
+                    FROM providers p
+                    JOIN cannabis_certifications cc
+                      ON cc.license_number = p.license_number
+                     AND cc.state = p.license_issuing_state
+                  UNION
+                  SELECT state, npi
+                    FROM cannabis_certifications
+                   WHERE npi IS NOT NULL
+                ) m ON m.state = s.state
+          GROUP BY s.state, s.program_name, s.source_name, s.source_url, s.as_of, s.listed_count
+          ORDER BY s.state`
+      );
+      return result.rows.map(r => ({
+        state: r.state,
+        programName: r.program_name,
+        sourceName: r.source_name,
+        sourceUrl: r.source_url,
+        asOf: r.as_of,
+        listedCount: Number(r.listed_count),
+        matchedCount: Number(r.matched_count)
+      }));
+    } catch (error) {
+      logger.error('Error building cannabis summary:', error);
+      return [];
     }
   }
 

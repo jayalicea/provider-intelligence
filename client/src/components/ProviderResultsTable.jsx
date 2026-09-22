@@ -70,7 +70,11 @@ export default function ProviderResultsTable({
                     .filter(Boolean)
                     .join(', ') || 'Not available'}
                 </td>
-                <td></td>
+                <td>
+                  {p.cannabisCertified ? (
+                    <span className="badge badge-accent">Cannabis-certified</span>
+                  ) : null}
+                </td>
               </tr>
             ))}
         </tbody>

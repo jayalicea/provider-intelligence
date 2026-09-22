@@ -272,3 +272,50 @@ describe('GET /api/v1/providers/:npi/verification license status', () => {
     expect(res.body.data.licenses.values[0].verified.status.value).toBe('Expired');
   });
 });
+
+describe('GET /api/v1/providers/:npi/verification cannabis certification', () => {
+  test('attaches a wrapped cannabis block when a certification row matches by npi', async () => {
+    seedProvider('1366446619');
+    mockDb._stores.cannabis.set('FL:ME900000', {
+      state: 'FL',
+      license_number: 'ME900000',
+      npi: '1366446619',
+      program_name: 'Florida Medical Marijuana Program',
+      as_of: '2026-09-11',
+      source_name: 'FL OMMU Qualified Physician List',
+      source_url: 'https://knowthefactsmmj.com/physicians/list/',
+      certification_status: 'qualified'
+    });
+
+    const res = await request(app).get('/api/v1/providers/1366446619/verification');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.cannabisCertification).toEqual({
+      programName: {
+        value: 'Florida Medical Marijuana Program',
+        source: 'FL OMMU Qualified Physician List',
+        asOf: '2026-09-11'
+      },
+      state: { value: 'FL', source: 'FL OMMU Qualified Physician List', asOf: '2026-09-11' },
+      certificationStatus: {
+        value: 'qualified',
+        source: 'FL OMMU Qualified Physician List',
+        asOf: '2026-09-11'
+      },
+      sourceUrl: {
+        value: 'https://knowthefactsmmj.com/physicians/list/',
+        source: 'FL OMMU Qualified Physician List',
+        asOf: '2026-09-11'
+      }
+    });
+  });
+
+  test('cannabisCertification is null when no certification row matches', async () => {
+    seedProvider('1366446619');
+
+    const res = await request(app).get('/api/v1/providers/1366446619/verification');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.cannabisCertification).toBeNull();
+  });
+});

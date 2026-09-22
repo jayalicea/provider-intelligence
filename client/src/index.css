@@ -322,6 +322,18 @@ textarea:focus-visible,
   margin-bottom: var(--space-5);
 }
 
+/* Cannabis hub: per-state stat cards fed by /api/v1/cannabis/summary. */
+.cannabis-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.cannabis-stats .card {
+  margin-bottom: 0;
+}
+
 .stat {
   background: var(--surface);
   padding: var(--space-4) var(--space-5);

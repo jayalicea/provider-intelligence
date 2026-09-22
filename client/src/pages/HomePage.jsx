@@ -8,6 +8,12 @@ const SURFACES = [
     description: 'Find a provider by name, NPI number, or location across the public NPI Registry.',
   },
   {
+    to: '/cannabis',
+    title: 'Cannabis Providers',
+    description:
+      'The cannabis-certification hub: search state lists of physicians certified to recommend medical marijuana, starting with Florida and West Virginia.',
+  },
+  {
     to: '/cohort',
     title: 'Cohort Explorer',
     description: 'Slice the national provider directory by specialty, geography, and MIPS participation.',

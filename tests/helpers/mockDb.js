@@ -12,6 +12,7 @@ const exclusions = [];       // oig_exclusions rows
 const taxonomyCodes = new Map(); // taxonomy_codes rows, keyed by code
 const taxonomyPercentiles = [];  // taxonomy_percentiles materialized rows
 const stateExclusions = []; // state_exclusions rows
+const cannabis = new Map(); // cannabis_certifications rows, keyed `${state}:${license_number}`
 const apiUsage = [];        // api_usage metering rows
 const apiKeys = new Map();  // label -> api_keys row
 let quality = [];            // quality_measures rows
@@ -26,6 +27,7 @@ function reset() {
   taxonomyCodes.clear();
   taxonomyPercentiles.length = 0;
   stateExclusions.length = 0;
+  cannabis.clear();
   apiUsage.length = 0;
   apiKeys.clear();
   quality = [];
@@ -254,6 +256,97 @@ async function query(text, params = []) {
     const rows = [...mips.values()]
       .filter(r => wanted.has(String(r.npi)))
       .map(r => ({ npi: r.npi }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // --- cannabis_certifications (license-number-keyed certification) ----------
+
+  // Single-NPI certification lookup: an NPI enriched directly onto a
+  // cannabis row, or cached license joins for that NPI.
+  if (/^SELECT cc\.program_name, cc\.state, cc\.as_of, cc\.source_name, cc\.source_url, cc\.certification_status FROM cannabis_certifications cc WHERE cc\.npi = \$1/.test(sql)) {
+    const npi = String(params[0]);
+    let row = [...cannabis.values()].find(r => r.npi && String(r.npi) === npi);
+    if (!row) {
+      const keys = new Set();
+      for (const pl of providerLicenses) {
+        if (String(pl.npi) === npi) keys.add(`${pl.issuing_state}:${pl.license_number}`);
+      }
+      const prov = providers.get(npi);
+      if (prov && prov.license_number) {
+        keys.add(`${prov.license_issuing_state}:${prov.license_number}`);
+      }
+      for (const k of keys) {
+        if (cannabis.has(k)) { row = cannabis.get(k); break; }
+      }
+    }
+    if (!row) return { rows: [], rowCount: 0 };
+    return {
+      rows: [{
+        program_name: row.program_name || 'Florida Medical Marijuana Program',
+        state: row.state,
+        as_of: row.as_of || '2026-09-11',
+        source_name: row.source_name || 'FL OMMU Qualified Physician List',
+        source_url: row.source_url || 'https://knowthefactsmmj.com/physicians/list/',
+        certification_status: row.certification_status || 'qualified'
+      }],
+      rowCount: 1
+    };
+  }
+
+  // Cannabis hub summary: listed counts per (state, program, source) plus
+  // per-state distinct matched NPIs under the same three-arm semantics.
+  if (/COUNT\(m\.npi\) AS matched_count/.test(sql)) {
+    const groups = new Map();
+    for (const r of cannabis.values()) {
+      const key = [r.state, r.program_name || '', r.source_name || '', r.source_url || ''].join('|');
+      if (!groups.has(key)) {
+        groups.set(key, { state: r.state, program_name: r.program_name, source_name: r.source_name, source_url: r.source_url, as_of: null, listed_count: 0 });
+      }
+      const g = groups.get(key);
+      g.listed_count++;
+      const a = r.as_of ? String(r.as_of).slice(0, 10) : null;
+      if (a && (!g.as_of || a > g.as_of)) g.as_of = a;
+    }
+    const matchedByState = new Map();
+    const addMatch = (state, npi) => {
+      if (!matchedByState.has(state)) matchedByState.set(state, new Set());
+      matchedByState.get(state).add(String(npi));
+    };
+    for (const pl of providerLicenses) {
+      const cc = cannabis.get(`${pl.issuing_state}:${pl.license_number}`);
+      if (cc) addMatch(cc.state, pl.npi);
+    }
+    for (const p of providers.values()) {
+      if (!p.license_number) continue;
+      const cc = cannabis.get(`${p.license_issuing_state}:${p.license_number}`);
+      if (cc) addMatch(cc.state, p.npi);
+    }
+    for (const r of cannabis.values()) {
+      if (r.npi) addMatch(r.state, r.npi);
+    }
+    const rows = [...groups.values()]
+      .sort((a, b) => String(a.state).localeCompare(String(b.state)))
+      .map(g => ({ ...g, matched_count: matchedByState.get(g.state) ? matchedByState.get(g.state).size : 0 }));
+    return { rows, rowCount: rows.length };
+  }
+
+  // UNION of NPIs whose cached licenses (provider_licenses baseline or the
+  // providers row) match a certification on (license_number, state), plus
+  // NPIs enriched directly onto cannabis_certifications rows.
+  if (/FROM provider_licenses pl JOIN cannabis_certifications cc/.test(sql)) {
+    const npis = new Set();
+    for (const r of providerLicenses) {
+      if (cannabis.has(`${r.issuing_state}:${r.license_number}`)) npis.add(String(r.npi));
+    }
+    for (const r of providers.values()) {
+      if (r.license_number && cannabis.has(`${r.license_issuing_state}:${r.license_number}`)) {
+        npis.add(String(r.npi));
+      }
+    }
+    for (const r of cannabis.values()) {
+      if (r.npi) npis.add(String(r.npi));
+    }
+    const rows = [...npis].map(npi => ({ npi }));
     return { rows, rowCount: rows.length };
   }
 
@@ -879,6 +972,7 @@ module.exports = {
     taxonomyPercentiles,
     exclusions,
     stateExclusions,
+    cannabis,
     queryLog,
     apiUsage,
     apiKeys

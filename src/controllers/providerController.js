@@ -145,11 +145,16 @@ class ProviderController {
         }
       }
 
+      // Medical-cannabis certification when the NPI matches a certification
+      // row (enriched NPI or cached license join); null when not certified.
+      const cannabisCertification = await this.npiService.getCannabisCertification(npi);
+
       res.json({
         success: true,
         data: {
           ...provider,
-          mipsPerformance: mipsData
+          mipsPerformance: mipsData,
+          cannabisCertification
         }
       });
     } catch (error) {
@@ -312,6 +317,28 @@ class ProviderController {
         logger.warn('Failed to load cached MIPS data for verification dossier:', mipsError.message);
       }
 
+      // Cannabis certification block: state-program certification when a
+      // cannabis_certifications row matches (enriched NPI or cached license
+      // join). Every value carries the certification row's own source and
+      // as-of; null when the provider has no certification.
+      let cannabisCertification = null;
+      try {
+        const cert = await this.npiService.getCannabisCertification(provider.npi);
+        if (cert) {
+          const cSource = cert.sourceName;
+          const cAsOf = formatAsOf(cert.asOf);
+          const wrapC = value => ({ value, source: cSource, asOf: cAsOf });
+          cannabisCertification = {
+            programName: wrapC(cert.programName),
+            state: wrapC(cert.state),
+            certificationStatus: wrapC(cert.certificationStatus),
+            sourceUrl: wrapC(cert.sourceUrl)
+          };
+        }
+      } catch (cannabisError) {
+        logger.warn('Failed to load cannabis certification for verification dossier:', cannabisError.message);
+      }
+
       const flagsSummary = exclusion.verdict === 'EXCLUDED'
         ? 'flags found'
         : exclusion.verdict === 'CLEAR'
@@ -326,6 +353,7 @@ class ProviderController {
           licenses,
           exclusion,
           performance,
+          cannabisCertification,
           flagsSummary,
           terms: TERMS
         }
@@ -479,6 +507,28 @@ class ProviderController {
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve quality measure data'
+      });
+    }
+  }
+
+  /**
+   * Cannabis hub summary: per-state certification counts (listed vs matched
+   * to provider profiles) from cannabis_certifications.
+   */
+  async getCannabisSummary(req, res) {
+    try {
+      const summary = await this.npiService.getCannabisSummary();
+
+      res.json({
+        success: true,
+        data: summary,
+        count: summary.length
+      });
+    } catch (error) {
+      logger.error('Error in getCannabisSummary:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve cannabis summary'
       });
     }
   }

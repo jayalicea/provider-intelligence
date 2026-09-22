@@ -30,7 +30,8 @@ src/
   config/
     api-config.js         Upstream API base URLs, dataset IDs, rate limits
     database.js           pg Pool (reads DB_* env vars)
-    init.sql              Schema: providers, mips_performance_scores, ...
+    init.sql              Schema: providers, mips_performance_scores,
+                          cannabis_certifications, ...
   controllers/            HTTP layer (validation, 400/404/500 handling)
   middleware/             errorHandler.js, rateLimiter.js (in-memory)
   routes/                 Express routers (bind controller methods!)
