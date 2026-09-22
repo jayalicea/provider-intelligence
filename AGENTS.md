@@ -30,17 +30,25 @@ src/
   config/
     api-config.js         Upstream API base URLs, dataset IDs, rate limits
     database.js           pg Pool (reads DB_* env vars)
-    init.sql              Schema: providers, mips_performance_scores,
-                          cannabis_certifications, ...
+    init.sql              Schema: providers, mips_performance_scores, ...
+    migrations/           Incremental DDL (e.g. cannabis_certifications)
   controllers/            HTTP layer (validation, 400/404/500 handling)
   middleware/             errorHandler.js, rateLimiter.js (in-memory)
   routes/                 Express routers (bind controller methods!)
   services/               npiService, cmsDataService, analyticsService
   utils/                  apiClient (axios wrapper), logger (winston)
+tools/                    One-off ingest/backfill scripts (cannabis registries,
+                          license backfill); not part of the served app
 tests/                    jest + supertest, offline via nock + mockDb
 client/                   Vite + React frontend (separate package.json)
 docs/                     Research docs and frontend spec
+tmp/                      Scratch inputs for ingest tools (PDFs/txt exports)
 ```
+
+Note: a stale parallel checkout exists at `./provider-intelligence/`
+(its own git worktree from an earlier session). Jest ignores it via
+`testPathIgnorePatterns` in `jest.config.js`; do not import from it —
+always edit the top-level `src/`.
 
 ## Run commands
 
