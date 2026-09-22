@@ -194,6 +194,32 @@ class NpiService {
   }
 
   /**
+   * Registry rows behind the summary: every cannabis_certifications entry
+   * (one row per listed physician) with the NPI when one is known — either
+   * enriched directly onto the row or resolvable by nothing else here (the
+   * enrich tool owns matching). Ordered for directory display. state=null
+   * returns all states. Failures degrade to an empty list.
+   */
+  async getCannabisPhysicians(state = null) {
+    try {
+      const result = await db.query(
+        `SELECT state, program_name, source_name, source_url, as_of,
+                practitioner_first_name, practitioner_last_name, credential,
+                npi, license_number, certification_status
+           FROM cannabis_certifications
+          WHERE ($1::text IS NULL OR state = $1)
+          ORDER BY state, practitioner_last_name, practitioner_first_name
+          LIMIT 500`,
+        [state]
+      );
+      return result.rows;
+    } catch (error) {
+      logger.error('Error fetching cannabis physicians:', error);
+      return [];
+    }
+  }
+
+  /**
    * Per-state summary of cannabis_certifications for the hub page: listed
    * counts grouped by (state, program, source) plus, per state, the count of
    * distinct NPIs matching under the same three-arm semantics as

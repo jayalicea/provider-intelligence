@@ -532,6 +532,38 @@ class ProviderController {
       });
     }
   }
+
+  /**
+   * Registry rows behind the cannabis summary: the listed physicians
+   * themselves, with NPIs where known. Optional ?state=XX filter.
+   */
+  async getCannabisPhysicians(req, res) {
+    try {
+      const { state } = req.query;
+      if (state !== undefined && !/^[A-Za-z]{2}$/.test(state)) {
+        return res.status(400).json({
+          success: false,
+          error: 'state must be a two-letter code'
+        });
+      }
+
+      const physicians = await this.npiService.getCannabisPhysicians(
+        state ? state.toUpperCase() : null
+      );
+
+      res.json({
+        success: true,
+        data: physicians,
+        count: physicians.length
+      });
+    } catch (error) {
+      logger.error('Error in getCannabisPhysicians:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve cannabis physicians'
+      });
+    }
+  }
 }
 
 module.exports = ProviderController;

@@ -17,4 +17,8 @@ router.use(rateLimiter({ windowMs: 60 * 1000, max: 100 }));
 // top-level path).
 router.get('/summary', bound('getCannabisSummary'));
 
+// The registry lists themselves: one row per listed physician, with the
+// NPI whenever one is known (enriched rows).
+router.get('/physicians', bound('getCannabisPhysicians'));
+
 module.exports = router;

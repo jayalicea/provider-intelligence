@@ -293,6 +293,33 @@ async function query(text, params = []) {
     };
   }
 
+  // Cannabis registry directory: one row per listed physician, optional
+  // state filter, name-ordered.
+  if (/^SELECT state, program_name, source_name, source_url, as_of, practitioner_first_name/.test(sql)) {
+    const state = params[0] ?? null;
+    let rows = [...cannabis.values()];
+    if (state) rows = rows.filter(r => r.state === state);
+    rows = rows
+      .sort((a, b) =>
+        `${a.state}|${a.practitioner_last_name || ''}|${a.practitioner_first_name || ''}`
+          .localeCompare(`${b.state}|${b.practitioner_last_name || ''}|${b.practitioner_first_name || ''}`))
+      .slice(0, 500)
+      .map(r => ({
+        state: r.state,
+        program_name: r.program_name,
+        source_name: r.source_name,
+        source_url: r.source_url,
+        as_of: r.as_of,
+        practitioner_first_name: r.practitioner_first_name ?? null,
+        practitioner_last_name: r.practitioner_last_name ?? null,
+        credential: r.credential ?? null,
+        npi: r.npi ?? null,
+        license_number: r.license_number ?? null,
+        certification_status: r.certification_status
+      }));
+    return { rows, rowCount: rows.length };
+  }
+
   // Cannabis hub summary: listed counts per (state, program, source) plus
   // per-state distinct matched NPIs under the same three-arm semantics.
   if (/COUNT\(m\.npi\) AS matched_count/.test(sql)) {
