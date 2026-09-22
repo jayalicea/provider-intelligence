@@ -57,16 +57,16 @@ describe('GET /api/v1/cannabis/physicians', () => {
     expect(res.body.count).toBe(2);
     expect(res.body.data[0]).toMatchObject({
       state: 'AL',
-      practitioner_last_name: 'ABURIME',
+      practitionerLastName: 'ABURIME',
       npi: null,
-      license_number: null,
-      certification_status: 'registered'
+      licenseNumber: null,
+      certificationStatus: 'registered'
     });
     expect(res.body.data[1]).toMatchObject({
       state: 'FL',
-      practitioner_last_name: 'WESTWOOD',
+      practitionerLastName: 'WESTWOOD',
       npi: '1234567890',
-      license_number: 'ME126815'
+      licenseNumber: 'ME126815'
     });
   });
 

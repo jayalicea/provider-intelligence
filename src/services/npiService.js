@@ -212,7 +212,19 @@ class NpiService {
           LIMIT 500`,
         [state]
       );
-      return result.rows;
+      return result.rows.map(r => ({
+        state: r.state,
+        programName: r.program_name,
+        sourceName: r.source_name,
+        sourceUrl: r.source_url,
+        asOf: r.as_of,
+        practitionerFirstName: r.practitioner_first_name,
+        practitionerLastName: r.practitioner_last_name,
+        credential: r.credential,
+        npi: r.npi,
+        licenseNumber: r.license_number,
+        certificationStatus: r.certification_status
+      }));
     } catch (error) {
       logger.error('Error fetching cannabis physicians:', error);
       return [];
