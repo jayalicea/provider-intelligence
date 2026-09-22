@@ -351,7 +351,9 @@ export default function MyProvidersPage() {
                           </div>
                         )}
                       </td>
-                      <td className="mono">{npi}</td>
+                      <td>
+                        <NpiText npi={npi} />
+                      </td>
                       <td>{provider?.address?.state || 'Not available'}</td>
                       <td>{provider?.taxonomy?.description || 'Not available'}</td>
                       <td className="muted">

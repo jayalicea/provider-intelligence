@@ -1,10 +1,11 @@
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import api, { exportUrls } from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
 import SearchBar from '../components/SearchBar.jsx'
 import FilterPanel from '../components/FilterPanel.jsx'
 import ProviderResultsTable from '../components/ProviderResultsTable.jsx'
+import NpiText from '../components/NpiText.jsx'
 
 export default function ProviderSearchPage() {
   // Search state is mirrored into URL search params so results are shareable.
@@ -18,6 +19,13 @@ export default function ProviderSearchPage() {
   const cannabisOnly = searchParams.get('cannabis') === 'true'
 
   const hasCriteria = Boolean(terms || state || city)
+
+  // The NPI is the canonical identifier: a 10-digit query is offered a
+  // direct jump to that provider's profile rather than only a fuzzy list;
+  // a digit-run of the wrong length gets an inline correction.
+  const trimmedTerms = terms.trim()
+  const npiExact = /^\d{10}$/.test(trimmedTerms) ? trimmedTerms : null
+  const npiMalformed = !npiExact && /^\d{5,}$/.test(trimmedTerms)
 
   const { data, loading, error, refetch } = useFetch(
     () =>
@@ -100,6 +108,24 @@ export default function ProviderSearchPage() {
           </a>
         )}
       </div>
+
+      {npiExact && (
+        <div className="card npi-jump stack-top">
+          <span>
+            This looks like an NPI, the canonical provider identifier.
+          Open its profile directly: <NpiText npi={npiExact} />
+          </span>
+          <Link className="btn btn-primary" to={`/providers/${npiExact}`}>
+            Open provider {npiExact}
+          </Link>
+        </div>
+      )}
+      {npiMalformed && (
+        <p className="info-banner stack-top" role="status">
+          NPI numbers are exactly 10 digits &mdash; treating this as a name
+          search instead.
+        </p>
+      )}
 
       {!hasCriteria && !loading ? (
         <p className="muted">

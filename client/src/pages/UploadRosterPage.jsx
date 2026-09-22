@@ -3,6 +3,7 @@ import api from '../api/client.js'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 import VerdictBadge from '../components/VerdictBadge.jsx'
+import NpiText from '../components/NpiText.jsx'
 
 const MAX_ROWS = 1000
 
@@ -210,7 +211,9 @@ export default function UploadRosterPage() {
                         <div className="provenance">{row.input.state}</div>
                       )}
                     </td>
-                    <td className="mono">{row.input.npi || '—'}</td>
+                    <td>
+                      <NpiText npi={row.input.npi} link={Boolean(row.input.npi)} />
+                    </td>
                     <td>
                       <VerdictBadge verdict={row.verdict} />
                       {row.match && (

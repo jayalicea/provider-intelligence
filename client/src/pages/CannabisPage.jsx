@@ -1,9 +1,11 @@
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
 import api from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
 import SearchBar from '../components/SearchBar.jsx'
 import FilterPanel from '../components/FilterPanel.jsx'
 import ProviderResultsTable from '../components/ProviderResultsTable.jsx'
+import NpiText from '../components/NpiText.jsx'
 
 const nf = new Intl.NumberFormat('en-US')
 
@@ -52,6 +54,21 @@ export default function CannabisPage() {
   // certification flag, and the upstream total is hidden while filtering,
   // same convention as the MIPS filter on the search page.
   const results = (data?.results ?? []).filter((p) => p.cannabisCertified)
+
+  // Registry directory: the raw state list rows. One state at a time (the
+  // endpoint caps at 500 rows and full lists run into the thousands);
+  // chips switch the state and default to the first listed one.
+  const summaryStates = [...new Set((summary ?? []).map((s) => s.state))].sort()
+  const [registryState, setRegistryState] = useState('')
+  const activeRegistryState = registryState || summaryStates[0] || 'FL'
+  const {
+    data: registry,
+    loading: registryLoading,
+    error: registryError,
+  } = useFetch(
+    () => api.getCannabisPhysicians(activeRegistryState),
+    [activeRegistryState]
+  )
 
   return (
     <section>
@@ -113,6 +130,84 @@ export default function CannabisPage() {
           onRetry={refetch}
         />
       )}
+
+      <div className="card">
+        <h2 className="card-title">Registry directory</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          The state registry lists themselves &mdash; every listed physician,
+          whether or not they resolve to an NPI yet. The NPI column is the
+          link into the rest of the platform.
+        </p>
+        {summaryStates.length > 1 && (
+          <p className="stack-bottom">
+            {summaryStates.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={s === activeRegistryState ? 'btn btn-primary' : 'btn'}
+                onClick={() => setRegistryState(s)}
+              >
+                {s}
+              </button>
+            ))}
+          </p>
+        )}
+        {registryError && (
+          <p className="info-banner" role="alert">
+            Registry list unavailable: {registryError.message}
+          </p>
+        )}
+        {registry && registry.length > 0 && (
+          <div className="table-region">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Physician</th>
+                  <th>Credential</th>
+                  <th>NPI</th>
+                  <th>License</th>
+                  <th>Status</th>
+                  <th>List as of</th>
+                </tr>
+              </thead>
+              <tbody>
+                {registry.map((r) => (
+                  <tr key={`${r.state}-${r.licenseNumber || 'na'}-${r.practitionerLastName}-${r.practitionerFirstName}`}>
+                    <td>
+                      {r.npi ? (
+                        <Link to={`/providers/${r.npi}`}>
+                          {r.practitionerLastName}, {r.practitionerFirstName}
+                        </Link>
+                      ) : (
+                        <>
+                          {r.practitionerLastName}, {r.practitionerFirstName}{' '}
+                          <span className="muted">(unlinked)</span>
+                        </>
+                      )}
+                    </td>
+                    <td>{r.credential || '—'}</td>
+                    <td>
+                      <NpiText npi={r.npi} link={Boolean(r.npi)} />
+                    </td>
+                    <td className="mono">{r.licenseNumber || '—'}</td>
+                    <td>{r.certificationStatus || '—'}</td>
+                    <td className="muted">
+                      {r.asOf ? String(r.asOf).slice(0, 10) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="results-count">
+              {registry.length} physicians listed by {registry[0]?.sourceName}
+              , accessed {new Date().toISOString().slice(0, 10)}
+            </p>
+          </div>
+        )}
+        {!registryLoading && registry && registry.length === 0 && (
+          <p className="muted">No registry rows for {activeRegistryState}.</p>
+        )}
+      </div>
 
       <p className="provenance">
         &ldquo;Linked&rdquo; means matched by license number or name and city

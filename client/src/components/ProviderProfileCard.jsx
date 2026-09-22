@@ -1,4 +1,5 @@
 import ErrorBanner from './ErrorBanner.jsx'
+import NpiText from './NpiText.jsx'
 
 export default function ProviderProfileCard({ provider, loading, error }) {
   if (error) {
@@ -38,7 +39,9 @@ export default function ProviderProfileCard({ provider, loading, error }) {
       <dl className="detail-list">
         <div>
           <dt>NPI</dt>
-          <dd className="mono">{provider.npi || 'Not available'}</dd>
+          <dd>
+            <NpiText npi={provider.npi} />
+          </dd>
         </div>
         <div>
           <dt>Taxonomy</dt>

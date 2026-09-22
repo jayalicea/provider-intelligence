@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import ErrorBanner from './ErrorBanner.jsx'
 import EmptyState from './EmptyState.jsx'
+import NpiText from './NpiText.jsx'
 
 function providerName(p) {
   const full = [p.name?.first, p.name?.middle, p.name?.last]
@@ -63,7 +64,9 @@ export default function ProviderResultsTable({
                 <td>
                   <Link to={`/providers/${p.npi}`}>{providerName(p)}</Link>
                 </td>
-                <td className="mono">{p.npi}</td>
+                <td>
+                  <NpiText npi={p.npi} />
+                </td>
                 <td>{p.taxonomy?.description || 'Not available'}</td>
                 <td>
                   {[p.address?.city, p.address?.state]

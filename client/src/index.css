@@ -1232,3 +1232,34 @@ button.btn-primary:hover:not(:disabled) {
     text-decoration: none;
   }
 }
+
+/* Copyable NPI: the identifier stays quiet until hovered or focused. */
+.npi-text {
+  white-space: nowrap;
+}
+
+.npi-copy {
+  font-size: 0.72rem;
+  margin-left: 6px;
+  opacity: 0.55;
+  padding: 0 2px;
+  text-transform: none;
+}
+
+.npi-text:hover .npi-copy,
+.npi-copy:focus {
+  opacity: 1;
+}
+
+/* NPI quick-jump card on the search page. */
+.npi-jump {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 12px);
+  justify-content: space-between;
+}
+
+.npi-jump .mono {
+  font-weight: 600;
+}

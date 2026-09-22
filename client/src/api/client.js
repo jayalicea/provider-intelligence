@@ -54,6 +54,13 @@ export const api = {
     return data.data ?? []
   },
 
+  getCannabisPhysicians: async (state) => {
+    const { data } = await http.get('/cannabis/physicians', {
+      params: state ? { state } : {},
+    })
+    return data.data ?? []
+  },
+
   getMipsPerformance: async (npi, year) => {
     const { data } = await http.get(`/providers/${npi}/mips-performance`, {
       params: { year },
