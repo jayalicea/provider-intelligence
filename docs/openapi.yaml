@@ -248,6 +248,13 @@ paths:
         '200': { description: '{ success, data: [...], count, counts, submitted, truncated }' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /cannabis/summary:
+    get:
+      summary: Per-state medical-cannabis certifying practitioner counts
+      parameters:
+        - { name: state, in: query, schema: { type: string, pattern: '^[A-Za-z]{2}$' }, description: Optional two-letter filter; omit for all states }
+      responses:
+        '200': { description: '{ success, data: [{ state, source_name, certified_count, ... }] }' }
   /admin/usage:
     get:
       summary: Per-key and per-endpoint API usage from api_usage (API key required, every method)
