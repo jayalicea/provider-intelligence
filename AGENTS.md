@@ -45,10 +45,9 @@ docs/                     Research docs and frontend spec
 tmp/                      Scratch inputs for ingest tools (PDFs/txt exports)
 ```
 
-Note: a stale parallel checkout exists at `./provider-intelligence/`
-(its own git worktree from an earlier session). Jest ignores it via
-`testPathIgnorePatterns` in `jest.config.js`; do not import from it —
-always edit the top-level `src/`.
+`jest.config.js` keeps `testPathIgnorePatterns` pointed at
+`<rootDir>/provider-intelligence/` in case a nested checkout ever
+reappears; there is none today.
 
 ## Run commands
 
