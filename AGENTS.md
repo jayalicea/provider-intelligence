@@ -38,7 +38,10 @@ src/
   services/               npiService, cmsDataService, analyticsService
   utils/                  apiClient (axios wrapper), logger (winston)
 tools/                    One-off ingest/backfill scripts (cannabis registries,
-                          license backfill); not part of the served app
+                          license backfill); not part of the served app.
+                          cannabis-nppes-match.js backfills missing NPIs on
+                          cannabis_certifications from the local nppes_providers
+                          load (offline; cannabis-npi-enrich.js is the API path)
 tests/                    jest + supertest, offline via nock + mockDb
 client/                   Vite + React frontend (separate package.json)
 docs/                     Research docs and frontend spec
