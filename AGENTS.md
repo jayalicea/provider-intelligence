@@ -41,7 +41,10 @@ tools/                    One-off ingest/backfill scripts (cannabis registries,
                           license backfill); not part of the served app.
                           cannabis-nppes-match.js backfills missing NPIs on
                           cannabis_certifications from the local nppes_providers
-                          load (offline; cannabis-npi-enrich.js is the API path)
+                          load (offline; cannabis-npi-enrich.js is the API path);
+                          cannabis-nppes-resolve.js scores quarantined rows on
+                          ZIP/city/middle-initial signals and auto-accepts
+                          decisive winners
 tests/                    jest + supertest, offline via nock + mockDb
 client/                   Vite + React frontend (separate package.json)
 docs/                     Research docs and frontend spec
