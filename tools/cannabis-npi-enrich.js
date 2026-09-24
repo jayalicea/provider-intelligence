@@ -27,11 +27,14 @@ const fs = require('fs');
 const path = require('path');
 const { parseQpList } = require('./cannabis-ingest.js');
 const { parseWvList } = require('./cannabis-ingest-wv.js');
+const { parseAlList } = require('./cannabis-ingest-al.js');
 
 const NPI_URL = 'https://clinicaltables.nlm.nih.gov/api/npi_idv/v3/search';
 // Per-state source texts for the city lookup (schema keeps addresses out, so
-// the parsed rows carry them in memory only).
-const SOURCE_FILE = { FL: 'tmp/qplist.txt', WV: 'tmp/wv-physicians.txt' };
+// the parsed rows carry them in memory only). AL is license-less: its city
+// map is keyed by normalized name instead of license.
+const SOURCE_FILE = { FL: 'tmp/qplist.txt', WV: 'tmp/wv-physicians.txt', AL: 'tmp/al-physicians.txt' };
+const NAME_KEYED_STATE = 'AL';
 // Verified live (2026-09-20): dotted leaf paths return values; bare
 // first_name/last_name come back null (same convention as
 // transformNpiResponse in src/services/npiService.js).
@@ -201,13 +204,18 @@ async function main() {
     );
     const dbRows = res.rows;
 
-    // Source city per license, re-derived from the source text. WV's parser
+    // Source city per row, re-derived from the source text. WV's parser
     // returns no cities (addresses stay out of the schema by design), so WV
-    // rows carry none and go through the weaker exact-name gate below.
+    // rows carry none and go through the weaker exact-name gate below. AL
+    // rows carry no license, so their city map is name-keyed.
     const sourceText = fs.readFileSync(SOURCE_FILE[state], 'utf8');
-    const cityByLicense = state === 'FL'
+    const cityByRowKey = state === 'FL'
       ? new Map(parseQpList(sourceText).rows.map(r => [r.license, r.city || '']))
-      : new Map(parseWvList(sourceText).rows.map(r => [r.license, r.city || '']));
+      : state === NAME_KEYED_STATE
+        ? new Map(parseAlList(sourceText).rows.map(r => [
+            `${normalizeName(r.last)}|${normalizeName(stripMiddleInitials(r.first))}`,
+            r.city || '']))
+        : new Map(parseWvList(sourceText).rows.map(r => [r.license, r.city || '']));
 
     // Group by normalized name so each distinct name costs one API call.
     const groups = new Map();
@@ -216,9 +224,14 @@ async function main() {
       const last = normalizeName(r.practitioner_last_name);
       const key = `${last}|${first}`;
       if (!groups.has(key)) groups.set(key, { last, first, rows: [] });
+      const rowKey = r.license_number
+        ? r.license_number
+        : `${normalizeName(r.practitioner_last_name)}|${normalizeName(stripMiddleInitials(r.practitioner_first_name))}`;
       groups.get(key).rows.push({
         license: r.license_number,
-        city: (cityByLicense.get(r.license_number) || '').toUpperCase(),
+        lastName: r.practitioner_last_name,
+        firstName: r.practitioner_first_name,
+        city: (cityByRowKey.get(rowKey) || '').toUpperCase(),
         provenance: r.provenance_note
       });
     }
@@ -239,7 +252,7 @@ async function main() {
       } catch (e) {
         console.warn(`  warn: lookup failed for ${g.last} ${g.first}: ${e.message}`);
         for (const r of g.rows) {
-          quarantined.push({ license: r.license, last: g.last, first: g.first, city: r.city, reason: 'lookup-failed', candidateCount: 0, provenance: r.provenance });
+          quarantined.push({ license: r.license, lastName: r.lastName, firstName: r.firstName, last: g.last, first: g.first, city: r.city, reason: 'lookup-failed', candidateCount: 0, provenance: r.provenance });
         }
         await sleep(args.delayMs);
         continue;
@@ -250,7 +263,7 @@ async function main() {
 
       if (matches.length === 0) {
         for (const r of g.rows) {
-          quarantined.push({ license: r.license, last: g.last, first: g.first, city: r.city, reason: 'no-candidates', candidateCount: 0, provenance: r.provenance });
+          quarantined.push({ license: r.license, lastName: r.lastName, firstName: r.firstName, last: g.last, first: g.first, city: r.city, reason: 'no-candidates', candidateCount: 0, provenance: r.provenance });
         }
         await sleep(args.delayMs);
         continue;
@@ -265,6 +278,8 @@ async function main() {
           if (cityMatches.length === 1) {
             accepted.push({
               license: r.license,
+              lastName: r.lastName,
+              firstName: r.firstName,
               npi: cityMatches[0].npi,
               provenance: `${freshNote(r.provenance)} | NPI matched ${today}: unique name+city match`
             });
@@ -272,7 +287,7 @@ async function main() {
             const reason = cityMatches.length > 1
               ? 'multiple-city-matches'
               : (matches.length === 1 ? 'unique-name-no-city' : 'name-matches-no-city-confirmation');
-            quarantined.push({ license: r.license, last: g.last, first: g.first, city: r.city, reason, candidateCount: matches.length, detail, provenance: r.provenance });
+            quarantined.push({ license: r.license, lastName: r.lastName, firstName: r.firstName, last: g.last, first: g.first, city: r.city, reason, candidateCount: matches.length, detail, provenance: r.provenance });
           }
         } else {
           // No city in the source (WV): accept only a unique EXACT-name
@@ -281,12 +296,14 @@ async function main() {
           if (exact.length === 1) {
             accepted.push({
               license: r.license,
+              lastName: r.lastName,
+              firstName: r.firstName,
               npi: exact[0].npi,
               provenance: `${freshNote(r.provenance)} | NPI matched ${today}: unique name match (no city in source)`
             });
           } else {
             const reason = exact.length > 1 ? 'multiple-city-matches' : 'name-matches-no-city-confirmation';
-            quarantined.push({ license: r.license, last: g.last, first: g.first, city: r.city, reason, candidateCount: matches.length, detail, provenance: r.provenance });
+            quarantined.push({ license: r.license, lastName: r.lastName, firstName: r.firstName, last: g.last, first: g.first, city: r.city, reason, candidateCount: matches.length, detail, provenance: r.provenance });
           }
         }
       }
@@ -311,20 +328,41 @@ async function main() {
       await c.query('BEGIN');
       try {
         for (const a of accepted) {
-          await c.query(
-            `UPDATE cannabis_certifications
-                SET npi = $1, provenance_note = $2
-              WHERE state = $3 AND license_number = $4`,
-            [a.npi, a.provenance, state, a.license]
-          );
+          if (a.license) {
+            await c.query(
+              `UPDATE cannabis_certifications
+                  SET npi = $1, provenance_note = $2
+                WHERE state = $3 AND license_number = $4`,
+              [a.npi, a.provenance, state, a.license]
+            );
+          } else {
+            await c.query(
+              `UPDATE cannabis_certifications
+                  SET npi = $1, provenance_note = $2
+                WHERE state = $3 AND practitioner_last_name = $4
+                  AND practitioner_first_name = $5 AND npi IS NULL`,
+              [a.npi, a.provenance, state, a.lastName, a.firstName]
+            );
+          }
         }
         for (const q of quarantined) {
-          await c.query(
-            `UPDATE cannabis_certifications
-                SET provenance_note = $1
-              WHERE state = $2 AND license_number = $3`,
-            [`${freshNote(q.provenance)} | NPI match quarantined ${today}: ${q.reason}`, state, q.license]
-          );
+          const note = `${freshNote(q.provenance)} | NPI match quarantined ${today}: ${q.reason}`;
+          if (q.license) {
+            await c.query(
+              `UPDATE cannabis_certifications
+                  SET provenance_note = $1
+                WHERE state = $2 AND license_number = $3`,
+              [note, state, q.license]
+            );
+          } else {
+            await c.query(
+              `UPDATE cannabis_certifications
+                  SET provenance_note = $1
+                WHERE state = $2 AND practitioner_last_name = $3
+                  AND practitioner_first_name = $4 AND npi IS NULL`,
+              [note, state, q.lastName, q.firstName]
+            );
+          }
         }
         await c.query('COMMIT');
       } catch (e) {
