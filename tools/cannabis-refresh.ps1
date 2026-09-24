@@ -131,6 +131,13 @@ Log "dropped $droppedCount rows absent from new list: $($droppedLicenses -join '
 node tools/cannabis-npi-enrich.js
 if ($LASTEXITCODE -ne 0) { Log 'WARN enrich failed; table is otherwise refreshed' }
 
+# 5b. Offline NPPES backfill + scored auto-resolve for what the API gate
+# quarantined (see tools/cannabis-nppes-match.js / -resolve.js)
+node tools/cannabis-nppes-match.js --state FL
+if ($LASTEXITCODE -ne 0) { Log 'WARN nppes-match failed' }
+node tools/cannabis-nppes-resolve.js --state FL
+if ($LASTEXITCODE -ne 0) { Log 'WARN nppes-resolve failed' }
+
 # 6. summary
 $after = DbJson "SELECT COUNT(*)::int n, COUNT(npi)::int with_npi FROM cannabis_certifications WHERE state = 'FL' AND source_name = 'FL OMMU Qualified Physician List'"
 $union = DbJson "SELECT COUNT(*)::int n FROM (SELECT DISTINCT pl.npi FROM provider_licenses pl JOIN cannabis_certifications cc ON cc.license_number = pl.license_number AND cc.state = pl.issuing_state UNION SELECT p.npi FROM providers p JOIN cannabis_certifications cc ON cc.license_number = p.license_number AND cc.state = p.license_issuing_state UNION SELECT npi FROM cannabis_certifications WHERE npi IS NOT NULL) u"
