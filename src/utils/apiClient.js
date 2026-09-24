@@ -60,7 +60,7 @@ class ApiClient {
     }
   }
 
-  async getWithPagination(endpoint, params = {}, maxPages = 10) {
+  async getWithPagination(endpoint, params = {}, maxPages = 10, delayMs = 100) {
     const allResults = [];
     let page = 0;
     let hasMoreData = true;
@@ -91,8 +91,8 @@ class ApiClient {
         hasMoreData = results.length >= (params.size || 100);
         page++;
 
-        // Rate limiting delay
-        await this.delay(100);
+        // Rate limiting delay (0 in tests)
+        await this.delay(delayMs);
       } catch (error) {
         logger.error(`Pagination error at page ${page}:`, error);
         break;

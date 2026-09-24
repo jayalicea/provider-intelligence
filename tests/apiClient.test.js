@@ -50,7 +50,7 @@ describe('ApiClient.getWithPagination', () => {
     nock(HOST).get('/rows').query(q => q.offset === '2' && q.size === '2')
       .reply(200, [{ id: 3 }]);
 
-    const rows = await client().getWithPagination('/rows', { size: 2 });
+    const rows = await client().getWithPagination('/rows', { size: 2 }, 10, 0);
 
     expect(rows).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
     expect(nock.isDone()).toBe(true);
@@ -59,7 +59,7 @@ describe('ApiClient.getWithPagination', () => {
   test('unwraps {data: [...]} envelopes', async () => {
     nock(HOST).get('/wrapped').query(true).reply(200, { data: [{ id: 'a' }] });
 
-    const rows = await client().getWithPagination('/wrapped', { size: 5 });
+    const rows = await client().getWithPagination('/wrapped', { size: 5 }, 10, 0);
 
     expect(rows).toEqual([{ id: 'a' }]);
   });
@@ -70,7 +70,7 @@ describe('ApiClient.getWithPagination', () => {
     nock(HOST).get('/rows').query(q => q.offset === '100')
       .reply(500, 'boom');
 
-    const rows = await client().getWithPagination('/rows', {});
+    const rows = await client().getWithPagination('/rows', {}, 10, 0);
 
     expect(rows).toHaveLength(100);
   });
@@ -81,7 +81,7 @@ describe('ApiClient.getWithPagination', () => {
         .reply(200, Array(100).fill(0).map((_, j) => ({ id: i * 100 + j })));
     }
 
-    const rows = await client().getWithPagination('/rows', {}, 2);
+    const rows = await client().getWithPagination('/rows', {}, 2, 0);
 
     expect(rows).toHaveLength(200);
   });
