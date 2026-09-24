@@ -158,7 +158,8 @@ class NpiService {
     try {
       const result = await db.query(
         `SELECT cc.program_name, cc.state, cc.as_of, cc.source_name, cc.source_url,
-                cc.certification_status
+                cc.certification_status, cc.first_listed_at, cc.last_confirmed_at,
+                cc.currently_listed
            FROM cannabis_certifications cc
           WHERE cc.npi = $1
              OR EXISTS (
@@ -185,7 +186,10 @@ class NpiService {
         asOf: r.as_of,
         sourceName: r.source_name,
         sourceUrl: r.source_url,
-        certificationStatus: r.certification_status
+        certificationStatus: r.certification_status,
+        firstListedAt: r.first_listed_at,
+        lastConfirmedAt: r.last_confirmed_at,
+        currentlyListed: r.currently_listed
       };
     } catch (error) {
       logger.error('Error fetching cannabis certification:', error);
@@ -205,7 +209,8 @@ class NpiService {
       const result = await db.query(
         `SELECT state, program_name, source_name, source_url, as_of,
                 practitioner_first_name, practitioner_last_name, credential,
-                npi, license_number, certification_status
+                npi, license_number, certification_status,
+                first_listed_at, last_confirmed_at, currently_listed
            FROM cannabis_certifications
           WHERE ($1::text IS NULL OR state = $1)
           ORDER BY state, practitioner_last_name, practitioner_first_name
@@ -223,7 +228,10 @@ class NpiService {
         credential: r.credential,
         npi: r.npi,
         licenseNumber: r.license_number,
-        certificationStatus: r.certification_status
+        certificationStatus: r.certification_status,
+        firstListedAt: r.first_listed_at,
+        lastConfirmedAt: r.last_confirmed_at,
+        currentlyListed: r.currently_listed
       }));
     } catch (error) {
       logger.error('Error fetching cannabis physicians:', error);

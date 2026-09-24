@@ -70,7 +70,13 @@ export default function ProviderProfileCard({ provider, loading, error }) {
               <span className="badge badge-accent">Cannabis-certified</span>{' '}
               <span className="muted">
                 {provider.cannabisCertification.programName} (list as of{' '}
-                {String(provider.cannabisCertification.asOf).slice(0, 10)})
+                {String(provider.cannabisCertification.asOf).slice(0, 10)}
+                {provider.cannabisCertification.firstListedAt
+                  ? ` · certified since ${String(provider.cannabisCertification.firstListedAt).slice(0, 10)}`
+                  : ''}
+                {provider.cannabisCertification.currentlyListed === false
+                  ? ' · not on the current list edition'
+                  : ''})
               </span>
             </dd>
           </div>

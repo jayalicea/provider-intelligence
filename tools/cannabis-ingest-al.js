@@ -175,22 +175,34 @@ async function main() {
   await c.connect();
 
   try {
-    // Replace-per-source: no license key exists, so the table mirrors the
-    // current list rather than upserting.
+    // Upsert by natural name key (no license exists): confirm survivors,
+    // insert newcomers, retire names absent from this edition. Matched NPIs
+    // and their provenance survive re-ingests; the provenance_note is only
+    // written on first insert.
+    const lastArr = rows.map(r => r.last);
+    const firstArr = rows.map(r => r.first);
     await c.query('BEGIN');
-    const del = await c.query(
-      'DELETE FROM cannabis_certifications WHERE state = $1 AND source_name = $2',
-      [STATE, SOURCE_NAME]
+    const seen = await c.query(
+      `UPDATE cannabis_certifications
+          SET last_confirmed_at = $3::date, as_of = $3, currently_listed = true
+        WHERE state = $1 AND source_name = $2
+          AND (practitioner_last_name, practitioner_first_name) IN
+              (SELECT * FROM unnest($4::text[], $5::text[]))
+        RETURNING practitioner_last_name, practitioner_first_name`,
+      [STATE, SOURCE_NAME, asOf, lastArr, firstArr]
     );
+    const seenKeys = new Set(seen.rows.map(r => `${r.practitioner_last_name}|${r.practitioner_first_name}`));
     let inserted = 0;
     for (const r of rows) {
+      if (seenKeys.has(`${r.last}|${r.first}`)) continue;
       await c.query(
         `INSERT INTO cannabis_certifications (
            state, source_name, source_url,
            practitioner_first_name, practitioner_last_name, credential, npi,
            license_number, certification_status, program_name, as_of,
-           retrieval_method, provenance_note
-         ) VALUES ($1, $2, $3, $4, $5, $6, NULL, NULL, $7, $8, $9, $10, $11)`,
+           retrieval_method, provenance_note,
+           first_listed_at, last_confirmed_at, currently_listed
+         ) VALUES ($1, $2, $3, $4, $5, $6, NULL, NULL, $7, $8, $9, $10, $11, $9::date, $9::date, true)`,
         [
           STATE, SOURCE_NAME, SOURCE_URL,
           r.first, r.last, r.credential,
@@ -200,8 +212,15 @@ async function main() {
       );
       inserted++;
     }
+    const retired = await c.query(
+      `UPDATE cannabis_certifications SET currently_listed = false
+        WHERE state = $1 AND source_name = $2 AND currently_listed
+          AND (practitioner_last_name, practitioner_first_name) NOT IN
+              (SELECT * FROM unnest($3::text[], $4::text[]))`,
+      [STATE, SOURCE_NAME, lastArr, firstArr]
+    );
     await c.query('COMMIT');
-    console.log(`CANNABIS_INGEST_AL_OK deleted=${del.rowCount} inserted=${inserted}`);
+    console.log(`CANNABIS_INGEST_AL_OK confirmed=${seen.rows.length} inserted=${inserted} retired=${retired.rowCount}`);
   } catch (e) {
     await c.query('ROLLBACK');
     throw e;

@@ -29,7 +29,10 @@ function seedCannabis() {
     source_name: 'FL OMMU Qualified Physician List',
     source_url: 'https://example.test/fl',
     as_of: '2026-09-11',
-    certification_status: 'qualified'
+    certification_status: 'qualified',
+    first_listed_at: '2026-08-01',
+    last_confirmed_at: '2026-09-11',
+    currently_listed: true
   });
   // AL rows carry no license or NPI (license-less source).
   mockDb._stores.cannabis.set('AL:ROW-1', {
@@ -66,7 +69,9 @@ describe('GET /api/v1/cannabis/physicians', () => {
       state: 'FL',
       practitionerLastName: 'WESTWOOD',
       npi: '1234567890',
-      licenseNumber: 'ME126815'
+      licenseNumber: 'ME126815',
+      firstListedAt: '2026-08-01',
+      currentlyListed: true
     });
   });
 

@@ -320,8 +320,9 @@ async function main() {
            state, source_name, source_url,
            practitioner_first_name, practitioner_last_name, credential, npi,
            license_number, certification_status, program_name, as_of,
-           retrieval_method, provenance_note
-         ) VALUES ($1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8, $9, $10, $11)
+           retrieval_method, provenance_note,
+           first_listed_at, last_confirmed_at, currently_listed
+         ) VALUES ($1, $2, $3, $4, $5, NULL, NULL, $6, $7, $8, $9, $10, $11, $9::date, $9::date, true)
          ON CONFLICT (state, license_number) DO UPDATE SET
            practitioner_first_name = EXCLUDED.practitioner_first_name,
            practitioner_last_name = EXCLUDED.practitioner_last_name,
@@ -330,7 +331,9 @@ async function main() {
            source_name = EXCLUDED.source_name,
            source_url = EXCLUDED.source_url,
            retrieval_method = EXCLUDED.retrieval_method,
-           provenance_note = EXCLUDED.provenance_note
+           provenance_note = EXCLUDED.provenance_note,
+           last_confirmed_at = EXCLUDED.last_confirmed_at,
+           currently_listed = true
          RETURNING (xmax = 0) AS was_inserted`,
         [
           STATE, SOURCE_NAME, SOURCE_URL,
@@ -343,8 +346,16 @@ async function main() {
       );
       if (res.rows[0] && res.rows[0].was_inserted) inserted++; else updated++;
     }
+    // Retire licenses absent from this edition: still in the table (NPI and
+    // history survive) but no longer on the current list.
+    const retire = await c.query(
+      `UPDATE cannabis_certifications SET currently_listed = false
+        WHERE state = $1 AND source_name = $2 AND currently_listed
+          AND license_number <> ALL($3::text[])`,
+      [STATE, SOURCE_NAME, rows.map(r => r.license)]
+    );
     await c.query('COMMIT');
-    console.log(`CANNABIS_INGEST_OK inserted=${inserted} updated=${updated} skipped=${stats.noLicense + stats.badLicense + stats.other}`);
+    console.log(`CANNABIS_INGEST_OK inserted=${inserted} updated=${updated} retired=${retire.rowCount} skipped=${stats.noLicense + stats.badLicense + stats.other}`);
   } catch (e) {
     await c.query('ROLLBACK');
     throw e;

@@ -263,7 +263,7 @@ async function query(text, params = []) {
 
   // Single-NPI certification lookup: an NPI enriched directly onto a
   // cannabis row, or cached license joins for that NPI.
-  if (/^SELECT cc\.program_name, cc\.state, cc\.as_of, cc\.source_name, cc\.source_url, cc\.certification_status FROM cannabis_certifications cc WHERE cc\.npi = \$1/.test(sql)) {
+  if (/^SELECT cc\.program_name, cc\.state, cc\.as_of, cc\.source_name, cc\.source_url, cc\.certification_status[\s\S]*FROM cannabis_certifications cc WHERE cc\.npi = \$1/.test(sql)) {
     const npi = String(params[0]);
     let row = [...cannabis.values()].find(r => r.npi && String(r.npi) === npi);
     if (!row) {
@@ -287,7 +287,10 @@ async function query(text, params = []) {
         as_of: row.as_of || '2026-09-11',
         source_name: row.source_name || 'FL OMMU Qualified Physician List',
         source_url: row.source_url || 'https://knowthefactsmmj.com/physicians/list/',
-        certification_status: row.certification_status || 'qualified'
+        certification_status: row.certification_status || 'qualified',
+        first_listed_at: row.first_listed_at ?? null,
+        last_confirmed_at: row.last_confirmed_at ?? null,
+        currently_listed: row.currently_listed ?? true
       }],
       rowCount: 1
     };
@@ -315,7 +318,10 @@ async function query(text, params = []) {
         credential: r.credential ?? null,
         npi: r.npi ?? null,
         license_number: r.license_number ?? null,
-        certification_status: r.certification_status
+        certification_status: r.certification_status,
+        first_listed_at: r.first_listed_at ?? null,
+        last_confirmed_at: r.last_confirmed_at ?? null,
+        currently_listed: r.currently_listed ?? true
       }));
     return { rows, rowCount: rows.length };
   }
