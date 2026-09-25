@@ -12,6 +12,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const intelligenceRoutes = require('./routes/intelligenceRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const cannabisRoutes = require('./routes/cannabisRoutes');
+const cliaRoutes = require('./routes/cliaRoutes');
 
 class App {
   constructor() {
@@ -102,6 +103,7 @@ class App {
 
     // Cannabis hub routes
     this.app.use('/api/v1/cannabis', cannabisRoutes);
+    this.app.use('/api/v1/labs', cliaRoutes);
 
     // Analytics routes
     this.app.use('/api/v1/analytics', analyticsRoutes);

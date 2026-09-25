@@ -15,6 +15,7 @@ const stateExclusions = []; // state_exclusions rows
 const cannabis = new Map(); // cannabis_certifications rows, keyed `${state}:${license_number}`
 const apiUsage = [];        // api_usage metering rows
 const apiKeys = new Map();  // label -> api_keys row
+const clia = new Map();     // clia_labs rows, keyed by clia_number
 let quality = [];            // quality_measures rows
 
 function reset() {
@@ -30,6 +31,7 @@ function reset() {
   cannabis.clear();
   apiUsage.length = 0;
   apiKeys.clear();
+  clia.clear();
   quality = [];
   failCacheWrite = false;
   queryLog.length = 0;
@@ -968,6 +970,36 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
+  // --- clia_labs (directory + detail reads) ---------------------------------
+
+  if (/FROM clia_labs/.test(sql)) {
+    const condVal = re => {
+      const m = sql.match(re);
+      return m ? params[parseInt(m[1], 10) - 1] : undefined;
+    };
+    const nameF = condVal(/lab_name ILIKE \$(\d+)/);
+    const stateF = condVal(/state = \$(\d+)/);
+    const cityF = condVal(/city ILIKE \$(\d+)/);
+
+    let rows = [...clia.values()].filter(r => r.currently_registered !== false);
+    if (nameF) rows = rows.filter(r => String(r.lab_name || '').toUpperCase().includes(nameF.slice(1, -1).toUpperCase()));
+    if (stateF) rows = rows.filter(r => r.state === stateF);
+    if (cityF) rows = rows.filter(r => String(r.city || '').toUpperCase().includes(cityF.slice(1, -1).toUpperCase()));
+
+    if (/^SELECT COUNT\(\*\)/.test(sql)) {
+      return { rows: [{ n: rows.length }], rowCount: 1 };
+    }
+    if (/^SELECT \* FROM clia_labs WHERE clia_number = \$1$/.test(sql)) {
+      const row = clia.get(String(params[0]));
+      return { rows: row ? [{ ...row }] : [], rowCount: row ? 1 : 0 };
+    }
+    rows = rows.sort((a, b) => String(a.lab_name).localeCompare(String(b.lab_name)));
+    return {
+      rows: rows.map(r => ({ ...r })),
+      rowCount: rows.length
+    };
+  }
+
   throw new Error(`mockDb: unsupported SQL: ${sql}`);
 }
 
@@ -1000,6 +1032,7 @@ module.exports = {
     licenseStatus,
     nppesProviders,
     mips,
+    clia,
     get quality() { return quality; },
     taxonomyCodes,
     taxonomyPercentiles,
