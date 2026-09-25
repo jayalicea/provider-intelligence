@@ -28,13 +28,15 @@ const path = require('path');
 const { parseQpList } = require('./cannabis-ingest.js');
 const { parseWvList } = require('./cannabis-ingest-wv.js');
 const { parseAlList } = require('./cannabis-ingest-al.js');
+const { parsePaList } = require('./cannabis-ingest-pa.js');
 
 const NPI_URL = 'https://clinicaltables.nlm.nih.gov/api/npi_idv/v3/search';
 // Per-state source texts for the city lookup (schema keeps addresses out, so
-// the parsed rows carry them in memory only). AL is license-less: its city
-// map is keyed by normalized name instead of license.
-const SOURCE_FILE = { FL: 'tmp/qplist.txt', WV: 'tmp/wv-physicians.txt', AL: 'tmp/al-physicians.txt' };
-const NAME_KEYED_STATE = 'AL';
+// the parsed rows carry them in memory only). AL and PA are license-less:
+// their city maps are keyed by normalized name instead of license.
+const SOURCE_FILE = { FL: 'tmp/qplist.txt', WV: 'tmp/wv-physicians.txt', AL: 'tmp/al-physicians.txt', PA: 'tmp/pa-practitioners.txt' };
+const NAME_KEYED_STATES = new Set(['AL', 'PA']);
+const NAME_KEYED_PARSER = { AL: parseAlList, PA: parsePaList };
 // Verified live (2026-09-20): dotted leaf paths return values; bare
 // first_name/last_name come back null (same convention as
 // transformNpiResponse in src/services/npiService.js).
@@ -211,8 +213,8 @@ async function main() {
     const sourceText = fs.readFileSync(SOURCE_FILE[state], 'utf8');
     const cityByRowKey = state === 'FL'
       ? new Map(parseQpList(sourceText).rows.map(r => [r.license, r.city || '']))
-      : state === NAME_KEYED_STATE
-        ? new Map(parseAlList(sourceText).rows.map(r => [
+      : NAME_KEYED_STATES.has(state)
+        ? new Map(NAME_KEYED_PARSER[state](sourceText).rows.map(r => [
             `${normalizeName(r.last)}|${normalizeName(stripMiddleInitials(r.first))}`,
             r.city || '']))
         : new Map(parseWvList(sourceText).rows.map(r => [r.license, r.city || '']));
