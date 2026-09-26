@@ -53,10 +53,21 @@ if (Get-Source 'https://omc.wv.gov/patients/schedule-an-appointment/Documents/PH
   node tools\cannabis-nppes-resolve.js --state WV
 } else { Log 'WARN WV skipped (no source text)' }
 
-# AL (manual source update; pipeline still improves matches)
+# AL (the AMCC PDF URL is date-stamped; discover the current link from the
+# patients page, then run the pipeline)
 Log '--- AL ---'
-if (Test-Path 'tmp\al-physicians.txt') {
-  Log 'note: AL source URL is date-stamped; refresh tmp/al-physicians.pdf/.txt manually for a new edition'
+$alHref = $null
+try {
+  $alPage = (Invoke-WebRequest -Uri 'https://amcc.alabama.gov/patients/' -UserAgent $ua -UseBasicParsing -TimeoutSec 60).Content
+  $m = [regex]::Match($alPage, 'href="([^"]*Certifying-Physicians[^"]*\.pdf)"')
+  if ($m.Success) { $alHref = $m.Groups[1].Value }
+} catch { Log "WARN AMCC page fetch failed: $($_.Exception.Message)" }
+if ($alHref -and (Get-Source $alHref 'tmp\al-physicians.pdf' 'tmp\al-physicians.txt')) {
+  node tools\cannabis-ingest-al.js
+  node tools\cannabis-nppes-match.js --state AL
+  node tools\cannabis-nppes-resolve.js --state AL
+} elseif (Test-Path 'tmp\al-physicians.txt') {
+  Log 'AL download failed; running pipeline on the existing source text'
   node tools\cannabis-ingest-al.js
   node tools\cannabis-nppes-match.js --state AL
   node tools\cannabis-nppes-resolve.js --state AL
