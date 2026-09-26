@@ -95,3 +95,27 @@ describe('middleware/rateLimiter', () => {
     expect(allowed.status).not.toHaveBeenCalled();
   });
 });
+
+describe('app trust proxy (TRUST_PROXY)', () => {
+  const App = require('../src/app');
+  const original = process.env.TRUST_PROXY;
+  afterEach(() => {
+    if (original === undefined) delete process.env.TRUST_PROXY;
+    else process.env.TRUST_PROXY = original;
+  });
+
+  test('is off by default so X-Forwarded-For cannot be spoofed', () => {
+    delete process.env.TRUST_PROXY;
+    expect(new App().app.get('trust proxy')).toBe(false);
+  });
+
+  test('numeric value sets the hop count', () => {
+    process.env.TRUST_PROXY = '1';
+    expect(new App().app.get('trust proxy')).toBe(1);
+  });
+
+  test('non-numeric value passes through as an Express trust string', () => {
+    process.env.TRUST_PROXY = 'loopback';
+    expect(new App().app.get('trust proxy')).toBe('loopback');
+  });
+});

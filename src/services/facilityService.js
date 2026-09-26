@@ -1,5 +1,4 @@
 const db = require('../config/database');
-const { logger } = require('../utils/logger');
 
 // provider_type_id labels, inferred from facility-name sampling of the Q1
 // 2026 iQIES file (see docs/research/pos-iqies-hha-asc-hospice.md). Codes

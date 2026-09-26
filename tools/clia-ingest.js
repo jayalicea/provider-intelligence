@@ -14,7 +14,6 @@ const readline = require('readline');
 const path = require('path');
 
 const DEFAULT_FILE = 'tmp/clia-q2-2026.csv';
-const SOURCE_NAME = 'CMS POS Clinical Laboratories (CLIA)';
 const BATCH = 1500; // 1500 rows x 25 params = 37,500 < Postgres' 65,535 parameter cap
 
 // Header column -> staging column. Dates arrive as YYYYMMDD strings.
@@ -110,13 +109,6 @@ async function main() {
 
   const { Client } = require('pg');
   const env = readEnvFile();
-  const c = new Client({
-    host: env.DB_HOST || process.env.DB_HOST || 'localhost',
-    port: parseInt(env.DB_PORT || process.env.DB_PORT || '5432', 10),
-    database: env.DB_NAME || process.env.DB_NAME || 'provider_intelligence',
-    user: env.DB_USER || process.env.DB_USER || 'admin',
-    password: env.DB_PASSWORD || process.env.DB_PASSWORD || '',
-  });
 
   function rowToParams(rec) {
     const get = col => clean(rec[idx[col]]);
