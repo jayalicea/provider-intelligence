@@ -53,12 +53,13 @@ function readEnvFile() {
 }
 
 function parseArgs(argv) {
-  const args = { state: null, dryRun: false, limit: null };
+  const args = { state: null, dryRun: false, limit: null, promoteMinScore: null };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--state') args.state = String(argv[++i] || '').toUpperCase();
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--limit') args.limit = parseInt(argv[++i], 10);
+    else if (a === '--promote-min-score') args.promoteMinScore = parseInt(argv[++i], 10);
     else { console.error(`Unknown argument: ${a}`); process.exit(1); }
   }
   if (args.state && !SOURCE[args.state]) {
@@ -66,6 +67,19 @@ function parseArgs(argv) {
     process.exit(1);
   }
   return args;
+}
+
+// Directed threshold override: promote a quarantined row when its best
+// candidate meets a manually set score floor (regardless of margin). The
+// promotion is labeled as such in provenance so these links are auditable
+// and reversible.
+function shouldPromote(decision, minScore) {
+  return (
+    minScore != null &&
+    decision.status === 'quarantine' &&
+    decision.best != null &&
+    decision.best.score >= minScore
+  );
 }
 
 function freshNote(note) {
@@ -257,6 +271,7 @@ async function main() {
       }
 
       const accepted = [];
+      const promoted = [];
       const quarantined = [];
       let done = 0;
 
@@ -288,6 +303,27 @@ async function main() {
               firstName: r.firstName,
               npi: decision.npi,
               provenance: `${freshNote(r.provenance)} | NPI matched ${today}: NPPES auto-resolve ${decision.note} [score ${decision.score}, margin ${decision.margin}]`,
+            });
+          } else if (shouldPromote(decision, args.promoteMinScore)) {
+            // Directed override (manual threshold): promote the best
+            // candidate even without a decisive margin. Margin < 3 means
+            // the match was contested - reported separately at the end.
+            promoted.push({
+              license: r.license,
+              lastName: r.lastName,
+              firstName: r.firstName,
+              npi: decision.best.npi,
+              contested: decision.best.margin < 3,
+              score: decision.best.score,
+              margin: decision.best.margin,
+              provenance: `${freshNote(r.provenance)} | NPI matched ${today}: NPPES promoted at manual threshold (score ${decision.best.score}, margin ${decision.best.margin}, floor ${args.promoteMinScore})`,
+            });
+            accepted.push({
+              license: r.license,
+              lastName: r.lastName,
+              firstName: r.firstName,
+              npi: decision.best.npi,
+              provenance: `${freshNote(r.provenance)} | NPI matched ${today}: NPPES promoted at manual threshold (score ${decision.best.score}, margin ${decision.best.margin}, floor ${args.promoteMinScore})`,
             });
           } else {
             quarantined.push({
@@ -351,6 +387,10 @@ async function main() {
       }
 
       console.log(`state: ${state}${args.dryRun ? ' (dry-run)' : ''}`);
+      if (promoted.length > 0) {
+        const contested = promoted.filter(p => p.contested).length;
+        console.log(`promoted at manual threshold >= ${args.promoteMinScore}: ${promoted.length} rows (${contested} contested, margin < 3)`);
+      }
       console.log(`resolved automatically: ${accepted.length} rows`);
       console.log(`still quarantined by reason: ${JSON.stringify(byReason)}`);
       console.log(`review CSV: ${csvPath} (${quarantined.length} rows)`);
@@ -365,4 +405,4 @@ if (require.main === module) {
   main().catch(e => { console.error('CANNABIS_NPPES_RESOLVE_FAILED:', e.message); process.exit(1); });
 }
 
-module.exports = { scoreCandidate, decideScored };
+module.exports = { scoreCandidate, decideScored, shouldPromote };
