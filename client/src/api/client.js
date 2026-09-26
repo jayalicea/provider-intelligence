@@ -61,6 +61,22 @@ export const api = {
     return data.data ?? []
   },
 
+  searchLabs: async ({ name, state, city, limit = 50 } = {}) => {
+    const { data } = await http.get('/labs/search', {
+      params: { name, state, city, limit },
+    })
+    return {
+      results: data.data ?? [],
+      count: data.count ?? 0,
+      total: data.total ?? 0,
+    }
+  },
+
+  getLab: async (cliaNumber) => {
+    const { data } = await http.get(`/labs/${cliaNumber}`)
+    return data.data
+  },
+
   getMipsPerformance: async (npi, year) => {
     const { data } = await http.get(`/providers/${npi}/mips-performance`, {
       params: { year },

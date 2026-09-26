@@ -248,6 +248,25 @@ paths:
         '200': { description: '{ success, data: [...], count, counts, submitted, truncated }' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /labs/search:
+    get:
+      summary: Search CLIA-registered laboratories
+      parameters:
+        - { name: name, in: query, schema: { type: string }, description: Lab name substring (case-insensitive) }
+        - { name: state, in: query, schema: { type: string, pattern: '^[A-Za-z]{2}$' } }
+        - { name: city, in: query, schema: { type: string } }
+      responses:
+        '200': { description: '{ success, data: [{ cliaNumber, labName, city, state, certificateTypeCd, ... }], count, total }' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /labs/{cliaNumber}:
+    get:
+      summary: Laboratory detail by CLIA number
+      parameters:
+        - { name: cliaNumber, in: path, required: true, schema: { type: string, pattern: '^[0-9]{2}[A-Z0-9]{8}$' } }
+      responses:
+        '200': { description: '{ success, data: { cliaNumber, labName, address, certificateTypeCd, certificateEffectiveDate, labClassificationCds, medicareNumber, currentlyRegistered, ... } }' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /cannabis/summary:
     get:
       summary: Per-state medical-cannabis certifying practitioner counts

@@ -14,6 +14,8 @@ import CoveragePage from './pages/CoveragePage.jsx'
 import MipsDashboardPage from './pages/MipsDashboardPage.jsx'
 import BenchmarkPage from './pages/BenchmarkPage.jsx'
 import HospitalQualityPage from './pages/HospitalQualityPage.jsx'
+import LabSearchPage from './pages/LabSearchPage.jsx'
+import LabDetailPage from './pages/LabDetailPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import coverage from './data/coverage.json'
 
@@ -27,6 +29,7 @@ Values may be stale or incorrect at the source; always verify against the source
 const NAV = [
   { to: '/', label: 'Home' },
   { to: '/providers', label: 'Search' },
+  { to: '/labs', label: 'Labs' },
   { to: '/cohort', label: 'Cohort' },
   { to: '/watchlist', label: 'Watchlist' },
   { to: '/my-providers', label: 'My Providers' },
@@ -85,6 +88,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/providers" element={<ProviderSearchPage />} />
+            <Route path="/labs" element={<LabSearchPage />} />
+            <Route path="/labs/:cliaNumber" element={<LabDetailPage />} />
             <Route path="/cannabis" element={<CannabisPage />} />
             <Route path="/providers/:npi" element={<ProviderDetailPage />} />
             <Route path="/providers/:npi/360" element={<Provider360Page />} />
