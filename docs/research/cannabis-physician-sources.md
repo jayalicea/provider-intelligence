@@ -153,15 +153,10 @@ paywall; Maryland OneStop needs JS execution, not credentials.)
 - Pennsylvania's and DC's published files appear stale despite "periodic"
   update claims — capture the internal as-of date during ingest.
 
-## Update 2026-09-26
+## Update 2026-09-26 (second pass)
 
-- **Pennsylvania**: DONE - PA DOH "Approved Practitioners" PDF (stable
-  pa.gov URL, whitespace-columned table with city/state/ZIP). Ingested,
-  587/1202 NPI-matched (48.8%).
-- **Oklahoma**: DONE - OMMA "Registered Physicians" PDF (SB 1066 voluntary
-  opt-in list; undated, access-date as-of; includes out-of-state
-  physicians). Ingested, 36/102 matched (35%).
-- **Utah**: NOT automatable - the QMP search at
-  medicalcannabis.utah.gov/find-a-provider/ is a reCAPTCHA-guarded search
-  with no bulk list or public endpoint. Manual checks only unless the state
-  publishes a list later.
+- QCOR has a per-session anti-bot token (`mystring`); automated lookups
+  are blocked by design until a live POST is captured. See
+  qcor-director-lookups.md.
+- POS iQIES slice (HHA+ASC+hospice) located: Q1 2026 CSV ingested into
+  `facilities` by tools/facility-ingest.js. See pos-iqies-hha-asc-hospice.md.

@@ -16,13 +16,18 @@ https://qcor.cms.gov/main.jsp), which is interactive by design.
 - Lookup form: `GET https://qcor.cms.gov/advanced_find_provider.jsp?which=4&backReport=active_CLIA.jsp`
   (linked from `/CLIA_Labs` and the main page).
 - Form fields (`providerSearch`, POSTs to the same URL):
-  `name`, `prvdr` (provider/CLIA number), `director` (DIRECTOR NAME
-  search), `state`, `city`, `zip`, `intern`, `exempt`, `report`,
-  `apptype`. Validation lives in `/includes/js_functions.js`.
-- A "Download CSV" submit exists (`doDownload()`); the exact parameter
-  it sets was not captured - a browser devtools pass will show it.
-- A first POST with a subset of fields returned no rows; the full field
-  set (and valid `report`/`apptype` values) must be replicated.
+  `name`, `state` (XX = all), `city`, `report` (select of JSP pages;
+  `active_CLIA.jsp` is the active-labs report), `apptype` ('',
+  Compliance, Waiver, Accreditation, PPMP), `intern`, `exempt`, plus
+  hidden fields `mystring`, `mystring1`, `mystring2`, `myimage`,
+  `myreport`. Validation lives in `/includes/js_functions.js`; a
+  "Download CSV" submit exists (`doDownload()`).
+- BLOCKER: the hidden `mystring` value is a per-session anti-bot token
+  ("111, 69, 99, ..."). POSTs with a captured token still return no
+  rows, so blind automation is stopped by design. Capturing a live POST
+  (browser devtools, or the desktop-browser tool after /reload) is
+  required to learn the token's inputs - or whether doDownload's CSV
+  path bypasses it.
 
 ## Recommended next steps (one focused session)
 
