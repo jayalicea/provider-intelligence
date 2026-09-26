@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import api from '../api/client.js'
 import { useFetch } from '../hooks/useFetch.js'
 import CliaText from '../components/CliaText.jsx'
+import NpiText from '../components/NpiText.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 import { certTypeLabel } from '../lib/clia.js'
 
@@ -80,6 +81,15 @@ export default function LabDetailPage() {
             <div>
               <dt>Medicare number</dt>
               <dd className="mono">{lab.medicareNumber}</dd>
+            </div>
+          ) : null}
+          {lab.npi ? (
+            <div>
+              <dt>Organization NPI</dt>
+              <dd>
+                <NpiText npi={lab.npi} />
+                <span className="muted"> matched by legal name, city, and state</span>
+              </dd>
             </div>
           ) : null}
           <div>

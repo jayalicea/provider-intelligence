@@ -29,14 +29,15 @@ const { parseQpList } = require('./cannabis-ingest.js');
 const { parseWvList } = require('./cannabis-ingest-wv.js');
 const { parseAlList } = require('./cannabis-ingest-al.js');
 const { parsePaList } = require('./cannabis-ingest-pa.js');
+const { parseOkList } = require('./cannabis-ingest-ok.js');
 
 const NPI_URL = 'https://clinicaltables.nlm.nih.gov/api/npi_idv/v3/search';
 // Per-state source texts for the city lookup (schema keeps addresses out, so
 // the parsed rows carry them in memory only). AL and PA are license-less:
 // their city maps are keyed by normalized name instead of license.
-const SOURCE_FILE = { FL: 'tmp/qplist.txt', WV: 'tmp/wv-physicians.txt', AL: 'tmp/al-physicians.txt', PA: 'tmp/pa-practitioners.txt' };
+const SOURCE_FILE = { FL: 'tmp/qplist.txt', WV: 'tmp/wv-physicians.txt', AL: 'tmp/al-physicians.txt', PA: 'tmp/pa-practitioners.txt', OK: 'tmp/ok-physicians.txt' };
 const NAME_KEYED_STATES = new Set(['AL', 'PA']);
-const NAME_KEYED_PARSER = { AL: parseAlList, PA: parsePaList };
+const NAME_KEYED_PARSER = { AL: parseAlList, PA: parsePaList, OK: parseOkList };
 // Verified live (2026-09-20): dotted leaf paths return values; bare
 // first_name/last_name come back null (same convention as
 // transformNpiResponse in src/services/npiService.js).

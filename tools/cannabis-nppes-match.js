@@ -22,6 +22,7 @@ const { parseQpList } = require('./cannabis-ingest');
 const { parseWvList } = require('./cannabis-ingest-wv');
 const { parseAlList } = require('./cannabis-ingest-al');
 const { parsePaList } = require('./cannabis-ingest-pa');
+const { parseOkList } = require('./cannabis-ingest-ok');
 
 // Per-state source texts for the city signal (the schema keeps addresses
 // out; the parsed rows carry cities in memory only). AL is license-less, so
@@ -31,6 +32,7 @@ const SOURCE_FILE = {
   WV: { file: 'tmp/wv-physicians.txt', parse: parseWvList, key: 'license' },
   AL: { file: 'tmp/al-physicians.txt', parse: parseAlList, key: 'name' },
   PA: { file: 'tmp/pa-practitioners.txt', parse: parsePaList, key: 'name' },
+  OK: { file: 'tmp/ok-physicians.txt', parse: parseOkList, key: 'name' },
 };
 
 function readEnvFile() {

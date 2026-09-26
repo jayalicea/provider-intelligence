@@ -53,6 +53,14 @@ if (Get-Source 'https://omc.wv.gov/patients/schedule-an-appointment/Documents/PH
   node tools\cannabis-nppes-resolve.js --state WV
 } else { Log 'WARN WV skipped (no source text)' }
 
+# OK
+Log '--- OK ---'
+if (Get-Source 'https://oklahoma.gov/content/dam/ok/en/omma/forms/Registered%20Physicians.pdf' 'tmp\ok-physicians.pdf' 'tmp\ok-physicians.txt') {
+  node tools\cannabis-ingest-ok.js
+  node tools\cannabis-nppes-match.js --state OK
+  node tools\cannabis-nppes-resolve.js --state OK
+} else { Log 'WARN OK skipped (no source text)' }
+
 # AL (the AMCC PDF URL is date-stamped; discover the current link from the
 # patients page, then run the pipeline)
 Log '--- AL ---'

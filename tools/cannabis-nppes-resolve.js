@@ -31,12 +31,14 @@ const { parseQpList } = require('./cannabis-ingest');
 const { parseWvList } = require('./cannabis-ingest-wv');
 const { parseAlList } = require('./cannabis-ingest-al');
 const { parsePaList } = require('./cannabis-ingest-pa');
+const { parseOkList } = require('./cannabis-ingest-ok');
 
 const SOURCE = {
   FL: { file: 'tmp/qplist.txt', parse: parseQpList, key: 'license', city: true, zip: true },
   AL: { file: 'tmp/al-physicians.txt', parse: parseAlList, key: 'name', city: true, zip: false },
   WV: { file: 'tmp/wv-physicians.txt', parse: parseWvList, key: 'license', city: false, zip: false },
   PA: { file: 'tmp/pa-practitioners.txt', parse: parsePaList, key: 'name', city: true, zip: true },
+  OK: { file: 'tmp/ok-physicians.txt', parse: parseOkList, key: 'name', city: true, zip: true },
 };
 
 function readEnvFile() {

@@ -152,3 +152,16 @@ paywall; Maryland OneStop needs JS execution, not credentials.)
   are not directly equivalent for analytics.
 - Pennsylvania's and DC's published files appear stale despite "periodic"
   update claims — capture the internal as-of date during ingest.
+
+## Update 2026-09-26
+
+- **Pennsylvania**: DONE - PA DOH "Approved Practitioners" PDF (stable
+  pa.gov URL, whitespace-columned table with city/state/ZIP). Ingested,
+  587/1202 NPI-matched (48.8%).
+- **Oklahoma**: DONE - OMMA "Registered Physicians" PDF (SB 1066 voluntary
+  opt-in list; undated, access-date as-of; includes out-of-state
+  physicians). Ingested, 36/102 matched (35%).
+- **Utah**: NOT automatable - the QMP search at
+  medicalcannabis.utah.gov/find-a-provider/ is a reCAPTCHA-guarded search
+  with no bulk list or public endpoint. Manual checks only unless the state
+  publishes a list later.
