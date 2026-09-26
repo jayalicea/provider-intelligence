@@ -87,9 +87,15 @@ Create the database and load the schema:
 ```bash
 createdb -U admin provider_intelligence
 psql -U admin -d provider_intelligence -f src/config/init.sql
+npm run migrate                 # apply pending src/config/migrations/*.sql
 ```
 
-Then apply the dated migrations in `src/config/migrations/` in filename order.
+`npm run migrate` records each file in `schema_migrations` and skips ones
+already applied; `npm run migrate -- status` lists state. Migrations that
+index `nppes_providers` are deferred until `tools/nppes-ingest.js` has
+created that table; re-run `npm run migrate` afterwards. **Existing
+databases migrated by hand:** run `npm run migrate -- baseline` once to
+record every current file as applied without re-running it.
 
 Create a `.env` in the repo root, modeled on the committed `.env.example`.
 These are the variables the code actually reads (`src/config/database.js`,

@@ -1,3 +1,4 @@
+-- requires-table: nppes_providers
 -- Composite index for the national cohort scan on nppes_providers
 -- (GET /api/v1/intelligence/cohort?source=national). The v2 ingest migration
 -- (20260913_create_nppes_providers.sql) already created single-column indexes

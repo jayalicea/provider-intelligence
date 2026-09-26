@@ -31,7 +31,10 @@ src/
     api-config.js         Upstream API base URLs, dataset IDs, rate limits
     database.js           pg Pool (reads DB_* env vars)
     init.sql              Schema: providers, mips_performance_scores, ...
-    migrations/           Incremental DDL (e.g. cannabis_certifications)
+    migrations/           Incremental DDL (e.g. cannabis_certifications);
+                          never edit an applied file, add a new one.
+                          `-- requires-table: X` defers until X exists
+    migrate.js            Migration runner (schema_migrations table)
   controllers/            HTTP layer (validation, 400/404/500 handling)
   middleware/             errorHandler.js, rateLimiter.js (in-memory)
   routes/                 Express routers (bind controller methods!)
@@ -64,6 +67,7 @@ reappears; there is none today.
 npm install                          # backend deps
 psql -U admin -f src/config/init.sql # DB schema (or run the SQL in a psql
                                      # session against database provider_intelligence)
+npm run migrate                      # apply pending migrations (-- status, -- baseline)
 npm test                             # jest --coverage (fully offline)
 npm start                            # node src/app.js, serves on :3000
 ```

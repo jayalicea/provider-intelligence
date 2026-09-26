@@ -118,10 +118,13 @@ shared `pg` pool.
    ```
 
 5. Run the schema initialization script, then the dated migrations in
-   `src/config/migrations/` in filename order:
+   `src/config/migrations/` with the runner (see the root README for
+   `status`, deferred NPPES migrations, and `baseline` for existing
+   databases):
 
    ```bash
    psql -U admin -d provider_intelligence -f src/config/init.sql
+   npm run migrate
    ```
 
 6. Create a `.env` in the repository root. **There is no committed
