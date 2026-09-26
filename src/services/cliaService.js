@@ -3,6 +3,17 @@ const { logger } = require('../utils/logger');
 
 // Directory + detail reads over clia_labs. The CLIA number is the
 // canonical lab identifier, mirroring the NPI on the provider side.
+// CLIA certificate type codes, verified against CMS certificate
+// definitions (1=Compliance, 2=Waiver, 3=Accreditation, 4=PPMP,
+// 9=Registration). Unknown codes fall back to 'Type N'.
+const CERT_TYPE_LABELS = {
+  1: 'Certificate of Compliance',
+  2: 'Certificate of Waiver',
+  3: 'Certificate of Accreditation',
+  4: 'PPMP (physician-performed microscopy)',
+  9: 'Certificate of Registration'
+};
+
 class CliaService {
   /**
    * Search registered labs by name substring and/or state.
@@ -57,6 +68,47 @@ class CliaService {
   }
 
   /**
+   * Delisting alerts: labs that disappeared from the latest CLIA vintage,
+   * and certified physicians who disappeared from their state registry
+   * edition. Presence on a government list is the compliance signal; losing
+   * it is the alert.
+   */
+  async getDelistedAlerts() {
+    const labs = await db.query(
+      `SELECT clia_number, lab_name, state, city, last_confirmed_at
+         FROM clia_labs
+        WHERE currently_registered = false
+        ORDER BY last_confirmed_at DESC
+        LIMIT 100`
+    );
+    const certifiers = await db.query(
+      `SELECT state, practitioner_last_name, practitioner_first_name,
+              source_name, program_name, last_confirmed_at
+         FROM cannabis_certifications
+        WHERE currently_listed = false
+        ORDER BY last_confirmed_at DESC
+        LIMIT 100`
+    );
+    return {
+      labs: labs.rows.map(r => ({
+        cliaNumber: r.clia_number,
+        labName: r.lab_name,
+        state: r.state,
+        city: r.city,
+        lastConfirmedAt: r.last_confirmed_at
+      })),
+      certifiers: certifiers.rows.map(r => ({
+        state: r.state,
+        lastName: r.practitioner_last_name,
+        firstName: r.practitioner_first_name,
+        sourceName: r.source_name,
+        programName: r.program_name,
+        lastConfirmedAt: r.last_confirmed_at
+      }))
+    };
+  }
+
+  /**
    * Loose CLIA format check: 10 chars, 2-digit state prefix, alphanumeric.
    * (The third character is conventionally a facility-type letter, e.g. D
    * for independent labs, but the registry also issues all-digit numbers.)
@@ -77,6 +129,7 @@ class CliaService {
       phone: r.phone,
       fax: r.fax,
       certificateTypeCd: r.certificate_type_cd,
+      certificateTypeLabel: CERT_TYPE_LABELS[r.certificate_type_cd] || `Type ${r.certificate_type_cd}`,
       certificateEffectiveDate: r.certificate_effective_dt,
       certificationDate: r.certification_dt,
       complianceStatusCd: r.compliance_status_cd,

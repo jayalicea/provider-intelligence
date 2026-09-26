@@ -32,6 +32,23 @@ class CliaController {
   }
 
   /**
+   * GET /api/v1/labs/alerts - delisted labs and certifiers
+   */
+  async getAlerts(req, res) {
+    try {
+      const alerts = await this.cliaService.getDelistedAlerts();
+      res.json({
+        success: true,
+        data: alerts,
+        count: alerts.labs.length + alerts.certifiers.length
+      });
+    } catch (error) {
+      logger.error('Error in getAlerts:', error);
+      res.status(500).json({ success: false, error: 'Failed to retrieve alerts' });
+    }
+  }
+
+  /**
    * GET /api/v1/labs/:cliaNumber
    */
   async getLab(req, res) {

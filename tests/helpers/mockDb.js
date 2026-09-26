@@ -980,8 +980,11 @@ async function query(text, params = []) {
     const nameF = condVal(/lab_name ILIKE \$(\d+)/);
     const stateF = condVal(/state = \$(\d+)/);
     const cityF = condVal(/city ILIKE \$(\d+)/);
+    const delistedOnly = /currently_registered = false/.test(sql);
 
-    let rows = [...clia.values()].filter(r => r.currently_registered !== false);
+    let rows = [...clia.values()].filter(r => delistedOnly
+      ? r.currently_registered === false
+      : r.currently_registered !== false);
     if (nameF) rows = rows.filter(r => String(r.lab_name || '').toUpperCase().includes(nameF.slice(1, -1).toUpperCase()));
     if (stateF) rows = rows.filter(r => r.state === stateF);
     if (cityF) rows = rows.filter(r => String(r.city || '').toUpperCase().includes(cityF.slice(1, -1).toUpperCase()));
@@ -998,6 +1001,21 @@ async function query(text, params = []) {
       rows: rows.map(r => ({ ...r })),
       rowCount: rows.length
     };
+  }
+
+  // Delisted certifiers (currently_listed = false) for the alerts endpoint.
+  if (/^SELECT state, practitioner_last_name, practitioner_first_name, source_name, program_name, last_confirmed_at FROM cannabis_certifications WHERE currently_listed = false/.test(sql)) {
+    const rows = [...cannabis.values()]
+      .filter(r => r.currently_listed === false)
+      .map(r => ({
+        state: r.state,
+        practitioner_last_name: r.practitioner_last_name,
+        practitioner_first_name: r.practitioner_first_name,
+        source_name: r.source_name,
+        program_name: r.program_name,
+        last_confirmed_at: r.last_confirmed_at
+      }));
+    return { rows, rowCount: rows.length };
   }
 
   throw new Error(`mockDb: unsupported SQL: ${sql}`);

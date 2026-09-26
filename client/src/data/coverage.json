@@ -94,6 +94,36 @@
       "notes": [
         "Only Texas and Colorado publish free keyless license-status bulk; the remaining states are lookup-only per docs/research/license-source-survey.md."
       ]
+    },
+    {
+      "id": "cannabis-certifications",
+      "name": "Medical cannabis certifying practitioners",
+      "publisher": "State cannabis programs (FL OMMU, AL AMCC, WV OMC, PA DOH, OK OMMA)",
+      "scope": "Physicians certified to recommend medical marijuana in five states, NPI-linked",
+      "records": 1568,
+      "recordLabel": "NPI-linked certifications (listed counts include only matched rows)",
+      "asOf": "2026-09-26",
+      "cadence": "Weekly scheduled refresh (FL/AL/WV/PA/OK), each state on its own publish schedule",
+      "sourceUrl": "https://knowthefactsmmj.com/physicians/list/",
+      "provenance": "PDF registry lists parsed per-state (tools/cannabis-ingest-*.js), NPIs matched against the local NPPES load by tools/cannabis-nppes-match.js and cannabis-nppes-resolve.js.",
+      "notes": [
+        "FL/AL/WV/PA are fully matched; OK is voluntary opt-in (SB 1066) at 36/102. Utah has no bulk list (reCAPTCHA-guarded search)."
+      ]
+    },
+    {
+      "id": "clia-labs",
+      "name": "CLIA laboratories",
+      "publisher": "CMS Provider of Services - Clinical Laboratories",
+      "scope": "All CLIA-registered laboratories in the United States",
+      "records": 681059,
+      "recordLabel": "laboratories",
+      "asOf": "2026-04-01",
+      "cadence": "Quarterly scheduled refresh (Jan/Apr/Jul/Oct 20)",
+      "sourceUrl": "https://catalog.data.gov/dataset/provider-of-services-file-clinical-laboratories",
+      "provenance": "Quarterly POS_CLIA CSV (681,059 labs in Q2 2026) loaded by tools/clia-ingest.js; 55,820 linked to organization NPIs by tools/clia-npi-match.js.",
+      "notes": [
+        "The CLIA number is the lab's canonical identifier, served at /api/v1/labs."
+      ]
     }
   ],
   "jurisdictions": [

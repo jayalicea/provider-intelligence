@@ -12,6 +12,7 @@ const bound = (method) => controller[method].bind(controller);
 router.use(rateLimiter({ windowMs: 60 * 1000, max: 100 }));
 
 router.get('/search', bound('searchLabs'));
+router.get('/alerts', bound('getAlerts'));
 router.get('/:cliaNumber', bound('getLab'));
 
 module.exports = router;

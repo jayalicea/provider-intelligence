@@ -139,3 +139,39 @@ describe('GET /api/v1/labs/:cliaNumber', () => {
     expect(res.body.error).toMatch(/invalid clia/i);
   });
 });
+
+describe('GET /api/v1/labs/alerts', () => {
+  test('lists delisted labs and delisted certifiers', async () => {
+    seedLabs();
+    mockDb._stores.clia.set('99D0000001', {
+      clia_number: '99D0000001', lab_name: 'CLOSED LAB LLC', state: 'PA',
+      city: 'PHILADELPHIA', currently_registered: false,
+      last_confirmed_at: '2026-01-02', accreditation: {}, lab_classification_cds: []
+    });
+    mockDb._stores.cannabis.set('FL:DELIST-1', {
+      state: 'FL', license_number: 'DELIST-1', npi: '1111111111',
+      practitioner_first_name: 'JANE', practitioner_last_name: 'DOE',
+      source_name: 'FL OMMU Qualified Physician List',
+      program_name: 'Florida Medical Marijuana Program',
+      currently_listed: false, last_confirmed_at: '2026-09-11'
+    });
+
+    const res = await request(app).get('/api/v1/labs/alerts');
+
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(2);
+    expect(res.body.data.labs[0]).toMatchObject({
+      cliaNumber: '99D0000001', labName: 'CLOSED LAB LLC'
+    });
+    expect(res.body.data.certifiers[0]).toMatchObject({
+      state: 'FL', lastName: 'DOE', firstName: 'JANE', programName: 'Florida Medical Marijuana Program'
+    });
+  });
+
+  test('empty when nothing is delisted', async () => {
+    seedLabs();
+    const res = await request(app).get('/api/v1/labs/alerts');
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(0);
+  });
+});

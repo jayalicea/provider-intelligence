@@ -37,14 +37,17 @@ src/
   routes/                 Express routers (bind controller methods!)
   services/               npiService, cmsDataService, analyticsService
   utils/                  apiClient (axios wrapper), logger (winston)
-tools/                    One-off ingest/backfill scripts (cannabis registries,
-                          license backfill); not part of the served app.
-                          cannabis-nppes-match.js backfills missing NPIs on
-                          cannabis_certifications from the local nppes_providers
-                          load (offline; cannabis-npi-enrich.js is the API path);
-                          cannabis-nppes-resolve.js scores quarantined rows on
-                          ZIP/city/middle-initial signals and auto-accepts
-                          decisive winners
+tools/                    One-off ingest/backfill scripts; not part of the
+                          served app. Cannabis pipeline per state:
+                          cannabis-ingest-{fl,al,wv,pa,ok}.js parsers,
+                          cannabis-npi-enrich.js (API match),
+                          cannabis-nppes-match.js (offline NPPES gate),
+                          cannabis-nppes-resolve.js (scored; --promote-min-score
+                          is a directed override, NOT used by the weekly task),
+                          cannabis-refresh.ps1 (FL) / cannabis-refresh-all.ps1
+                          (all states, weekly scheduled task). CLIA pipeline:
+                          clia-ingest.js (quarterly POS CSV), clia-npi-match.js
+                          (org-NPI links), clia-refresh.ps1 (quarterly task).
 tests/                    jest + supertest, offline via nock + mockDb
 client/                   Vite + React frontend (separate package.json)
 docs/                     Research docs and frontend spec
