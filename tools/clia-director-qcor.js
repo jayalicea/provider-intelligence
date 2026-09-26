@@ -34,17 +34,18 @@ function readEnvFile() {
 }
 
 function parseArgs(argv) {
-  const args = { clia: null, limit: null, dryRun: false, delayMs: 1500 };
+  const args = { clia: null, limit: null, backfill: null, dryRun: false, delayMs: 1500 };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--clia') args.clia = String(argv[++i] || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
     else if (a === '--limit') args.limit = parseInt(argv[++i], 10);
+    else if (a === '--backfill') args.backfill = parseInt(argv[++i], 10);
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--delay-ms') args.delayMs = parseInt(argv[++i], 10);
     else { console.error(`Unknown argument: ${a}`); process.exit(1); }
   }
-  if (!args.clia && !args.limit) {
-    console.error('Provide a watchlist subset: --clia 01D...,34D... or --limit N');
+  if (!args.clia && !args.limit && !args.backfill) {
+    console.error('Provide a watchlist subset: --clia 01D...,34D..., --limit N, or --backfill N');
     process.exit(1);
   }
   return args;
@@ -120,9 +121,19 @@ async function main() {
   await c.connect();
 
   try {
-    const { rows: labs } = args.clia
-      ? await c.query('SELECT clia_number, lab_name, state FROM clia_labs WHERE clia_number = ANY($1::text[])', [args.clia])
-      : await c.query('SELECT clia_number, lab_name, state FROM clia_labs WHERE currently_registered ORDER BY clia_number LIMIT $1', [args.limit]);
+    let labs;
+    if (args.clia) {
+      ({ rows: labs } = await c.query('SELECT clia_number, lab_name, state FROM clia_labs WHERE clia_number = ANY($1::text[])', [args.clia]));
+    } else if (args.backfill != null) {
+      // Scheduled-incremental mode: registered labs not yet enriched,
+      // stalest sync first, bounded per run.
+      ({ rows: labs } = await c.query(
+        `SELECT clia_number, lab_name, state FROM clia_labs
+          WHERE currently_registered AND director_name IS NULL
+          ORDER BY sync_timestamp ASC, clia_number ASC LIMIT $1`, [args.backfill]));
+    } else {
+      ({ rows: labs } = await c.query('SELECT clia_number, lab_name, state FROM clia_labs WHERE currently_registered ORDER BY clia_number LIMIT $1', [args.limit]));
+    }
 
     console.log(`watchlist subset: ${labs.length} labs`);
 
@@ -136,6 +147,11 @@ async function main() {
         const popupMatch = resHtml.match(/active_popup\.jsp\?[^'"]*prvdr_intrnl_num=([A-Z0-9]+)[^'"]*'/i);
         if (!popupMatch || !resHtml.includes(lab.clia_number)) {
           console.log(`  ${lab.clia_number}: no QCOR result (delisted or unmatched)`);
+          // Touch so scheduled backfill rotates past this lab instead of
+          // re-picking it every run; QCOR may republish it later.
+          if (!args.dryRun) {
+            await c.query('UPDATE clia_labs SET sync_timestamp = CURRENT_TIMESTAMP WHERE clia_number = $1', [lab.clia_number]);
+          }
           continue;
         }
         await sleep(args.delayMs);
