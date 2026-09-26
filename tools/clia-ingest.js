@@ -15,7 +15,7 @@ const path = require('path');
 
 const DEFAULT_FILE = 'tmp/clia-q2-2026.csv';
 const SOURCE_NAME = 'CMS POS Clinical Laboratories (CLIA)';
-const BATCH = 5000;
+const BATCH = 1500; // 1500 rows x 25 params = 37,500 < Postgres' 65,535 parameter cap
 
 // Header column -> staging column. Dates arrive as YYYYMMDD strings.
 const COLS = {
@@ -102,11 +102,6 @@ async function main() {
   const args = parseArgs(process.argv);
   const asOf = path.basename(args.file, '.csv'); // e.g. Clia_DATA.Q2_2026
   const vintage = vintageDate(asOf);
-  const rl = readline.createInterface({
-    input: fs.createReadStream(args.file),
-    crlfDelay: Infinity
-  });
-
   let header = null;
   let idx = null;
   let parsed = 0;
@@ -137,7 +132,7 @@ async function main() {
         accred[body] = { matchDate: toDate(get(`${body}_ACRDTD_Y_MATCH_DT`)) || null };
       }
     }
-    params.push(classes, JSON.stringify(accred), asOf, vintage);
+    params.push(classes, JSON.stringify(accred), asOf, vintage, vintage);
     return params;
   }
 
@@ -174,8 +169,16 @@ async function main() {
       password: env.DB_PASSWORD || '',
     });
     await client.connect();
-    await client.query(`CREATE TEMP TABLE tmp_clia_stage (LIKE clia_labs INCLUDING DEFAULTS) ON COMMIT DROP`);
+    await client.query(`CREATE TEMP TABLE tmp_clia_stage (LIKE clia_labs INCLUDING DEFAULTS)`);
   }
+
+  // Create the readline interface AFTER the DB setup: lines emitted before
+  // the for-await consumer attaches are lost (that bug silently ate the
+  // CSV header and staged an empty table).
+  const rl = readline.createInterface({
+    input: fs.createReadStream(args.file),
+    crlfDelay: Infinity
+  });
 
   for await (const line of rl) {
     if (!line.trim()) continue;
@@ -183,7 +186,7 @@ async function main() {
       header = splitCsv(line);
       idx = Object.fromEntries(header.map((h, i) => [h, i]));
       const missing = Object.keys(COLS).filter(col => idx[col] === undefined);
-      if (missing.length) console.warn(`warn: columns not in header: ${missing.join(', ')}`);
+      if (missing.length) console.warn(`warn: columns not in header: ${missing.join(', ')}\n  header[0..4]=${header.slice(0, 5).join('|')}`);
       continue;
     }
     const rec = splitCsv(line);
@@ -246,11 +249,22 @@ async function main() {
          LEFT JOIN clia_labs l ON l.clia_number = s.clia_number
         WHERE l.clia_number IS NULL`
     );
-    const ret = await client.query(
-      `UPDATE clia_labs SET currently_registered = false
-        WHERE currently_registered AND clia_number NOT IN (SELECT clia_number FROM tmp_clia_stage)`
-    );
-    stats = { inserted: ins.rowCount, updated: upd.rowCount, retired: ret.rowCount };
+    // Guard: with an empty stage (parse failure) or a first load (no
+    // existing rows), retire is a no-op - and NOT IN against a 681k-row
+    // stage has produced pathological plans, so skip it entirely.
+    const existing = await client.query('SELECT COUNT(*)::int AS n FROM clia_labs');
+    if (parsed > 0 && existing.rows[0].n > 0) {
+      const ret = await client.query(
+        `UPDATE clia_labs l SET currently_registered = false
+          WHERE l.currently_registered
+            AND NOT EXISTS (SELECT 1 FROM tmp_clia_stage s WHERE s.clia_number = l.clia_number)`
+      );
+      stats.retired = ret.rowCount;
+    } else {
+      console.warn(`warn: retire-absent skipped (staged=${parsed}, existing=${existing.rows[0].n})`);
+    }
+    stats.inserted = ins.rowCount;
+    stats.updated = upd.rowCount;
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK');
