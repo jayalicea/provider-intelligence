@@ -16,6 +16,7 @@ const cannabis = new Map(); // cannabis_certifications rows, keyed `${state}:${l
 const apiUsage = [];        // api_usage metering rows
 const apiKeys = new Map();  // label -> api_keys row
 const clia = new Map();     // clia_labs rows, keyed by clia_number
+const facilities = new Map(); // facilities rows, keyed by ccn
 let quality = [];            // quality_measures rows
 
 function reset() {
@@ -32,6 +33,7 @@ function reset() {
   apiUsage.length = 0;
   apiKeys.clear();
   clia.clear();
+  facilities.clear();
   quality = [];
   failCacheWrite = false;
   queryLog.length = 0;
@@ -970,7 +972,37 @@ async function query(text, params = []) {
     return { rows, rowCount: rows.length };
   }
 
-  // --- clia_labs (directory + detail reads) ---------------------------------
+  // --- facilities (iQIES directory + detail reads) ---------------------------
+
+  if (/FROM facilities/.test(sql)) {
+    const condVal = re => {
+      const m = sql.match(re);
+      return m ? params[parseInt(m[1], 10) - 1] : undefined;
+    };
+    const nameF = condVal(/facility_name ILIKE \$(\d+)/);
+    const stateF = condVal(/state = \$(\d+)/);
+    const typeF = condVal(/provider_type_id = \$(\d+)/);
+    const cityF = condVal(/city ILIKE \$(\d+)/);
+    const delistedOnly = /currently_registered = false/.test(sql);
+
+    let rows = [...facilities.values()].filter(r => delistedOnly
+      ? r.currently_registered === false
+      : r.currently_registered !== false);
+    if (nameF) rows = rows.filter(r => String(r.facility_name || '').toUpperCase().includes(nameF.slice(1, -1).toUpperCase()));
+    if (stateF) rows = rows.filter(r => r.state === stateF);
+    if (typeF) rows = rows.filter(r => String(r.provider_type_id) === String(typeF));
+    if (cityF) rows = rows.filter(r => String(r.city || '').toUpperCase().includes(cityF.slice(1, -1).toUpperCase()));
+
+    if (/^SELECT COUNT\(\*\)/.test(sql)) {
+      return { rows: [{ n: rows.length }], rowCount: 1 };
+    }
+    if (/^SELECT \* FROM facilities WHERE ccn = \$1$/.test(sql)) {
+      const row = facilities.get(String(params[0]));
+      return { rows: row ? [{ ...row }] : [], rowCount: row ? 1 : 0 };
+    }
+    rows = rows.sort((a, b) => String(a.facility_name).localeCompare(String(b.facility_name)));
+    return { rows: rows.map(r => ({ ...r })), rowCount: rows.length };
+  }
 
   if (/FROM clia_labs/.test(sql)) {
     const condVal = re => {
@@ -1051,6 +1083,7 @@ module.exports = {
     nppesProviders,
     mips,
     clia,
+    facilities,
     get quality() { return quality; },
     taxonomyCodes,
     taxonomyPercentiles,
