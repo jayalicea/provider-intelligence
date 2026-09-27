@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { nameOrder } = require('../utils/searchOrder');
 
 // Directory + detail reads over clia_labs. The CLIA number is the
 // canonical lab identifier, mirroring the NPI on the provider side.
@@ -35,21 +36,23 @@ class CliaService {
     }
     params.push(Math.min(parseInt(limit, 10) || 50, 100), parseInt(offset, 10) || 0);
 
-    const result = await db.query(
-      `SELECT clia_number, lab_name, additional_lab_name, address, city, state, zip,
-              phone, certificate_type_cd, certificate_effective_dt, lab_classification_cds,
-              accreditation, last_confirmed_at
-         FROM clia_labs
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY lab_name
-        LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
+    const [result, total] = await Promise.all([
+      db.query(
+        `SELECT clia_number, lab_name, additional_lab_name, address, city, state, zip,
+                phone, certificate_type_cd, certificate_effective_dt, lab_classification_cds,
+                accreditation, last_confirmed_at
+           FROM clia_labs
+          WHERE ${conditions.join(' AND ')}
+          ORDER BY ${nameOrder(name, 'lab_name')}, clia_number
+          LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+      ),
+      db.query(
+        `SELECT COUNT(*)::int AS n FROM clia_labs WHERE ${conditions.join(' AND ')}`,
+        params.slice(0, -2)
+      )
+    ]);
 
-    const total = await db.query(
-      `SELECT COUNT(*)::int AS n FROM clia_labs WHERE ${conditions.join(' AND ')}`,
-      params.slice(0, -2)
-    );
 
     return { rows: result.rows.map(r => this.normalizeRow(r)), total: total.rows[0].n };
   }

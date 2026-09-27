@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { nameOrder } = require('../utils/searchOrder');
 
 // provider_type_id labels, inferred from facility-name sampling of the Q1
 // 2026 iQIES file (see docs/research/pos-iqies-hha-asc-hospice.md). Codes
@@ -26,18 +27,21 @@ class FacilityService {
     if (city) { params.push(`%${city}%`); conditions.push(`city ILIKE $${params.length}`); }
     params.push(Math.min(parseInt(limit, 10) || 50, 100), parseInt(offset, 10) || 0);
 
-    const result = await db.query(
-      `SELECT ccn, facility_name, provider_type_id, city, state, certification_dt, last_confirmed_at
-         FROM facilities
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY facility_name
-        LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
-    const total = await db.query(
-      `SELECT COUNT(*)::int AS n FROM facilities WHERE ${conditions.join(' AND ')}`,
-      params.slice(0, -2)
-    );
+    const [result, total] = await Promise.all([
+      db.query(
+        `SELECT ccn, facility_name, provider_type_id, city, state, certification_dt, last_confirmed_at
+           FROM facilities
+          WHERE ${conditions.join(' AND ')}
+          ORDER BY ${nameOrder(name, 'facility_name')}, ccn
+          LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+      ),
+      db.query(
+        `SELECT COUNT(*)::int AS n FROM facilities WHERE ${conditions.join(' AND ')}`,
+        params.slice(0, -2)
+      )
+    ]);
+
     return { rows: result.rows.map(r => this.normalizeRow(r)), total: total.rows[0].n };
   }
 
