@@ -36,7 +36,8 @@ src/
                           `-- requires-table: X` defers until X exists
     migrate.js            Migration runner (schema_migrations table)
   controllers/            HTTP layer (validation, 400/404/500 handling)
-  middleware/             errorHandler.js, rateLimiter.js (in-memory)
+  middleware/             errorHandler.js, rateLimiter.js (in-memory),
+                          cacheControl.js (Cache-Control on /api/v1)
   routes/                 Express routers (bind controller methods!)
   services/               npiService, cmsDataService, analyticsService
   utils/                  apiClient (axios wrapper), logger (winston)

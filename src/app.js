@@ -6,6 +6,7 @@ const compression = require('compression');
 const { logger } = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
+const cacheControl = require('./middleware/cacheControl');
 const apiKeyService = require('./services/apiKeyService').shared;
 const providerRoutes = require('./routes/providerRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
@@ -71,6 +72,7 @@ class App {
   setupRoutes() {
     // Package C: writes (and /api/v1/admin) require an API key; GETs stay open.
     this.app.use('/api/v1', apiKeyAuth);
+    this.app.use('/api/v1', cacheControl());
 
     // Health check endpoint
     this.app.get('/health', (req, res) => {

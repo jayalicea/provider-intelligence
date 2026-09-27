@@ -116,6 +116,16 @@ API_KEYS=local:some-long-random-string
 Without it every write and every admin request returns 401, which is the
 intended default; GET endpoints stay open either way.
 
+Optional variables:
+
+- `TRUST_PROXY` — set (e.g. `1`) only when a reverse proxy sits in front of
+  the app, so rate limiting keys on the real client IP. Leave unset otherwise:
+  it would let clients spoof `X-Forwarded-For`.
+- `CACHE_MAX_AGE` (default `300`) and `CACHE_STALE_WHILE_REVALIDATE`
+  (default `3600`), in seconds — `Cache-Control` on successful `/api/v1`
+  GETs (`public`, or `private` when sent with `X-API-Key`). Errors, non-GETs
+  and `/admin` are always `no-store`. `CACHE_MAX_AGE=0` disables caching.
+
 `.env` is gitignored and must stay that way. Upstream API base URLs and dataset
 IDs are not environment variables; they live in `src/config/api-config.js`.
 

@@ -119,3 +119,61 @@ describe('app trust proxy (TRUST_PROXY)', () => {
     expect(new App().app.get('trust proxy')).toBe('loopback');
   });
 });
+
+describe('middleware/cacheControl', () => {
+  const express = require('express');
+  const request = require('supertest');
+  const cacheControl = require('../src/middleware/cacheControl');
+
+  function app(opts) {
+    const a = express();
+    a.use(cacheControl(opts));
+    a.get('/data', (req, res) => res.json({ ok: true }));
+    a.get('/missing', (req, res) => res.status(404).json({ error: 'nope' }));
+    a.get('/boom', () => { throw new Error('x'); });
+    a.get('/admin/usage', (req, res) => res.json({ ok: true }));
+    a.post('/data', (req, res) => res.json({ ok: true }));
+    a.use((err, req, res, next) => res.status(500).json({ error: 'fail' })); // eslint-disable-line no-unused-vars
+    return a;
+  }
+
+  test('successful anonymous GET is publicly cacheable', async () => {
+    const res = await request(app({ maxAge: 300, staleWhileRevalidate: 3600 })).get('/data');
+    expect(res.headers['cache-control']).toBe('public, max-age=300, stale-while-revalidate=3600');
+  });
+
+  test('GET with an API key is private', async () => {
+    const res = await request(app({ maxAge: 300 })).get('/data').set('X-API-Key', 'k');
+    expect(res.headers['cache-control']).toBe('private, max-age=300');
+  });
+
+  test.each(['/missing', '/boom', '/admin/usage'])('%s is no-store', async (path) => {
+    const res = await request(app({ maxAge: 300 })).get(path);
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  test('non-GET is no-store', async () => {
+    const res = await request(app({ maxAge: 300 })).post('/data');
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  test('maxAge 0 disables caching', async () => {
+    const res = await request(app({ maxAge: 0 })).get('/data');
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  test('304 revalidation keeps the cache policy', async () => {
+    const a = app({ maxAge: 300, staleWhileRevalidate: 60 });
+    const first = await request(a).get('/data');
+    const again = await request(a).get('/data').set('If-None-Match', first.headers.etag);
+    expect(again.status).toBe(304);
+    expect(again.headers['cache-control']).toBe('public, max-age=300, stale-while-revalidate=60');
+  });
+
+  test('is mounted on /api/v1 in the app (unknown endpoint 404 is no-store)', async () => {
+    const App = require('../src/app');
+    const res = await request(new App().app).get('/api/v1/providers/not-a-route/x/y');
+    expect(res.status).toBe(404);
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+});
