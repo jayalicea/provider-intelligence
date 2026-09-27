@@ -48,3 +48,21 @@ describe('search services', () => {
     await expect(pending).resolves.toEqual({ rows: [], total: 0 });
   });
 });
+
+describe('tools/verify-search-plan indexesUsed', () => {
+  const { indexesUsed } = require('../tools/verify-search-plan');
+
+  test('collects index names from nested plan nodes', () => {
+    const plan = {
+      'Node Type': 'Limit',
+      Plans: [{ 'Node Type': 'Sort', Plans: [{ 'Node Type': 'Bitmap Heap Scan', Plans: [
+        { 'Node Type': 'Bitmap Index Scan', 'Index Name': 'idx_clia_labs_name_trgm' }
+      ] }] }]
+    };
+    expect([...indexesUsed(plan)]).toEqual(['idx_clia_labs_name_trgm']);
+  });
+
+  test('a sequential scan uses no index', () => {
+    expect([...indexesUsed({ 'Node Type': 'Seq Scan' })]).toEqual([]);
+  });
+});

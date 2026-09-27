@@ -211,8 +211,18 @@ also counts as unhealthy. The response is never cached.
 
 **One-time setup** (after `npm run migrate` has created the table):
 
-1. In Task Scheduler, change each task's action to run the script through
-   the wrapper, keeping its schedule. Program `powershell`, arguments:
+1. Switch the tasks to the wrapper. `tools\setup-refresh-tracking.ps1` finds
+   the tasks that run the four scripts and rewrites their actions (schedules
+   and script arguments are kept). Preview, then apply:
+
+   ```
+   powershell -ExecutionPolicy Bypass -File tools\setup-refresh-tracking.ps1
+   powershell -ExecutionPolicy Bypass -File tools\setup-refresh-tracking.ps1 -Apply
+   ```
+
+   Then run one task by hand (`Start-ScheduledTask -TaskName <name>`) and
+   check that `/health/data` shows it as `success`. To change a task by hand
+   instead, set its action to program `powershell`, arguments:
 
    ```
    -ExecutionPolicy Bypass -File tools\run-tracked.ps1 -Job leie -Script tools\monthly-leie-refresh.ps1
@@ -229,6 +239,10 @@ The wrapper records the wrapped script's exit code (0 = success). Scripts
 that log a `WARN` and still exit 0 (for example a skipped state in the
 cannabis refresh) count as successful runs. Tracking is best effort: if the
 database is unreachable the job still runs.
+
+To confirm name search uses the fast plan on a real database (read-only):
+`node tools/verify-search-plan.js [labTerm] [facilityTerm]`. It exits 1 if a
+search still walks the name b-tree.
 
 ## Documentation index
 
