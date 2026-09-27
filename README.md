@@ -118,7 +118,7 @@ intended default; GET endpoints stay open either way.
 
 Optional variables:
 
-- `TRUST_PROXY` — set (e.g. `1`) only when a reverse proxy sits in front of
+- `TRUST_PROXY` — set (e.g. `1` or `true`) only when a reverse proxy sits in front of
   the app, so rate limiting keys on the real client IP. Leave unset otherwise:
   it would let clients spoof `X-Forwarded-For`.
 - `CACHE_MAX_AGE` (default `300`) and `CACHE_STALE_WHILE_REVALIDATE`

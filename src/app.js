@@ -27,11 +27,18 @@ class App {
   configureMiddleware() {
     // Behind a reverse proxy/load balancer, req.ip (the rate-limiter key) is
     // the proxy's address unless Express trusts X-Forwarded-For. Opt-in via
-    // TRUST_PROXY (hop count, e.g. 1, or an Express trust-proxy string):
-    // trusting it with no proxy in front would let clients spoof their IP.
-    if (process.env.TRUST_PROXY) {
-      const hops = Number(process.env.TRUST_PROXY);
-      this.app.set('trust proxy', Number.isInteger(hops) ? hops : process.env.TRUST_PROXY);
+    // TRUST_PROXY (hop count such as 1, true/false, or an Express trust-proxy
+    // string such as 'loopback' or a subnet list): trusting it with no proxy
+    // in front would let clients spoof their IP.
+    const trustProxy = (process.env.TRUST_PROXY || '').trim();
+    if (trustProxy) {
+      const lower = trustProxy.toLowerCase();
+      const hops = Number(trustProxy);
+      let value = trustProxy;
+      if (lower === 'true') value = true;
+      else if (lower === 'false') value = false;
+      else if (Number.isInteger(hops)) value = hops;
+      this.app.set('trust proxy', value);
     }
 
     // Security headers

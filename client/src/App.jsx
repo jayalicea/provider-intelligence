@@ -1,8 +1,9 @@
 import { Suspense, lazy, useState } from 'react'
-import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import HomePage from './pages/HomePage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import LoadingSpinner from './components/LoadingSpinner.jsx'
+import RouteErrorBoundary from './components/RouteErrorBoundary.jsx'
 import coverage from './data/coverage.json'
 
 // Every page except Home and Not Found is loaded on first visit to its route,
@@ -52,6 +53,13 @@ function globalAsOf() {
   return dates[0] ?? null
 }
 
+// Resetting the boundary per path lets a user leave a page that failed to
+// load without reloading the whole app.
+function PageBoundary({ children }) {
+  const { pathname } = useLocation()
+  return <RouteErrorBoundary key={pathname}>{children}</RouteErrorBoundary>
+}
+
 export default function App() {
   const [showDisclaimer, setShowDisclaimer] = useState(false)
   const asOf = globalAsOf()
@@ -89,27 +97,29 @@ export default function App() {
         </header>
 
         <main className="app-main">
-          <Suspense fallback={<LoadingSpinner label="Loading page" />}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/providers" element={<ProviderSearchPage />} />
-              <Route path="/labs" element={<LabSearchPage />} />
-              <Route path="/labs/:cliaNumber" element={<LabDetailPage />} />
-              <Route path="/cannabis" element={<CannabisPage />} />
-              <Route path="/providers/:npi" element={<ProviderDetailPage />} />
-              <Route path="/providers/:npi/360" element={<Provider360Page />} />
-              <Route path="/cohort" element={<CohortExplorerPage />} />
-              <Route path="/watchlist" element={<WatchlistPage />} />
-              <Route path="/my-providers" element={<MyProvidersPage />} />
-              <Route path="/compare" element={<ComparePage />} />
-              <Route path="/upload-roster" element={<UploadRosterPage />} />
-              <Route path="/coverage" element={<CoveragePage />} />
-              <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
-              <Route path="/benchmark" element={<BenchmarkPage />} />
-              <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
+          <PageBoundary>
+            <Suspense fallback={<LoadingSpinner label="Loading page" />}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/providers" element={<ProviderSearchPage />} />
+                <Route path="/labs" element={<LabSearchPage />} />
+                <Route path="/labs/:cliaNumber" element={<LabDetailPage />} />
+                <Route path="/cannabis" element={<CannabisPage />} />
+                <Route path="/providers/:npi" element={<ProviderDetailPage />} />
+                <Route path="/providers/:npi/360" element={<Provider360Page />} />
+                <Route path="/cohort" element={<CohortExplorerPage />} />
+                <Route path="/watchlist" element={<WatchlistPage />} />
+                <Route path="/my-providers" element={<MyProvidersPage />} />
+                <Route path="/compare" element={<ComparePage />} />
+                <Route path="/upload-roster" element={<UploadRosterPage />} />
+                <Route path="/coverage" element={<CoveragePage />} />
+                <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
+                <Route path="/benchmark" element={<BenchmarkPage />} />
+                <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </PageBoundary>
         </main>
 
         <footer className="app-footer">
