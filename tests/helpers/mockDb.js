@@ -1003,6 +1003,18 @@ async function query(text, params = []) {
     return { rows: rows.map(r => ({ ...r })), rowCount: rows.length };
   }
 
+  // Certificates expiring within 90 days (or already lapsed) for the alerts
+  // endpoint; "today" is the real clock, so tests seed dates relative to it.
+  if (/FROM clia_labs WHERE currently_registered AND certificate_expiration_dt IS NOT NULL/.test(sql)) {
+    const cutoff = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+    const rows = [...clia.values()]
+      .filter(r => r.currently_registered !== false && r.certificate_expiration_dt &&
+        String(r.certificate_expiration_dt).slice(0, 10) <= cutoff)
+      .sort((a, b) => String(a.certificate_expiration_dt).localeCompare(String(b.certificate_expiration_dt)))
+      .map(r => ({ ...r }));
+    return { rows, rowCount: rows.length };
+  }
+
   if (/FROM clia_labs/.test(sql)) {
     const condVal = re => {
       const m = sql.match(re);
