@@ -94,9 +94,29 @@ describe('migrate runner', () => {
   test('baseline records pending files without running their SQL', async () => {
     const ms = tmpMigrations({ 'a.sql': 'CREATE TABLE a (id int);' });
     const client = fakeClient();
-    expect(await baseline(client, ms)).toEqual(['a.sql']);
+    expect(await baseline(client, ms)).toEqual({ recorded: ['a.sql'], deferred: [] });
     expect(client.calls).not.toContain('CREATE TABLE a (id int);');
     expect(client.rows.map(r => r.filename)).toEqual(['a.sql']);
+  });
+
+  test('baseline leaves a migration pending when its required table is missing', async () => {
+    const ms = tmpMigrations({
+      'a.sql': 'CREATE TABLE a (id int);',
+      'b.sql': '-- requires-table: nppes_providers\nCREATE INDEX i ON nppes_providers (x);'
+    });
+    const client = fakeClient();
+    expect(await baseline(client, ms)).toEqual({ recorded: ['a.sql'], deferred: ['b.sql'] });
+    expect(client.rows.map(r => r.filename)).toEqual(['a.sql']);
+
+    // Once the table exists, up applies the file baseline skipped.
+    const later = fakeClient({ applied: client.rows, tables: ['nppes_providers'] });
+    expect((await up(later, ms, quiet)).applied).toEqual(['b.sql']);
+  });
+
+  test('checksum ignores CRLF vs LF line endings', () => {
+    const [lf] = tmpMigrations({ 'a.sql': 'CREATE TABLE a (id int);\nSELECT 1;\n' });
+    const [crlf] = tmpMigrations({ 'a.sql': 'CREATE TABLE a (id int);\r\nSELECT 1;\r\n' });
+    expect(crlf.checksum).toBe(lf.checksum);
   });
 
   test('repository migrations tag the tool-created nppes_providers dependency', () => {

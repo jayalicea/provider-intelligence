@@ -114,6 +114,14 @@ describe('app trust proxy (TRUST_PROXY)', () => {
     expect(new App().app.get('trust proxy')).toBe(1);
   });
 
+  test.each([['true', true], ['TRUE', true], ['false', false]])(
+    'boolean value %s is a boolean, not an IP (starting the app must not throw)',
+    (raw, expected) => {
+      process.env.TRUST_PROXY = raw;
+      expect(new App().app.get('trust proxy')).toBe(expected);
+    }
+  );
+
   test('non-numeric value passes through as an Express trust string', () => {
     process.env.TRUST_PROXY = 'loopback';
     expect(new App().app.get('trust proxy')).toBe('loopback');

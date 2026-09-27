@@ -35,7 +35,9 @@ function loadMigrations(dir = MIGRATIONS_DIR) {
     .map(filename => {
       const sql = fs.readFileSync(path.join(dir, filename), 'utf8');
       const requiresTables = [...sql.matchAll(/^--\s*requires-table:\s*([\w.]+)\s*$/gm)].map(m => m[1]);
-      const checksum = crypto.createHash('sha256').update(sql).digest('hex');
+      // Hash with normalized line endings so a Windows (CRLF) checkout and a
+      // Linux one agree on the checksum of the same file.
+      const checksum = crypto.createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex');
       return { filename, sql, checksum, requiresTables };
     });
 }
@@ -66,6 +68,14 @@ async function status(client, migrations = loadMigrations()) {
   return plan(migrations, await appliedRows(client));
 }
 
+async function missingTables(client, migration) {
+  const missing = [];
+  for (const t of migration.requiresTables) {
+    if (!(await tableExists(client, t))) missing.push(t);
+  }
+  return missing;
+}
+
 async function up(client, migrations = loadMigrations(), log = console.log) {
   const { pending, changed } = plan(migrations, await appliedRows(client));
   for (const m of changed) {
@@ -73,10 +83,7 @@ async function up(client, migrations = loadMigrations(), log = console.log) {
   }
   const result = { applied: [], deferred: [] };
   for (const m of pending) {
-    const missing = [];
-    for (const t of m.requiresTables) {
-      if (!(await tableExists(client, t))) missing.push(t);
-    }
+    const missing = await missingTables(client, m);
     if (missing.length) {
       log(`deferred ${m.filename}: missing table(s) ${missing.join(', ')}`);
       result.deferred.push(m.filename);
@@ -98,15 +105,25 @@ async function up(client, migrations = loadMigrations(), log = console.log) {
   return result;
 }
 
+// Files whose required tables do not exist yet are NOT recorded: their
+// objects cannot exist either, so marking them applied would skip them
+// forever. They stay pending and `up` applies them once the table exists.
 async function baseline(client, migrations = loadMigrations()) {
   const { pending } = plan(migrations, await appliedRows(client));
+  const recorded = [];
+  const deferred = [];
   for (const m of pending) {
+    if ((await missingTables(client, m)).length) {
+      deferred.push(m.filename);
+      continue;
+    }
     await client.query(
       'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2) ON CONFLICT (filename) DO NOTHING',
       [m.filename, m.checksum]
     );
+    recorded.push(m.filename);
   }
-  return pending.map(m => m.filename);
+  return { recorded, deferred };
 }
 
 async function main(cmd = 'up') {
@@ -125,8 +142,9 @@ async function main(cmd = 'up') {
       }
       for (const f of s.missing) console.log(`MISSING  ${f} (recorded as applied, file not found)`);
     } else if (cmd === 'baseline') {
-      const marked = await baseline(client);
-      console.log(`baseline: recorded ${marked.length} migration(s) as applied without running them`);
+      const { recorded, deferred } = await baseline(client);
+      console.log(`baseline: recorded ${recorded.length} migration(s) as applied without running them`);
+      for (const f of deferred) console.log(`left pending ${f}: required table missing, npm run migrate will apply it later`);
     } else if (cmd === 'up') {
       const r = await up(client);
       console.log(`done: ${r.applied.length} applied, ${r.deferred.length} deferred`);
