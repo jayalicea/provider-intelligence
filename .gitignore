@@ -11,3 +11,6 @@ data/
 # converted with pdftotext); regenerable from the URLs in each tool's
 # SOURCE_URL and documented in docs/research/cannabis-physician-sources.md
 tmp/
+
+# Claude Code personal settings
+.claude/settings.local.json
