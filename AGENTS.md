@@ -52,6 +52,10 @@ tools/                    One-off ingest/backfill scripts; not part of the
                           (all states, weekly scheduled task). CLIA pipeline:
                           clia-ingest.js (quarterly POS CSV), clia-npi-match.js
                           (org-NPI links), clia-refresh.ps1 (quarterly task).
+                          run-tracked.ps1 wraps each scheduled task and records
+                          runs via refresh-run.js in data_refresh_runs; jobs and
+                          max ages live in src/config/refresh-jobs.js and are
+                          reported by GET /health/data (503 when stale/failed).
 tests/                    jest + supertest, offline via nock + mockDb
 client/                   Vite + React frontend (separate package.json)
 docs/                     Research docs and frontend spec

@@ -15,6 +15,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const cannabisRoutes = require('./routes/cannabisRoutes');
 const cliaRoutes = require('./routes/cliaRoutes');
 const facilityRoutes = require('./routes/facilityRoutes');
+const { getRefreshStatus } = require('./services/refreshStatusService');
 
 class App {
   constructor() {
@@ -88,6 +89,20 @@ class App {
         timestamp: new Date().toISOString(),
         version: process.env.APP_VERSION || '1.0.0'
       });
+    });
+
+    // Scheduled data-refresh health: 200 when every job's last run succeeded
+    // within its expected interval, 503 otherwise, so an external uptime
+    // monitor can alert on missed or failing refreshes.
+    this.app.get('/health/data', async (req, res) => {
+      res.set('Cache-Control', 'no-store');
+      try {
+        const status = await getRefreshStatus();
+        res.status(status.healthy ? 200 : 503).json(status);
+      } catch (error) {
+        logger.error({ message: 'refresh status query failed', error: error.message });
+        res.status(503).json({ healthy: false, error: 'Refresh status unavailable' });
+      }
     });
 
     // API documentation

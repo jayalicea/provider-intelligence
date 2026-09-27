@@ -192,6 +192,42 @@ Endpoint groups:
 Full request/response shapes: [docs/openapi.yaml](docs/openapi.yaml)
 (OpenAPI 3.1).
 
+## Scheduled refresh monitoring
+
+The data refreshes run as Windows scheduled tasks. Each run is recorded in
+the `data_refresh_runs` table, and `GET /health/data` returns **503** when any
+job's latest run failed or its last success is older than its expected
+interval (`src/config/refresh-jobs.js`). A job that has never recorded a run
+also counts as unhealthy. The response is never cached.
+
+| Job | Script | Alerts after |
+|---|---|---|
+| `clia-director` | `tools\clia-director-enrich.ps1` | 2 days |
+| `cannabis` | `tools\cannabis-refresh-all.ps1` | 8 days |
+| `leie` | `tools\monthly-leie-refresh.ps1` | 35 days |
+| `clia` | `tools\clia-refresh.ps1` | 100 days |
+
+**One-time setup** (after `npm run migrate` has created the table):
+
+1. In Task Scheduler, change each task's action to run the script through
+   the wrapper, keeping its schedule. Program `powershell`, arguments:
+
+   ```
+   -ExecutionPolicy Bypass -File tools\run-tracked.ps1 -Job leie -Script tools\monthly-leie-refresh.ps1
+   ```
+
+   with "Start in" set to the repository root. Arguments for the wrapped
+   script go in one string: `-ScriptArgs "-BatchSize 150"`.
+2. Point an external uptime monitor (e.g. UptimeRobot, Healthchecks, Better
+   Stack) at `https://<host>/health/data` and alert on any non-200. Because
+   the endpoint is served by the app, a monitor also alerts when the machine
+   or the app is down.
+
+The wrapper records the wrapped script's exit code (0 = success). Scripts
+that log a `WARN` and still exit 0 (for example a skipped state in the
+cannabis refresh) count as successful runs. Tracking is best effort: if the
+database is unreachable the job still runs.
+
 ## Documentation index
 
 ### Reference and research
