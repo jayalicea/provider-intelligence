@@ -4,6 +4,7 @@ import api from '../api/client.js'
 import { useWatchlist } from '../hooks/useWatchlist.js'
 import { WATCHLIST_MAX, decodeShareToken, encodeShareToken } from '../lib/watchlist.js'
 import EmptyState from '../components/EmptyState.jsx'
+import NpiText from '../components/NpiText.jsx'
 import ErrorBanner from '../components/ErrorBanner.jsx'
 import { findLargestDrop } from '../lib/scoreDrop.js'
 
