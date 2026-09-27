@@ -118,10 +118,13 @@ shared `pg` pool.
    ```
 
 5. Run the schema initialization script, then the dated migrations in
-   `src/config/migrations/` in filename order:
+   `src/config/migrations/` with the runner (see the root README for
+   `status`, deferred NPPES migrations, and `baseline` for existing
+   databases):
 
    ```bash
    psql -U admin -d provider_intelligence -f src/config/init.sql
+   npm run migrate
    ```
 
 6. Create a `.env` in the repository root. **There is no committed
@@ -280,7 +283,8 @@ shipped:
   for how it reconciles with `docs/FRONTEND_SPEC.md`.
 - **Docker support**: shipped. `Dockerfile` (Node 20 Alpine, no secrets baked
   in) and `docker-compose.yml` (app plus PostgreSQL 15, schema bootstrapped
-  from `init.sql`). The image build is verified; `docker compose up` runtime
+  from `init.sql`, then a one-shot `migrate` service applies pending
+  migrations before the app starts). The image build is verified; `docker compose up` runtime
   validation has not been run.
 
 What is still open is tracked in `docs/V2_ROADMAP.md` (phased user stories)

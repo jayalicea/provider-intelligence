@@ -1,3 +1,4 @@
+-- requires-table: nppes_providers
 -- NPPES organization lookup for the CLIA cross-reference: organization
 -- names live in legal_business_name (entity_type_code '2'), which had no
 -- index. One-time build; used by tools/clia-npi-match.js.

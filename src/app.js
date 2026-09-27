@@ -6,6 +6,7 @@ const compression = require('compression');
 const { logger } = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
+const cacheControl = require('./middleware/cacheControl');
 const apiKeyService = require('./services/apiKeyService').shared;
 const providerRoutes = require('./routes/providerRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
@@ -24,6 +25,15 @@ class App {
   }
 
   configureMiddleware() {
+    // Behind a reverse proxy/load balancer, req.ip (the rate-limiter key) is
+    // the proxy's address unless Express trusts X-Forwarded-For. Opt-in via
+    // TRUST_PROXY (hop count, e.g. 1, or an Express trust-proxy string):
+    // trusting it with no proxy in front would let clients spoof their IP.
+    if (process.env.TRUST_PROXY) {
+      const hops = Number(process.env.TRUST_PROXY);
+      this.app.set('trust proxy', Number.isInteger(hops) ? hops : process.env.TRUST_PROXY);
+    }
+
     // Security headers
     this.app.use(helmet());
 
@@ -41,22 +51,17 @@ class App {
     // Compression
     this.app.use(compression());
 
-    // Request logging
+    // Request logging: one line per request, written when it completes.
     this.app.use((req, res, next) => {
-      logger.info({
-        method: req.method,
-        url: req.url,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
       const start = Date.now();
       res.on('finish', () => {
         logger.info({
           method: req.method,
           url: req.url,
           status: res.statusCode,
-          duration: `${Date.now() - start}ms`
+          duration: `${Date.now() - start}ms`,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
         });
       });
 
@@ -67,6 +72,7 @@ class App {
   setupRoutes() {
     // Package C: writes (and /api/v1/admin) require an API key; GETs stay open.
     this.app.use('/api/v1', apiKeyAuth);
+    this.app.use('/api/v1', cacheControl());
 
     // Health check endpoint
     this.app.get('/health', (req, res) => {

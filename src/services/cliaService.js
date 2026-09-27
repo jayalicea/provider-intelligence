@@ -1,5 +1,4 @@
 const db = require('../config/database');
-const { logger } = require('../utils/logger');
 
 // Directory + detail reads over clia_labs. The CLIA number is the
 // canonical lab identifier, mirroring the NPI on the provider side.

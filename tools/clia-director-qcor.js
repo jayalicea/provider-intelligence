@@ -17,7 +17,7 @@
 
 const { Client } = require('pg');
 const fs = require('fs');
-const { normalizeName, stripMiddleInitials } = require('./cannabis-npi-enrich');
+const { normalizeName } = require('./cannabis-npi-enrich');
 
 const SEARCH_URL = 'https://qcor.cms.gov/advanced_find_provider_response.jsp?which=4&provider=22&backReport=active_CLIA.jsp';
 const UA = 'provider-intelligence-clia-director-enrich/1.0 (public QCOR data; watchlist subset; contact: local admin)';
@@ -137,9 +137,8 @@ async function main() {
 
     console.log(`watchlist subset: ${labs.length} labs`);
 
-    let done = 0, enriched = 0, matched = 0, failed = 0;
+    let enriched = 0, matched = 0, failed = 0;
     for (const lab of labs) {
-      done++;
       try {
         // 1) search by exact CLIA number
         const body = `name=&prvdr=${encodeURIComponent(lab.clia_number)}&director=&state=XX&city=&zip=&report=${encodeURIComponent('active_CLIA.jsp')}&apptype=`;

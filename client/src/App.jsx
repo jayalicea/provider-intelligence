@@ -1,23 +1,27 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import HomePage from './pages/HomePage.jsx'
-import ProviderSearchPage from './pages/ProviderSearchPage.jsx'
-import CannabisPage from './pages/CannabisPage.jsx'
-import ProviderDetailPage from './pages/ProviderDetailPage.jsx'
-import Provider360Page from './pages/Provider360Page.jsx'
-import CohortExplorerPage from './pages/CohortExplorerPage.jsx'
-import WatchlistPage from './pages/WatchlistPage.jsx'
-import MyProvidersPage from './pages/MyProvidersPage.jsx'
-import ComparePage from './pages/ComparePage.jsx'
-import UploadRosterPage from './pages/UploadRosterPage.jsx'
-import CoveragePage from './pages/CoveragePage.jsx'
-import MipsDashboardPage from './pages/MipsDashboardPage.jsx'
-import BenchmarkPage from './pages/BenchmarkPage.jsx'
-import HospitalQualityPage from './pages/HospitalQualityPage.jsx'
-import LabSearchPage from './pages/LabSearchPage.jsx'
-import LabDetailPage from './pages/LabDetailPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
+import LoadingSpinner from './components/LoadingSpinner.jsx'
 import coverage from './data/coverage.json'
+
+// Every page except Home and Not Found is loaded on first visit to its route,
+// so recharts and page code stay out of the initial bundle.
+const ProviderSearchPage = lazy(() => import('./pages/ProviderSearchPage.jsx'))
+const CannabisPage = lazy(() => import('./pages/CannabisPage.jsx'))
+const ProviderDetailPage = lazy(() => import('./pages/ProviderDetailPage.jsx'))
+const Provider360Page = lazy(() => import('./pages/Provider360Page.jsx'))
+const CohortExplorerPage = lazy(() => import('./pages/CohortExplorerPage.jsx'))
+const WatchlistPage = lazy(() => import('./pages/WatchlistPage.jsx'))
+const MyProvidersPage = lazy(() => import('./pages/MyProvidersPage.jsx'))
+const ComparePage = lazy(() => import('./pages/ComparePage.jsx'))
+const UploadRosterPage = lazy(() => import('./pages/UploadRosterPage.jsx'))
+const CoveragePage = lazy(() => import('./pages/CoveragePage.jsx'))
+const MipsDashboardPage = lazy(() => import('./pages/MipsDashboardPage.jsx'))
+const BenchmarkPage = lazy(() => import('./pages/BenchmarkPage.jsx'))
+const HospitalQualityPage = lazy(() => import('./pages/HospitalQualityPage.jsx'))
+const LabSearchPage = lazy(() => import('./pages/LabSearchPage.jsx'))
+const LabDetailPage = lazy(() => import('./pages/LabDetailPage.jsx'))
 
 // Verbatim from docs/DESIGN.md §7.
 const DISCLAIMER = `ProviderLens reports what public US government sources publish, as of the access date
@@ -85,25 +89,27 @@ export default function App() {
         </header>
 
         <main className="app-main">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/providers" element={<ProviderSearchPage />} />
-            <Route path="/labs" element={<LabSearchPage />} />
-            <Route path="/labs/:cliaNumber" element={<LabDetailPage />} />
-            <Route path="/cannabis" element={<CannabisPage />} />
-            <Route path="/providers/:npi" element={<ProviderDetailPage />} />
-            <Route path="/providers/:npi/360" element={<Provider360Page />} />
-            <Route path="/cohort" element={<CohortExplorerPage />} />
-            <Route path="/watchlist" element={<WatchlistPage />} />
-            <Route path="/my-providers" element={<MyProvidersPage />} />
-            <Route path="/compare" element={<ComparePage />} />
-            <Route path="/upload-roster" element={<UploadRosterPage />} />
-            <Route path="/coverage" element={<CoveragePage />} />
-            <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
-            <Route path="/benchmark" element={<BenchmarkPage />} />
-            <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+          <Suspense fallback={<LoadingSpinner label="Loading page" />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/providers" element={<ProviderSearchPage />} />
+              <Route path="/labs" element={<LabSearchPage />} />
+              <Route path="/labs/:cliaNumber" element={<LabDetailPage />} />
+              <Route path="/cannabis" element={<CannabisPage />} />
+              <Route path="/providers/:npi" element={<ProviderDetailPage />} />
+              <Route path="/providers/:npi/360" element={<Provider360Page />} />
+              <Route path="/cohort" element={<CohortExplorerPage />} />
+              <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/my-providers" element={<MyProvidersPage />} />
+              <Route path="/compare" element={<ComparePage />} />
+              <Route path="/upload-roster" element={<UploadRosterPage />} />
+              <Route path="/coverage" element={<CoveragePage />} />
+              <Route path="/providers/:npi/mips" element={<MipsDashboardPage />} />
+              <Route path="/benchmark" element={<BenchmarkPage />} />
+              <Route path="/facilities/:facilityId/quality" element={<HospitalQualityPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
         </main>
 
         <footer className="app-footer">

@@ -95,7 +95,6 @@ function csvField(v) {
 }
 
 const clean = s => normalizeName(s).replace(/[^A-Z0-9]/g, '');
-const firstToken = s => normalizeName(s).split(' ')[0];
 const zip5 = z => String(z || '').replace(/\D/g, '').slice(0, 5);
 
 // --- pure scoring core (unit-tested) ---------------------------------------

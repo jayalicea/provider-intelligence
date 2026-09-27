@@ -87,9 +87,15 @@ Create the database and load the schema:
 ```bash
 createdb -U admin provider_intelligence
 psql -U admin -d provider_intelligence -f src/config/init.sql
+npm run migrate                 # apply pending src/config/migrations/*.sql
 ```
 
-Then apply the dated migrations in `src/config/migrations/` in filename order.
+`npm run migrate` records each file in `schema_migrations` and skips ones
+already applied; `npm run migrate -- status` lists state. Migrations that
+index `nppes_providers` are deferred until `tools/nppes-ingest.js` has
+created that table; re-run `npm run migrate` afterwards. **Existing
+databases migrated by hand:** run `npm run migrate -- baseline` once to
+record every current file as applied without re-running it.
 
 Create a `.env` in the repo root, modeled on the committed `.env.example`.
 These are the variables the code actually reads (`src/config/database.js`,
@@ -109,6 +115,16 @@ API_KEYS=local:some-long-random-string
 `API_KEYS` is a comma-separated list of `label:key` pairs, read at startup.
 Without it every write and every admin request returns 401, which is the
 intended default; GET endpoints stay open either way.
+
+Optional variables:
+
+- `TRUST_PROXY` — set (e.g. `1`) only when a reverse proxy sits in front of
+  the app, so rate limiting keys on the real client IP. Leave unset otherwise:
+  it would let clients spoof `X-Forwarded-For`.
+- `CACHE_MAX_AGE` (default `300`) and `CACHE_STALE_WHILE_REVALIDATE`
+  (default `3600`), in seconds — `Cache-Control` on successful `/api/v1`
+  GETs (`public`, or `private` when sent with `X-API-Key`). Errors, non-GETs
+  and `/admin` are always `no-store`. `CACHE_MAX_AGE=0` disables caching.
 
 `.env` is gitignored and must stay that way. Upstream API base URLs and dataset
 IDs are not environment variables; they live in `src/config/api-config.js`.
@@ -133,7 +149,9 @@ The client needs its own install once: `cd client && npm install`.
 
 Docker is an alternative to the local Postgres steps: `docker compose up`
 builds the app image and starts PostgreSQL 15 with `init.sql` applied on first
-boot. `DB_PASSWORD` must be set in `.env` or compose fails fast. See
+boot. A one-shot `migrate` service then runs `npm run migrate` against it, and
+the app starts only if that succeeds (`docker compose logs migrate` shows what
+ran). `DB_PASSWORD` must be set in `.env` or compose fails fast. See
 [docs/docker-runtime-validation.md](docs/docker-runtime-validation.md).
 
 ## API

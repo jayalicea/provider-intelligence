@@ -2,7 +2,7 @@ process.env.LOG_LEVEL = 'error';
 process.env.DB_PASSWORD = 'test';
 
 const request = require('supertest');
-const nock = require('nock');
+require('nock');
 
 jest.mock('../src/config/database', () => require('./helpers/mockDb'));
 
