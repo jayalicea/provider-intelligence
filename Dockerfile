@@ -10,6 +10,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
+# npm can crash mid-install ("Exit handler never called") yet exit 0, leaving
+# empty package directories and an image that fails only at runtime. Fail
+# the build instead unless every production dependency actually resolves.
+RUN node -e "Object.keys(require('./package.json').dependencies).forEach(d => require.resolve(d))"
+
 # Application code (see .dockerignore for what is excluded).
 COPY src ./src
 
