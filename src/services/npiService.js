@@ -78,7 +78,7 @@ class NpiService {
       return { total, providers };
     } catch (error) {
       logger.error('Error searching NPI registry:', error);
-      throw new Error('Failed to search provider registry');
+      throw new Error('Failed to search provider registry', { cause: error });
     }
   }
 
@@ -333,7 +333,7 @@ class NpiService {
       return providerData;
     } catch (error) {
       logger.error(`Error fetching provider ${npiNumber}:`, error);
-      throw new Error('Failed to retrieve provider information');
+      throw new Error('Failed to retrieve provider information', { cause: error });
     }
   }
 

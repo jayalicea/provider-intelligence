@@ -748,7 +748,6 @@ async function query(text, params = []) {
         return m && m.final_score !== null && m.final_score !== undefined &&
           Number(m.final_score) >= min;
       });
-      pi += 1;
     }
 
     rows = rows

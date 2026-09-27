@@ -55,7 +55,7 @@ class CmsDataService {
       return mipsData;
     } catch (error) {
       logger.error(`Error fetching MIPS data for NPI ${npi}:`, error);
-      throw new Error('Failed to retrieve MIPS performance data');
+      throw new Error('Failed to retrieve MIPS performance data', { cause: error });
     }
   }
 
@@ -101,7 +101,7 @@ class CmsDataService {
       return measures;
     } catch (error) {
       logger.error(`Error fetching quality measures for ${facilityId}:`, error);
-      throw new Error('Failed to retrieve quality measure data');
+      throw new Error('Failed to retrieve quality measure data', { cause: error });
     }
   }
 
@@ -121,7 +121,7 @@ class CmsDataService {
       return trends.filter(trend => trend !== null);
     } catch (error) {
       logger.error(`Error fetching MIPS trends for NPI ${npi}:`, error);
-      throw new Error('Failed to retrieve MIPS performance trends');
+      throw new Error('Failed to retrieve MIPS performance trends', { cause: error });
     }
   }
 
@@ -160,7 +160,7 @@ class CmsDataService {
       }));
     } catch (error) {
       logger.error(`Error fetching MIPS history for NPI ${npi}:`, error);
-      throw new Error('Failed to retrieve MIPS performance history');
+      throw new Error('Failed to retrieve MIPS performance history', { cause: error });
     }
   }
 

@@ -46,15 +46,20 @@ class App {
     this.app.use(helmet());
 
     // CORS configuration
+    // CORS_ORIGIN: '*' (default) or a comma-separated allow-list of origins.
+    // '*' is safe here: the API uses no cookies, and cross-origin requests
+    // cannot send X-API-Key (it is not in allowedHeaders).
+    const corsOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(o => o.trim()).filter(Boolean);
     this.app.use(cors({
-      origin: process.env.CORS_ORIGIN || '*',
+      origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization']
     }));
 
     // Request parsing
-    this.app.use(express.json({ limit: '10mb' }));
-    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    // The largest body is a 1,000-row roster screen (~200 KB).
+    this.app.use(express.json({ limit: '1mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
     // Compression
     this.app.use(compression());
