@@ -74,6 +74,8 @@ target, because distribution matters more than market size at this stage.
 
 ## Validation step
 
+Outreach copy and interview guide: `docs/CUSTOMER_DISCOVERY.md`.
+
 Before building Phase B, show the Upload Roster → screening report flow to
 5–10 credentialing managers and ask whether they would pay for monthly
 re-screening. Their answers decide whether Phase C auth is worth building.
