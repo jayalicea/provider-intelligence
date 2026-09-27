@@ -6,6 +6,23 @@
 # .env interpolation). Do not commit a real .env.
 
 services:
+  # One-shot schema migration (src/config/migrate.js) against the db service.
+  # init.sql still bootstraps a brand-new volume; this then applies any
+  # pending src/config/migrations/*.sql and exits. The app starts only if it
+  # succeeds. Every current migration is idempotent, so the first run on a
+  # volume migrated by hand is a no-op that just records schema_migrations.
+  migrate:
+    build: .
+    command: ["node", "src/config/migrate.js", "up"]
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   app:
     build: .
     ports:
@@ -20,6 +37,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: always
     # Without this, `docker compose up -d --wait` can only wait for the
     # database: the app would be reported up the moment its container starts,

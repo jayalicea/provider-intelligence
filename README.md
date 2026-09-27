@@ -149,7 +149,9 @@ The client needs its own install once: `cd client && npm install`.
 
 Docker is an alternative to the local Postgres steps: `docker compose up`
 builds the app image and starts PostgreSQL 15 with `init.sql` applied on first
-boot. `DB_PASSWORD` must be set in `.env` or compose fails fast. See
+boot. A one-shot `migrate` service then runs `npm run migrate` against it, and
+the app starts only if that succeeds (`docker compose logs migrate` shows what
+ran). `DB_PASSWORD` must be set in `.env` or compose fails fast. See
 [docs/docker-runtime-validation.md](docs/docker-runtime-validation.md).
 
 ## API

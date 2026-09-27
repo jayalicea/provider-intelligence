@@ -283,7 +283,8 @@ shipped:
   for how it reconciles with `docs/FRONTEND_SPEC.md`.
 - **Docker support**: shipped. `Dockerfile` (Node 20 Alpine, no secrets baked
   in) and `docker-compose.yml` (app plus PostgreSQL 15, schema bootstrapped
-  from `init.sql`). The image build is verified; `docker compose up` runtime
+  from `init.sql`, then a one-shot `migrate` service applies pending
+  migrations before the app starts). The image build is verified; `docker compose up` runtime
   validation has not been run.
 
 What is still open is tracked in `docs/V2_ROADMAP.md` (phased user stories)
