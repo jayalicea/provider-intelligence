@@ -32,7 +32,8 @@ class CliaController {
   }
 
   /**
-   * GET /api/v1/labs/alerts - delisted labs and certifiers
+   * GET /api/v1/labs/alerts - delisted labs, expiring lab certificates,
+   * and delisted certifiers
    */
   async getAlerts(req, res) {
     try {
@@ -40,7 +41,7 @@ class CliaController {
       res.json({
         success: true,
         data: alerts,
-        count: alerts.labs.length + alerts.certifiers.length
+        count: alerts.labs.length + alerts.expiring.length + alerts.certifiers.length
       });
     } catch (error) {
       logger.error('Error in getAlerts:', error);

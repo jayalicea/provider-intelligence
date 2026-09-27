@@ -168,6 +168,31 @@ describe('GET /api/v1/labs/alerts', () => {
     });
   });
 
+  test('lists registered labs whose certificate expires within 90 days', async () => {
+    const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const lab = (clia, exp, extra = {}) => mockDb._stores.clia.set(clia, {
+      clia_number: clia, lab_name: `LAB ${clia}`, state: 'AL', city: 'MOBILE',
+      currently_registered: true, director_name: 'DR JANE ROE',
+      certificate_expiration_dt: exp, accreditation: {}, lab_classification_cds: [], ...extra
+    });
+    lab('01D0000030', day(30));
+    lab('01D0000005', day(-5));
+    lab('01D0000200', day(200));
+    lab('01D0000NUL', null);
+    lab('01D0000GON', day(10), { currently_registered: false });
+
+    const res = await request(app).get('/api/v1/labs/alerts');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.expiring.map(r => r.cliaNumber)).toEqual(['01D0000005', '01D0000030']);
+    expect(res.body.data.expiring[1]).toMatchObject({
+      labName: 'LAB 01D0000030', directorName: 'DR JANE ROE', certificateExpirationDate: day(30)
+    });
+    // the delisted lab still shows up as a delisting alert, not an expiry
+    expect(res.body.data.labs.map(r => r.cliaNumber)).toEqual(['01D0000GON']);
+    expect(res.body.count).toBe(3);
+  });
+
   test('empty when nothing is delisted', async () => {
     seedLabs();
     const res = await request(app).get('/api/v1/labs/alerts');

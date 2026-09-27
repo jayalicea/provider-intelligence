@@ -70,10 +70,11 @@ class CliaService {
   }
 
   /**
-   * Delisting alerts: labs that disappeared from the latest CLIA vintage,
-   * and certified physicians who disappeared from their state registry
-   * edition. Presence on a government list is the compliance signal; losing
-   * it is the alert.
+   * Delisting + certificate alerts: labs that disappeared from the latest
+   * CLIA vintage; labs whose QCOR-reported certificate expires within 90
+   * days; and certified physicians who disappeared from their state
+   * registry edition. Presence on a government list is the compliance
+   * signal; losing it (or letting it lapse) is the alert.
    */
   async getDelistedAlerts() {
     const labs = await db.query(
@@ -81,6 +82,14 @@ class CliaService {
          FROM clia_labs
         WHERE currently_registered = false
         ORDER BY last_confirmed_at DESC
+        LIMIT 100`
+    );
+    const expiring = await db.query(
+      `SELECT clia_number, lab_name, state, city, director_name, certificate_expiration_dt
+         FROM clia_labs
+        WHERE currently_registered AND certificate_expiration_dt IS NOT NULL
+          AND certificate_expiration_dt <= CURRENT_DATE + INTERVAL '90 days'
+        ORDER BY certificate_expiration_dt ASC
         LIMIT 100`
     );
     const certifiers = await db.query(
@@ -98,6 +107,14 @@ class CliaService {
         state: r.state,
         city: r.city,
         lastConfirmedAt: r.last_confirmed_at
+      })),
+      expiring: expiring.rows.map(r => ({
+        cliaNumber: r.clia_number,
+        labName: r.lab_name,
+        state: r.state,
+        city: r.city,
+        directorName: r.director_name,
+        certificateExpirationDate: r.certificate_expiration_dt
       })),
       certifiers: certifiers.rows.map(r => ({
         state: r.state,

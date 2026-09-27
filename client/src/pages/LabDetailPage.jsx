@@ -92,6 +92,29 @@ export default function LabDetailPage() {
               </dd>
             </div>
           ) : null}
+          {lab.directorName ? (
+            <div>
+              <dt>Lab Director</dt>
+              <dd>
+                {lab.directorName}
+                {lab.directorNpi ? (
+                  <>
+                    {' '}
+                    <NpiText npi={lab.directorNpi} link />
+                  </>
+                ) : (
+                  <span className="muted"> (NPI unmatched)</span>
+                )}
+                <span className="muted"> per QCOR</span>
+              </dd>
+            </div>
+          ) : null}
+          {lab.certificateExpirationDate ? (
+            <div>
+              <dt>Certificate expires</dt>
+              <dd className="numeric">{String(lab.certificateExpirationDate).slice(0, 10)}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Registry status</dt>
             <dd>
