@@ -141,7 +141,7 @@ textarea:focus-visible,
 .nav-link {
   position: relative;
   display: block;
-  padding: 18px var(--space-3) 16px;
+  padding: 18px 10px 16px;
   color: var(--text-muted);
   font-size: 14px;
   white-space: nowrap;
@@ -1110,6 +1110,37 @@ button.btn-primary:hover:not(:disabled) {
 }
 
 /* --- Responsive --------------------------------------------------------- */
+
+/* Header: below 1140px (the --container width) the nav needs more room than the row beside the
+   brand leaves, so it moves to its own full-width row; on phones the links
+   wrap instead of hiding behind a horizontal scroll. */
+@media (max-width: 1140px) {
+  .app-header-inner {
+    flex-wrap: wrap;
+    row-gap: 0;
+    padding-top: var(--space-3);
+  }
+
+  .app-nav {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .nav-link {
+    padding: 12px 8px 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-nav {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .nav-link {
+    padding: 8px 8px 6px;
+  }
+}
 
 @media (max-width: 900px) {
   .dossier {
