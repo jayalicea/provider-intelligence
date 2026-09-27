@@ -299,7 +299,7 @@ class IntelligenceService {
       });
     } catch (error) {
       logger.error('Error building cohort intelligence:', error);
-      throw new Error('Failed to build cohort intelligence');
+      throw new Error('Failed to build cohort intelligence', { cause: error });
     }
   }
 
@@ -449,7 +449,7 @@ class IntelligenceService {
       });
     } catch (error) {
       logger.error('Error building national cohort intelligence:', error);
-      throw new Error('Failed to build cohort intelligence');
+      throw new Error('Failed to build cohort intelligence', { cause: error });
     }
   }
 

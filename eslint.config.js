@@ -18,6 +18,11 @@ module.exports = [
         ...globals.node,
       },
     },
+    rules: {
+      // ESLint 9 changed the default to 'all'; keep 8's behavior so unused
+      // `catch (e)` bindings in the tools scripts are not errors.
+      'no-unused-vars': ['error', { caughtErrors: 'none' }],
+    },
   },
   {
     files: ['tests/**/*.js', '**/*.test.js'],

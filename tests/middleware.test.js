@@ -185,3 +185,46 @@ describe('middleware/cacheControl', () => {
     expect(res.headers['cache-control']).toBe('no-store');
   });
 });
+
+describe('app CORS_ORIGIN and body limits', () => {
+  const App = require('../src/app');
+  const request = require('supertest');
+  const original = process.env.CORS_ORIGIN;
+  afterEach(() => {
+    if (original === undefined) delete process.env.CORS_ORIGIN;
+    else process.env.CORS_ORIGIN = original;
+  });
+
+  test('defaults to * when CORS_ORIGIN is unset', async () => {
+    delete process.env.CORS_ORIGIN;
+    const res = await request(new App().app).get('/health').set('Origin', 'https://a.example');
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+  });
+
+  test('comma-separated CORS_ORIGIN allows only listed origins', async () => {
+    process.env.CORS_ORIGIN = 'https://a.example, https://b.example';
+    const app = new App().app;
+    const ok = await request(app).get('/health').set('Origin', 'https://b.example');
+    expect(ok.headers['access-control-allow-origin']).toBe('https://b.example');
+    const denied = await request(app).get('/health').set('Origin', 'https://evil.example');
+    expect(denied.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  test('bodies over 1 MB are rejected with 413', async () => {
+    const res = await request(new App().app)
+      .post('/api/v1/intelligence/screen-roster')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ rows: ['x'.repeat(1.2 * 1024 * 1024)] }));
+    expect(res.status).toBe(413);
+  });
+
+  test('a maximum-size roster (1,000 rows, long fields) fits well under 1 MB', () => {
+    const { ROSTER_MAX_ROWS } = require('../src/services/intelligenceService');
+    const row = {
+      npi: '1234567890', lastname: 'L'.repeat(40), firstname: 'F'.repeat(40),
+      state: 'CA', dob: '1970-01-01', organizationName: 'O'.repeat(120)
+    };
+    const bytes = Buffer.byteLength(JSON.stringify({ rows: Array(ROSTER_MAX_ROWS).fill(row) }));
+    expect(bytes).toBeLessThan(512 * 1024);
+  });
+});

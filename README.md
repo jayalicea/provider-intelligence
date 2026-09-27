@@ -121,6 +121,8 @@ Optional variables:
 - `TRUST_PROXY` — set (e.g. `1` or `true`) only when a reverse proxy sits in front of
   the app, so rate limiting keys on the real client IP. Leave unset otherwise:
   it would let clients spoof `X-Forwarded-For`.
+- `CORS_ORIGIN` (default `*`) — one origin or a comma-separated list, e.g.
+  `https://app.example.com,https://admin.example.com`.
 - `CACHE_MAX_AGE` (default `300`) and `CACHE_STALE_WHILE_REVALIDATE`
   (default `3600`), in seconds — `Cache-Control` on successful `/api/v1`
   GETs (`public`, or `private` when sent with `X-API-Key`). Errors, non-GETs

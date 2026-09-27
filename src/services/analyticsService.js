@@ -125,7 +125,7 @@ class AnalyticsService {
       };
     } catch (error) {
       logger.error('Error in group performance analytics:', error);
-      throw new Error('Failed to generate group performance analytics');
+      throw new Error('Failed to generate group performance analytics', { cause: error });
     }
   }
 
@@ -201,7 +201,7 @@ class AnalyticsService {
       };
     } catch (error) {
       logger.error('Error calculating provider ranking:', error);
-      throw new Error('Failed to calculate provider ranking');
+      throw new Error('Failed to calculate provider ranking', { cause: error });
     }
   }
 
@@ -251,7 +251,7 @@ class AnalyticsService {
       };
     } catch (error) {
       logger.error('Error in trend analysis:', error);
-      throw new Error('Failed to generate performance trend analysis');
+      throw new Error('Failed to generate performance trend analysis', { cause: error });
     }
   }
 
@@ -399,7 +399,7 @@ class AnalyticsService {
       return { npi, taxonomy, years };
     } catch (error) {
       logger.error('Error in percentile trends:', error);
-      throw new Error('Failed to generate percentile trend analysis');
+      throw new Error('Failed to generate percentile trend analysis', { cause: error });
     }
   }
 
@@ -497,7 +497,7 @@ class AnalyticsService {
     } catch (error) {
       if (error.statusCode) throw error;
       logger.error('Error in taxonomy benchmark:', error);
-      throw new Error('Failed to generate taxonomy benchmark report');
+      throw new Error('Failed to generate taxonomy benchmark report', { cause: error });
     }
   }
 
@@ -573,7 +573,7 @@ class AnalyticsService {
       };
     } catch (error) {
       logger.error('Error in benchmark comparison:', error);
-      throw new Error('Failed to generate benchmark comparison');
+      throw new Error('Failed to generate benchmark comparison', { cause: error });
     }
   }
 }
